@@ -3,142 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Physics Simulation Hub</title>
+    <title>Interactive Portfolio</title>
+    
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Inter -->
+    
+    <!-- Google Fonts for a clean look -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
     <style>
+        /* Use the Inter font family */
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Style for the active navigation link */
-        .nav-link.active {
-            background-color: #4f46e5; /* indigo-600 */
-            color: white;
+        /* Simple fade-in animation for content */
+        #content-area {
+            animation: fadeIn 0.5s ease-in-out;
         }
-        /* Ensure the iframe takes up the full available space */
-        #content-frame {
-            height: calc(100vh - 8rem); /* Full viewport height minus header/padding */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 flex flex-col h-screen">
+<body class="bg-gray-900 text-white selection:bg-blue-500 selection:text-white">
 
-    <!-- Header -->
-    <header class="bg-white shadow-md w-full p-4 z-10">
-        <div class="container mx-auto max-w-7xl flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-gray-900">Interactive Physics Projects</h1>
-            <p class="text-sm text-gray-500">Select a project from the sidebar to begin.</p>
-        </div>
-    </header>
+    <div class="container mx-auto px-4 min-h-screen flex flex-col">
 
-    <!-- Main Content Area -->
-    <div class="container mx-auto max-w-7xl flex-1 flex flex-col md:flex-row gap-6 p-4 md:p-6">
-
-        <!-- Sidebar Navigation -->
-        <aside class="w-full md:w-1/4 lg:w-1/5 bg-white p-6 rounded-2xl shadow-lg h-fit">
-            <h2 class="text-xl font-bold mb-4 border-b pb-2">Simulations</h2>
-            <nav id="project-nav">
-                <ul class="space-y-2">
-                    <!-- Project links will be added here by JavaScript -->
-                    <!-- Example: 
-                    <li>
-                        <a href="#" class="nav-link block p-3 rounded-lg hover:bg-gray-200 transition-colors" data-src="Scalar Wave/simulation.html">Bifilar Coil</a>
-                    </li> 
-                    -->
-                </ul>
+        <!-- Header and Navigation -->
+        <header class="py-6 border-b border-gray-700">
+            <nav class="flex justify-between items-center">
+                <a href="/" class="text-2xl font-bold text-white hover:text-blue-400 transition-colors">Your Name</a>
+                <div class="flex items-center space-x-6">
+                    <button id="projects-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Projects</button>
+                    <button id="tutorials-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Tutorials</button>
+                    
+                    <!-- Auth Section -->
+                    <div id="auth-container" class="pl-4 border-l border-gray-700">
+                         <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                            Login
+                        </button>
+                        <div id="user-profile" class="hidden items-center space-x-3">
+                            <span id="user-email" class="text-sm text-gray-400"></span>
+                            <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                Logout
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </nav>
-            <h2 class="text-xl font-bold mt-6 mb-4 border-b pb-2">Tutorials</h2>
-             <nav id="tutorial-nav">
-                <ul class="space-y-2">
-                   <!-- Add tutorial links here -->
-                </ul>
-            </nav>
-        </aside>
+        </header>
 
-        <!-- Content Display -->
-        <main class="flex-1 bg-white rounded-2xl shadow-lg overflow-hidden">
-            <iframe id="content-frame" class="w-full h-full border-0" src="about:blank"></iframe>
+        <!-- Main Content Area -->
+        <main id="content-area" class="flex-grow py-10">
+            <!-- Content from other HTML files will be loaded here -->
+            <div class="text-center">
+                <h1 class="text-5xl font-bold mb-4">Welcome to My Interactive Portfolio</h1>
+                <p class="text-xl text-gray-400">Select a section from the navigation to get started.</p>
+            </div>
         </main>
+
+        <!-- Footer -->
+        <footer class="text-center py-6 border-t border-gray-700 text-gray-500">
+            <p>&copy; 2025 Your Name. All Rights Reserved.</p>
+        </footer>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const projectNav = document.getElementById('project-nav').querySelector('ul');
-            const tutorialNav = document.getElementById('tutorial-nav').querySelector('ul');
-            const contentFrame = document.getElementById('content-frame');
+    <!-- Firebase SDKs and custom script -->
+    <script type="module">
+        // Import Firebase services
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
-            // --- Define your projects and tutorials here ---
-            // To add a new item, just add a new object to the array.
-            // The 'path' is the relative path to the HTML file.
-            const projects = [
-                {
-                    title: 'Bifilar Coil Simulation',
-                    path: 'Scalar Wave/Single Coil Simulation.html'
-                },
-                // Add more projects here
-                // { title: 'Another Simulation', path: 'Scalar Wave/another.html' }
-            ];
-            
-            const tutorials = [
-                {
-                    title: 'Scalar Wave Tutorial',
-                    path: 'Scalar Wave/Interactive Tutorial - Scalar Waves.html'
-                },
-                // { title: 'How to use the coil sim', path: 'Scalar Wave/tutorial1.html' }
-            ];
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
+            authDomain: "gitlabs-3e081.firebaseapp.com",
+            projectId: "gitlabs-3e081",
+            storageBucket: "gitlabs-3e081.appspot.com", // Corrected storage bucket domain
+            messagingSenderId: "46943115268",
+            appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
+            measurementId: "G-M3MLTNVRH0"
+        };
 
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app); // Initialize Analytics
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // Ensure user session persists across browser tabs/reloads
+        setPersistence(auth, browserLocalPersistence);
 
-            // --- Function to create and append navigation links ---
-            function populateNav(container, items) {
-                if (items.length === 0) {
-                    container.innerHTML = '<li><p class="text-sm text-gray-500">Coming soon.</p></li>';
-                    return;
-                }
-              
-                items.forEach(item => {
-                    const li = document.createElement('li');
-                    const a = document.createElement('a');
-                    a.href = '#';
-                    a.textContent = item.title;
-                    a.dataset.src = item.path;
-                    a.className = 'nav-link block p-3 rounded-lg hover:bg-gray-200 transition-colors';
-                    li.appendChild(a);
-                    container.appendChild(li);
+        // --- DOM Element References ---
+        const contentArea = document.getElementById('content-area');
+        const projectsBtn = document.getElementById('projects-btn');
+        const tutorialsBtn = document.getElementById('tutorials-btn');
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const userProfileDiv = document.getElementById('user-profile');
+        const userEmailSpan = document.getElementById('user-email');
+
+        // --- Authentication Logic ---
+        const provider = new GoogleAuthProvider();
+
+        // Listen for changes in authentication state (login/logout)
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                // User is signed in
+                console.log('User signed in:', user.uid);
+                userProfileDiv.classList.remove('hidden');
+                userProfileDiv.classList.add('flex');
+                loginBtn.classList.add('hidden');
+                userEmailSpan.textContent = user.email;
+
+                // Optional: Create a user document in Firestore if it doesn't exist
+                const userRef = doc(db, "users", user.uid);
+                getDoc(userRef).then(docSnap => {
+                    if (!docSnap.exists()) {
+                        setDoc(userRef, {
+                            email: user.email,
+                            createdAt: new Date(),
+                            tutorialProgress: {} // Example field
+                        }).then(() => console.log('New user document created in Firestore.'));
+                    }
                 });
-            }
 
-            // --- Populate the navigation menus ---
-            populateNav(projectNav, projects);
-            populateNav(tutorialNav, tutorials);
-
-            const navLinks = document.querySelectorAll('.nav-link');
-
-            // --- Event listener for all navigation links ---
-            navLinks.forEach(link => {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-
-                    // Update the iframe source
-                    const pageSrc = this.dataset.src;
-                    contentFrame.src = pageSrc;
-
-                    // Update active link styling
-                    navLinks.forEach(l => l.classList.remove('active'));
-                    this.classList.add('active');
-                });
-            });
-
-            // --- Load the first project by default ---
-            if (navLinks.length > 0) {
-                navLinks[0].click();
             } else {
-                contentFrame.srcdoc = `<div style="display:flex;justify-content:center;align-items:center;height:100%;font-family:sans-serif;color:#555;"><h1>No projects loaded.</h1><p>Add a project to the 'projects' array in the script.</p></div>`;
+                // User is signed out
+                console.log('User signed out.');
+                userProfileDiv.classList.add('hidden');
+                loginBtn.classList.remove('hidden');
+                userEmailSpan.textContent = '';
             }
         });
+
+        // Event listener for the login button
+        loginBtn.addEventListener('click', () => {
+            signInWithPopup(auth, provider)
+                .then((result) => {
+                    console.log("Login successful!", result.user);
+                }).catch((error) => {
+                    console.error("Authentication failed:", error);
+                    const errorCode = error.code;
+                    const errorMessage = error.message;
+                    // Handle errors here.
+                });
+        });
+
+        // Event listener for the logout button
+        logoutBtn.addEventListener('click', () => {
+            signOut(auth).then(() => {
+                // Sign-out successful.
+                // The onAuthStateChanged listener will handle the UI update.
+                // Navigate to home page after logout
+                contentArea.innerHTML = `
+                    <div class="text-center">
+                        <h1 class="text-5xl font-bold mb-4">You have been logged out.</h1>
+                        <p class="text-xl text-gray-400">Thank you for visiting.</p>
+                    </div>
+                `;
+            }).catch((error) => {
+                console.error("Sign out failed:", error);
+            });
+        });
+
+        // --- Content Loading Logic ---
+        async function loadContent(filePath) {
+            try {
+                // Add a loading state
+                contentArea.innerHTML = '<p class="text-center text-gray-400">Loading...</p>';
+                
+                const response = await fetch(filePath);
+                if (!response.ok) {
+                    throw new Error(`Could not load ${filePath}. Status: ${response.status}`);
+                }
+                const htmlContent = await response.text();
+                contentArea.innerHTML = htmlContent;
+
+            } catch (error) {
+                console.error('Failed to fetch content:', error);
+                contentArea.innerHTML = `<p class="text-center text-red-400">Sorry, we couldn't load this section. Please try again later.</p>`;
+            }
+        }
+
+        // Event listeners for navigation buttons
+        projectsBtn.addEventListener('click', () => loadContent('projects.html'));
+        tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html'));
+
     </script>
 </body>
 </html>
