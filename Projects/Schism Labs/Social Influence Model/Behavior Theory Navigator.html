@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Behaviour Theory Navigator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* General layout styles */
+        .view {
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+        }
+        /* Graph specific styles */
+        .graph-container {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .node-label {
+            pointer-events: none;
+            font-size: 10px;
+            fill: #E5E7EB; /* gray-200 */
+        }
+        .link {
+            stroke-opacity: 0.6;
+        }
+        .node.highlight circle {
+            stroke: #FBBF24; /* amber-400 */
+            stroke-width: 3px;
+        }
+        .link.highlight {
+            stroke: #FBBF24; /* amber-400 */
+            stroke-opacity: 1;
+            stroke-width: 2.5px;
+        }
+        .node:not(.highlight-neighbor) circle,
+        .link:not(.highlight) {
+            transition: opacity 0.3s ease;
+        }
+        body.selecting .node:not(.highlight):not(.highlight-neighbor) {
+            opacity: 0.2;
+        }
+        body.selecting .link:not(.highlight) {
+            opacity: 0.1;
+        }
+        .node.highlight-neighbor circle {
+            stroke: #FBBF24; /* amber-400 */
+            stroke-width: 1.5px;
+            stroke-opacity: 0.8;
+        }
+        /* Utility for text clamping */
+        .line-clamp-3 {
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <!-- View for listing all theories -->
+    <div id="list-view" class="view p-4 md:p-8">
+        <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Theories of Behaviour Change</h1>
+        <p class="text-gray-400 mb-6">Select a theory to explore its interactive graph.</p>
+        <div id="theory-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <!-- Theory cards will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- View for displaying a single theory graph -->
+    <div id="graph-view" class="hidden view flex-col md:flex-row h-screen max-h-screen overflow-hidden">
+        <!-- Main Graph Section -->
+        <main class="flex-grow flex flex-col relative" id="graph-area">
+            <div class="p-4 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700 flex justify-between items-center">
+                <div>
+                    <h1 id="theory-title" class="text-xl md:text-2xl font-bold text-white"></h1>
+                    <p class="text-sm text-gray-400">Click on any concept (node) to explore. Drag to rearrange.</p>
+                </div>
+                <button id="back-to-list" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex-shrink-0">
+                    &larr; Back to List
+                </button>
+            </div>
+            <div id="graph-container" class="flex-grow bg-gray-800/20"></div>
+            <div class="p-4 text-xs text-gray-500 border-t border-gray-700 overflow-y-auto max-h-24">
+                <strong>Description:</strong> <span id="theory-description-text"></span>
+            </div>
+        </main>
+
+        <!-- Info Panel Section -->
+        <aside id="info-panel" class="w-full md:w-96 bg-gray-800 shadow-lg p-6 flex-shrink-0 overflow-y-auto border-l border-gray-700">
+            <div id="info-content" class="sticky top-6">
+                 <!-- Content will be populated by JS -->
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // --- GLOBAL STATE & DOM ELEMENTS ---
+        let allTheories = [];
+        const listView = document.getElementById('list-view');
+        const graphView = document.getElementById('graph-view');
+        const theoryListContainer = document.getElementById('theory-list');
+        const backButton = document.getElementById('back-to-list');
+        const theoryTitleEl = document.getElementById('theory-title');
+        const theoryDescriptionEl = document.getElementById('theory-description-text');
+        const infoPanelContent = document.getElementById('info-content');
+        const graphContainer = document.getElementById('graph-container');
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Fetch the theory data from the JSON file
+            fetch('theory_data.json')
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    allTheories = data;
+                    populateTheoryList(allTheories);
+                })
+                .catch(error => {
+                    console.error("Error loading theory data:", error);
+                    theoryListContainer.innerHTML = `<p class="text-red-400 col-span-full">Error loading theories. Please check the console and ensure 'theory_data.json' is available.</p>`;
+                });
+            
+            backButton.addEventListener('click', showListView);
+        });
+
+        // --- VIEW MANAGEMENT & DATA HANDLING ---
+
+        /**
+         * Hides the graph view and shows the main list of theories.
+         */
+        function showListView() {
+            graphView.classList.add('hidden');
+            graphView.classList.remove('flex'); // remove flex display
+            listView.classList.remove('hidden');
+        }
+
+        /**
+         * Hides the list view and shows the graph for a selected theory.
+         * @param {object} theory - The theory object from the loaded JSON data.
+         */
+        function showGraphView(theory) {
+            listView.classList.add('hidden');
+            graphView.classList.remove('hidden');
+            graphView.classList.add('flex'); // set flex display
+
+            // Update UI elements with theory-specific info
+            theoryTitleEl.textContent = theory.name;
+            theoryDescriptionEl.textContent = theory.description || "No description provided.";
+            
+            // --- Data Transformation for D3 ---
+            const annotationMap = new Map();
+            if (theory.annotations) {
+                theory.annotations.forEach(ann => {
+                    if (!annotationMap.has(ann.construct)) {
+                        annotationMap.set(ann.construct, []);
+                    }
+                    // Format annotation for display
+                    annotationMap.get(ann.construct).push(`${ann.relation}: ${ann.value} [${ann.source}]`);
+                });
+            }
+
+            const nodes = theory.constructs.map(c => ({
+                id: c.name.trim(),
+                // Join multiple annotations with a line break for readability
+                annotation: annotationMap.has(c.name.trim()) ? annotationMap.get(c.name.trim()).join('<br>') : "No annotation available"
+            }));
+
+            const nodeMap = new Map(nodes.map(node => [node.id, node]));
+
+            const links = theory.triples.map(triple => {
+                const source = triple.subject.trim();
+                const predicate = triple.predicate.trim();
+                let object = triple.object.trim();
+                let modifier = null;
+                
+                // Regex to catch modified relationships (e.g., "influences the 'X' to 'Y' relationship")
+                const modifiedMatch = object.match(/the '(.*?)' to '(.*?)'/i);
+                
+                if (modifiedMatch) {
+                    return { source: modifiedMatch[1].trim(), target: modifiedMatch[2].trim(), type: predicate, modifier: source };
+                }
+                
+                // Handle cases where the object has an asterisk, e.g., "influences (*)"
+                const predicateMatch = predicate.match(/(.*?)\s*\(\*\)/);
+                if(predicateMatch){
+                    object = object.replace('(*)', '').trim();
+                }
+
+                return { source, target: object.replace('(*)', '').trim(), type: predicateMatch ? predicateMatch[1] : predicate, modifier };
+            }).map(link => { // Second map pass to link to actual node objects
+                const sourceNode = nodeMap.get(link.source);
+                const targetNode = nodeMap.get(link.target);
+                if (sourceNode && targetNode) {
+                    return { ...link, source: sourceNode, target: targetNode };
+                }
+                console.warn(`Invalid link due to missing node, ignoring: '${link.source}' -> '${link.target}' in theory '${theory.name}'`);
+                return null;
+            }).filter(Boolean); // Remove invalid links
+
+            // Run the D3 visualization with the processed data
+            runVisualization(nodes, links);
+        }
+
+        /**
+         * Populates the main list view with cards for each theory.
+         * @param {Array<object>} theories - The array of theory objects.
+         */
+        function populateTheoryList(theories) {
+            theoryListContainer.innerHTML = ''; // Clear placeholder/error content
+            theories.forEach(theory => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800 p-4 rounded-lg shadow-lg cursor-pointer hover:bg-gray-700 hover:scale-105 transition-all duration-200';
+                card.innerHTML = `
+                    <h3 class="font-bold text-sky-400">${theory.id}. ${theory.name}</h3>
+                    <p class="text-sm text-gray-400 mt-2 line-clamp-3">${theory.description || 'No description available.'}</p>
+                `;
+                card.addEventListener('click', () => showGraphView(theory));
+                theoryListContainer.appendChild(card);
+            });
+        }
+        
+        /**
+         * Renders the interactive graph for a given theory.
+         * @param {Array<object>} nodes - The array of node objects for the graph.
+         * @param {Array<object>} links - The array of link objects for the graph.
+         */
+        function runVisualization(nodes, links) {
+            const width = graphContainer.clientWidth;
+            const height = graphContainer.clientHeight;
+            graphContainer.innerHTML = ''; // Clear previous render
+            resetInfoPanel();
+
+            const svg = d3.select(graphContainer).append("svg")
+                .attr("viewBox", [-width / 2, -height / 2, width, height])
+                .style("font", "12px sans-serif");
+            
+            // Define arrow markers for directed links
+            svg.append("defs").selectAll("marker")
+                .data(["influences", "positively influences", "negatively influences", "transitions to", "part of", "type of", "correlates with", "may influence"])
+                .join("marker")
+                    .attr("id", d => `arrow-${d.replace(/[\s/]+/g, '-')}`)
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 19)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("orient", "auto")
+                .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", d => linkColor(d));
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).distance(120))
+                .force("charge", d3.forceManyBody().strength(-250))
+                .force("x", d3.forceX())
+                .force("y", d3.forceY());
+
+            const linkElements = svg.append("g")
+                .selectAll("line")
+                .data(links)
+                .join("line")
+                .attr("class", "link")
+                .attr("stroke", d => linkColor(d.type))
+                .attr("stroke-width", 1.5)
+                .attr("stroke-dasharray", d => d.modifier ? "5,5" : "none")
+                .attr("marker-end", d => `url(#arrow-${d.type.replace(/[\s/]+/g, '-')})`);
+
+            const nodeElements = svg.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
+                .attr("class", "node")
+                .call(drag(simulation))
+                .on("click", nodeClicked);
+            
+            nodeElements.append("circle")
+                .attr("r", 8)
+                .attr("fill", "#1F2937") // gray-800
+                .attr("stroke", "#4B5563") // gray-600
+                .attr("stroke-width", 1.5);
+            
+            nodeElements.append("text")
+                .text(d => d.id)
+                .attr("x", 12)
+                .attr("y", 4)
+                .attr("class", "node-label");
+            
+            simulation.on("tick", () => {
+                linkElements
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+            
+            // --- D3 HELPER FUNCTIONS ---
+            function linkColor(type) {
+                switch (type.toLowerCase()) {
+                    case 'influences': return '#60A5FA'; // blue-400
+                    case 'positively influences': return '#34D399'; // emerald-400
+                    case 'negatively influences': return '#F87171'; // red-400
+                    case 'part of': case 'type of': return '#F472B6'; // pink-400
+                    case 'correlates with': return '#A78BFA'; // violet-400
+                    case 'transitions to': return '#FCD34D'; // amber-300
+                    case 'may influence': return '#9CA3AF'; // gray-400
+                    default: return '#6B7280'; // gray-500
+                }
+            }
+
+            function drag(simulation) {
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+                return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+            }
+
+            let selectedNode = null;
+
+            function nodeClicked(event, d) {
+                event.stopPropagation();
+                if (selectedNode && selectedNode.id === d.id) {
+                    selectedNode = null;
+                    d3.selectAll('.node').classed('highlight', false).classed('highlight-neighbor', false);
+                    d3.selectAll('.link').classed('highlight', false);
+                    document.body.classList.remove('selecting');
+                    resetInfoPanel();
+                    return;
+                }
+                
+                selectedNode = d;
+                document.body.classList.add('selecting');
+                updateInfoPanel(d, links);
+
+                const connectedLinks = links.filter(l => l.source.id === d.id || l.target.id === d.id);
+                const neighborIds = new Set(connectedLinks.flatMap(l => [l.source.id, l.target.id]));
+
+                nodeElements.classed("highlight", n => n.id === d.id);
+                nodeElements.classed("highlight-neighbor", n => neighborIds.has(n.id) && n.id !== d.id);
+                linkElements.classed("highlight", l => l.source.id === d.id || l.target.id === d.id);
+            }
+
+            svg.on("click", () => {
+                 if (selectedNode) {
+                    selectedNode = null;
+                    d3.selectAll('.node').classed('highlight', false).classed('highlight-neighbor', false);
+                    d3.selectAll('.link').classed('highlight', false);
+                    document.body.classList.remove('selecting');
+                    resetInfoPanel();
+                 }
+            });
+        }
+        
+        // --- INFO PANEL UPDATE LOGIC ---
+        function updateInfoPanel(d, links) {
+            const incoming = links.filter(l => l.target.id === d.id);
+            const outgoing = links.filter(l => l.source.id === d.id);
+            let html = `<h2 class="text-lg font-semibold text-white break-words">${d.id}</h2>`;
+            html += `<div class="text-xs text-gray-400 mt-2 p-2 bg-gray-700/50 rounded-md font-mono break-words">${d.annotation}</div>`;
+            html += `<div class="mt-4 space-y-4">`;
+            if (outgoing.length > 0) {
+                html += `<div><h3 class="font-semibold text-gray-300 mb-1">Influences / Leads to:</h3><ul class="list-disc list-inside space-y-1 text-sm">`;
+                outgoing.forEach(l => {
+                    html += `<li style="color:${linkColor(l.type)}"><span class="text-gray-200">${l.type} <strong class="font-medium">${l.target.id}</strong>${l.modifier ? ` (modified by ${l.modifier})` : ''}</span></li>`;
+                });
+                html += `</ul></div>`;
+            }
+            if (incoming.length > 0) {
+                html += `<div><h3 class="font-semibold text-gray-300 mb-1">Is Influenced by:</h3><ul class="list-disc list-inside space-y-1 text-sm">`;
+                incoming.forEach(l => {
+                    html += `<li style="color:${linkColor(l.type)}"><span class="text-gray-200">${l.type} <strong class="font-medium">${l.source.id}</strong>${l.modifier ? ` (modified by ${l.modifier})` : ''}</span></li>`;
+                });
+                html += `</ul></div>`;
+            }
+            html += `</div>`;
+            infoPanelContent.innerHTML = html;
+        }
+
+        function resetInfoPanel() {
+            infoPanelContent.innerHTML = `
+                <h2 class="text-lg font-semibold text-white mb-2">Select a Concept</h2>
+                <p class="text-gray-300 text-sm">Click on a circle in the graph to see its details and relationships.</p>
+                <div class="mt-6">
+                    <h3 class="font-semibold text-gray-200 mb-2">Legend</h3>
+                    <ul class="text-sm space-y-2 text-gray-400">
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#60A5FA" stroke-width="2"></line></svg> influences</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#34D399" stroke-width="2"></line></svg> positively influences</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#F87171" stroke-width="2"></line></svg> negatively influences</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#F472B6" stroke-width="2"></line></svg> part of / type of</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#A78BFA" stroke-width="2"></line></svg> correlates with</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#FCD34D" stroke-width="2"></line></svg> transitions to</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Helper to get link color - used outside runVisualization
+        function linkColor(type) {
+            switch (type.toLowerCase()) {
+                case 'influences': return '#60A5FA'; // blue-400
+                case 'positively influences': return '#34D399'; // emerald-400
+                case 'negatively influences': return '#F87171'; // red-400
+                case 'part of': case 'type of': return '#F472B6'; // pink-400
+                case 'correlates with': return '#A78BFA'; // violet-400
+                case 'transitions to': return '#FCD34D'; // amber-300
+                case 'may influence': return '#9CA3AF'; // gray-400
+                default: return '#6B7280'; // gray-500
+            }
+        }
+    </script>
+</body>
+</html>
