@@ -109,6 +109,665 @@
     </div>
 
     <script>
+        // --- EMBEDDED DATA ---
+        // FIX: Instead of fetching, embed the data directly to avoid network errors.
+        const theoryData = [
+    {
+        "id": 1,
+        "name": "Action Theory Model of Consumption",
+        "description": "The Action Theory Model of Consumption posits that goal-directed consumer behaviors are driven by a complex interplay of cognitive and affective processes initiated by various antecedents. \n\nDesire to engage in a specific consumption behavior is directly influenced by attitudes, subjective norms, goal intentions (themselves shaped by the desirability and feasibility of those goals), somatic marker processes stemming from previous emotional experiences, moral imperatives, social identity processes, and frequency of past behavior. \n\nThis desire, along with perceived behavioral control, then shapes implementation intentions, which, in turn, along with perceived behavioural control, positively influence trying to perform the behavior. Trying and perceived behavioural control then jointly lead to the performance of goal-directed behaviors, ultimately resulting in goal attainment or failure, which provides feedback that informs future antecedents and subsequent behaviors. \n\nFurthermore, the model emphasizes the modulating role of self-conscious and moral emotions, individual virtues and values, empathy, and social/personal identity in strengthening the relationship between implementation intentions and trying, and further moderating the relationship between desire and implementation intentions. Situational forces modulate the impact of performance on goal attainment/failure. Ultimately, this dynamic system proposes that consumption is a process continuously shaped by cognitive evaluations, affective responses, social influences, and the outcomes of past actions.",
+        "picture_path": "C:/Users/Ghoar/Desktop/Thought Forms/Behavioral Theory Data Entry/1.png",
+        "complete": true,
+        "constructs": [
+            {
+                "name": "Somatic marker processes",
+                "description": ""
+            },
+            {
+                "name": "Anticipated emotions",
+                "description": ""
+            },
+            {
+                "name": "Desire",
+                "description": ""
+            },
+            {
+                "name": "Perceived behavioural control",
+                "description": ""
+            },
+            {
+                "name": "Implementation intentions",
+                "description": ""
+            },
+            {
+                "name": "Trying",
+                "description": ""
+            },
+            {
+                "name": "Goal attainment / failure",
+                "description": ""
+            },
+            {
+                "name": "Feedback",
+                "description": ""
+            },
+            {
+                "name": "Goal intention",
+                "description": ""
+            },
+            {
+                "name": "Subjective norms",
+                "description": ""
+            },
+            {
+                "name": "Attitudes",
+                "description": ""
+            },
+            {
+                "name": "Performance of goal-directed behaviours",
+                "description": ""
+            },
+            {
+                "name": "Antecedents of goal-directed behaviour",
+                "description": ""
+            },
+            {
+                "name": "Frequency of past behaviour",
+                "description": ""
+            },
+            {
+                "name": "Moral imperatives",
+                "description": ""
+            },
+            {
+                "name": "Social identity processes",
+                "description": ""
+            },
+            {
+                "name": "Low",
+                "description": ""
+            },
+            {
+                "name": "Situational Forces",
+                "description": ""
+            },
+            {
+                "name": "Recency of past behaviour",
+                "description": ""
+            },
+            {
+                "name": "High",
+                "description": ""
+            },
+            {
+                "name": "Self-conscious emotions",
+                "description": ""
+            },
+            {
+                "name": "Moral emotions",
+                "description": ""
+            },
+            {
+                "name": "Virtues, values, other individual differences",
+                "description": ""
+            },
+            {
+                "name": "Empathy",
+                "description": ""
+            },
+            {
+                "name": "Social and personal identity",
+                "description": ""
+            },
+            {
+                "name": "Desirability",
+                "description": ""
+            },
+            {
+                "name": "Feasibility of goals",
+                "description": ""
+            },
+            {
+                "name": "Previous emotional experiences with behaviour",
+                "description": ""
+            },
+            {
+                "name": "Normative beliefs",
+                "description": ""
+            },
+            {
+                "name": "Motivation to comply",
+                "description": ""
+            },
+            {
+                "name": "Beliefs",
+                "description": ""
+            },
+            {
+                "name": "Evaluations",
+                "description": ""
+            }
+        ],
+        "triples": [
+            {
+                "subject": "Somatic marker processes",
+                "predicate": "influences",
+                "object": "Anticipated emotions"
+            },
+            {
+                "subject": "Anticipated emotions",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Perceived behavioural control",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Implementation intentions",
+                "predicate": "positively influences",
+                "object": "Trying"
+            },
+            {
+                "subject": "Goal attainment / failure",
+                "predicate": "influences",
+                "object": "Feedback"
+            },
+            {
+                "subject": "Goal intention",
+                "predicate": "positively influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Subjective norms",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Attitudes",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Trying",
+                "predicate": "positively influences",
+                "object": "Performance of goal-directed behaviours"
+            },
+            {
+                "subject": "Perceived behavioural control",
+                "predicate": "positively influences",
+                "object": "Performance of goal-directed behaviours"
+            },
+            {
+                "subject": "Perceived behavioural control",
+                "predicate": "positively influences",
+                "object": "Trying"
+            },
+            {
+                "subject": "Desire",
+                "predicate": "influences",
+                "object": "Implementation intentions"
+            },
+            {
+                "subject": "Feedback",
+                "predicate": "influences",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Frequency of past behaviour",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Moral imperatives",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Social identity processes",
+                "predicate": "influences",
+                "object": "Desire"
+            },
+            {
+                "subject": "Social identity processes",
+                "predicate": "influences",
+                "object": "Implementation intentions"
+            },
+            {
+                "subject": "Low",
+                "predicate": "influences",
+                "object": "Implementation intentions"
+            },
+            {
+                "subject": "Performance of goal-directed behaviours",
+                "predicate": "influences",
+                "object": "Goal attainment / failure"
+            },
+            {
+                "subject": "Situational Forces",
+                "predicate": "influences",
+                "object": "the 'Performance of goal-directed behaviours' to 'Goal attainment / failure' Influences relationship"
+            },
+            {
+                "subject": "Recency of past behaviour",
+                "predicate": "positively influences",
+                "object": "Performance of goal-directed behaviours"
+            },
+            {
+                "subject": "High",
+                "predicate": "influences",
+                "object": "Performance of goal-directed behaviours"
+            },
+            {
+                "subject": "Perceived behavioural control",
+                "predicate": "influences",
+                "object": "Implementation intentions"
+            },
+            {
+                "subject": "Self-conscious emotions",
+                "predicate": "influences",
+                "object": "the 'Implementation intentions' to 'Trying' Positively influences relationship"
+            },
+            {
+                "subject": "Moral emotions",
+                "predicate": "influences",
+                "object": "the 'Implementation intentions' to 'Trying' Positively influences relationship"
+            },
+            {
+                "subject": "Virtues, values, other individual differences",
+                "predicate": "influences",
+                "object": "the 'Implementation intentions' to 'Trying' Positively influences relationship"
+            },
+            {
+                "subject": "Empathy",
+                "predicate": "influences",
+                "object": "the 'Implementation intentions' to 'Trying' Positively influences relationship"
+            },
+            {
+                "subject": "Social and personal identity",
+                "predicate": "influences",
+                "object": "the 'Implementation intentions' to 'Trying' Positively influences relationship"
+            },
+            {
+                "subject": "Social and personal identity",
+                "predicate": "influences",
+                "object": "the 'Desire' to 'Implementation intentions' Influences relationship"
+            },
+            {
+                "subject": "Empathy",
+                "predicate": "influences",
+                "object": "the 'Desire' to 'Implementation intentions' Influences relationship"
+            },
+            {
+                "subject": "Virtues, values, other individual differences",
+                "predicate": "influences",
+                "object": "the 'Desire' to 'Implementation intentions' Influences relationship"
+            },
+            {
+                "subject": "Moral emotions",
+                "predicate": "influences",
+                "object": "the 'Desire' to 'Implementation intentions' Influences relationship"
+            },
+            {
+                "subject": "Self-conscious emotions",
+                "predicate": "influences",
+                "object": "the 'Desire' to 'Implementation intentions' Influences relationship"
+            },
+            {
+                "subject": "Desirability",
+                "predicate": "influences",
+                "object": "(*) Goal intention"
+            },
+            {
+                "subject": "Feasibility of goals",
+                "predicate": "influences",
+                "object": "(*) Goal intention"
+            },
+            {
+                "subject": "Previous emotional experiences with behaviour",
+                "predicate": "part of",
+                "object": "Somatic marker processes"
+            },
+            {
+                "subject": "Normative beliefs",
+                "predicate": "influences",
+                "object": "(*) Subjective norms"
+            },
+            {
+                "subject": "Motivation to comply",
+                "predicate": "influences",
+                "object": "(*) Subjective norms"
+            },
+            {
+                "subject": "Beliefs",
+                "predicate": "influences",
+                "object": "(*) Attitudes"
+            },
+            {
+                "subject": "Beliefs",
+                "predicate": "influences",
+                "object": "(*) Subjective norms"
+            },
+            {
+                "subject": "Evaluations",
+                "predicate": "influences",
+                "object": "(*) Attitudes"
+            },
+            {
+                "subject": "Evaluations",
+                "predicate": "influences",
+                "object": "(*) Subjective norms"
+            },
+            {
+                "subject": "Subjective norms",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Anticipated emotions",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Social identity processes",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Somatic marker processes",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Goal intention",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Attitudes",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Perceived behavioural control",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Desire",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Frequency of past behaviour",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Moral imperatives",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Implementation intentions",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Trying",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Recency of past behaviour",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Desirability",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Feasibility of goals",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Normative beliefs",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Motivation to comply",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Beliefs",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "Evaluations",
+                "predicate": "part of",
+                "object": "Antecedents of goal-directed behaviour"
+            },
+            {
+                "subject": "High",
+                "predicate": "part of",
+                "object": "Frequency of past behaviour"
+            },
+            {
+                "subject": "Low",
+                "predicate": "part of",
+                "object": "Frequency of past behaviour"
+            }
+        ],
+        "annotations": [
+            {
+                "construct": "Somatic marker processes",
+                "relation": "BCIO:050564",
+                "value": "Affective attitude acquired through association",
+                "source": "1"
+            },
+            {
+                "construct": "Anticipated emotions",
+                "relation": "BCIO:050590",
+                "value": "Belief about emotional consequences of goal attainment",
+                "source": "1"
+            },
+            {
+                "construct": "Desire",
+                "relation": "MF:0000045",
+                "value": "Wanting",
+                "source": "1"
+            },
+            {
+                "construct": "Desire",
+                "relation": "BCIO:006075",
+                "value": "Subjective need",
+                "source": "1 82 69 22 5"
+            },
+            {
+                "construct": "Perceived behavioural control",
+                "relation": "BCIO:006034",
+                "value": "Belief about voluntariness of behaviour",
+                "source": "1"
+            },
+            {
+                "construct": "Perceived behavioural control",
+                "relation": "MFOEM:000075",
+                "value": "Appraisal of causal agency",
+                "source": "1 80"
+            },
+            {
+                "construct": "Implementation intentions",
+                "relation": "BCIO:006016",
+                "value": "Behavioural intention",
+                "source": "1 66 14 59 73 72 23 77 69 52 81 74 79 80 3 24 18"
+            },
+            {
+                "construct": "Trying",
+                "relation": "BCIO:006096",
+                "value": "Goal pursuit process",
+                "source": "1 17 53 3 10"
+            },
+            {
+                "construct": "Feedback",
+                "relation": "BCIO:007023",
+                "value": "Provide feedback on behaviour BCT",
+                "source": "1"
+            },
+            {
+                "construct": "Goal intention",
+                "relation": "BCIO:006016",
+                "value": "Behavioural intention",
+                "source": "1 66 14 59 73 72 23 77 69 52 81 74 79 80 3 24 18"
+            },
+            {
+                "construct": "Subjective norms",
+                "relation": "BCIO:006042",
+                "value": "Normative belief",
+                "source": "1"
+            },
+            {
+                "construct": "Subjective norms",
+                "relation": "BCIO:006059",
+                "value": "Willingness to comply",
+                "source": "1 3 79 66 73 35 81 80 72 14"
+            },
+            {
+                "construct": "Attitudes",
+                "relation": "BCIO:050328",
+                "value": "Attitude",
+                "source": "1 72 4 80 2 29 64 35"
+            },
+            {
+                "construct": "Performance of goal-directed behaviours",
+                "relation": "BCIO:050818",
+                "value": "Goal-directed behaviour",
+                "source": "1 53"
+            },
+            {
+                "construct": "Frequency of past behaviour",
+                "relation": "BCIO:050817",
+                "value": "Frequency of past behaviour",
+                "source": "1"
+            },
+            {
+                "construct": "Moral imperatives",
+                "relation": "BCIO:006063",
+                "value": "Personal value",
+                "source": "1 42 83 69 75"
+            },
+            {
+                "construct": "Social identity processes",
+                "relation": "BCIO:050775",
+                "value": "Social identity process",
+                "source": "1"
+            },
+            {
+                "construct": "Situational Forces",
+                "relation": "BCIO:006086",
+                "value": "Opportunity",
+                "source": "1 73 25 32 11 4 60 67 65 59 8 74 66 41 5 77 56 9 12 79"
+            },
+            {
+                "construct": "Self-conscious emotions",
+                "relation": "MFOEM:000001",
+                "value": "Emotional process",
+                "source": "1"
+            },
+            {
+                "construct": "Moral emotions",
+                "relation": "MFOEM:000001",
+                "value": "Emotional process",
+                "source": "1"
+            },
+            {
+                "construct": "Virtues, values, other individual differences",
+                "relation": "MF:0000203",
+                "value": "personality trait",
+                "source": "1 49"
+            },
+            {
+                "construct": "Empathy",
+                "relation": "MF:0000203",
+                "value": "personality trait",
+                "source": "1 49"
+            },
+            {
+                "construct": "Social and personal identity",
+                "relation": "BCIO:006051",
+                "value": "Social identity",
+                "source": "1"
+            },
+            {
+                "construct": "Social and personal identity",
+                "relation": "ADDICTO:0000381",
+                "value": "identity",
+                "source": "1"
+            },
+            {
+                "construct": "Desirability",
+                "relation": "BCIO:050617",
+                "value": "comparative desirability appraisal",
+                "source": "1"
+            },
+            {
+                "construct": "Feasibility of goals",
+                "relation": "BCIO:050592",
+                "value": "belief about goal attainment",
+                "source": "1"
+            },
+            {
+                "construct": "Previous emotional experiences with behaviour",
+                "relation": "MFOEM:000001",
+                "value": "emotion process",
+                "source": "1"
+            },
+            {
+                "construct": "Normative beliefs",
+                "relation": "BCIO:006042",
+                "value": "Normative belief",
+                "source": "1 79 73 35 81 3 14"
+            },
+            {
+                "construct": "Motivation to comply",
+                "relation": "BCIO:006059",
+                "value": "Willingness to comply",
+                "source": "1 3 66 80 79 72"
+            },
+            {
+                "construct": "Beliefs",
+                "relation": "MF:0000041",
+                "value": "belief",
+                "source": "1"
+            },
+            {
+                "construct": "Beliefs",
+                "relation": "BCIO:006019",
+                "value": "Belief about consequences of behaviour",
+                "source": "1 72 33 74 79 32 34 73 55 80 14 28 30 31 35 42 54 67"
+            },
+            {
+                "construct": "Evaluations",
+                "relation": "BCIO:006038",
+                "value": "Evaluative belief",
+                "source": "1"
+            },
+            {
+                "construct": "Evaluations",
+                "relation": "BCIO:006148",
+                "value": "Evaluative belief about the consequences of a behaviour",
+                "source": "1 77 42 39 66 80 53 64 55 35 74 12 14 79"
+            }
+        ]
+    }
+];
+
         // --- GLOBAL STATE & DOM ELEMENTS ---
         let allTheories = [];
         const listView = document.getElementById('list-view');
@@ -122,20 +781,13 @@
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Fetch the theory data from the JSON file
-            fetch('theory_data.json')
-                .then(response => {
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    return response.json();
-                })
-                .then(data => {
-                    allTheories = data;
-                    populateTheoryList(allTheories);
-                })
-                .catch(error => {
-                    console.error("Error loading theory data:", error);
-                    theoryListContainer.innerHTML = `<p class="text-red-400 col-span-full">Error loading theories. Please check the console and ensure 'theory_data.json' is available.</p>`;
-                });
+            try {
+                allTheories = theoryData;
+                populateTheoryList(allTheories);
+            } catch(error) {
+                 console.error("Error processing theory data:", error);
+                 theoryListContainer.innerHTML = `<p class="text-red-400 col-span-full">Error processing theories. Please check the data format.</p>`;
+            }
             
             backButton.addEventListener('click', showListView);
         });
