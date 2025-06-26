@@ -1,9 +1,30 @@
+<!-- projects.html -->
 <div class="text-left">
     <h2 class="text-4xl font-bold mb-6 border-b border-gray-700 pb-3">My Projects</h2>
-    <div class="p-6 bg-gray-800 rounded-lg mb-4">
-        <h3 class="text-2xl font-semibold text-blue-400">Project One</h3>
-        <p class="text-gray-300 mt-2">This is a description of my first amazing project. It solves a real-world problem by doing X, Y, and Z.</p>
+    
+    <!-- Project 1: Schism Labs (Interactive Accordion) -->
+    <div class="bg-gray-800 rounded-lg mb-4">
+        <!-- This button uses a data-attribute to toggle the visibility of the options div -->
+        <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-gray-700/50 rounded-t-lg">
+            <!-- pointer-events-none ensures the click is registered on the button itself -->
+            <h3 class="text-2xl font-semibold text-blue-400 pointer-events-none">Schism Labs</h3>
+            <p class="text-gray-300 mt-2 pointer-events-none">A venture into emergent AI and contextual embedding systems.</p>
+        </button>
+        
+        <!-- Collapsible Options. The 'id' here matches the 'data-toggle-id' from the button above -->
+        <div id="schism-labs-options" class="hidden px-6 pb-6 border-t border-gray-700">
+            <p class="text-gray-400 mt-4 mb-4">Select a resource to view:</p>
+            
+            <!-- This button uses a data-attribute to load new content into the main area -->
+            <button data-load-path="Projects/Schism Labs/Schism Labs Landing Page.html" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                View Landing Page
+            </button>
+            
+            <!-- You can add more buttons here that load other pages -->
+        </div>
     </div>
+
+    <!-- Project 2 -->
     <div class="p-6 bg-gray-800 rounded-lg">
         <h3 class="text-2xl font-semibold text-blue-400">Project Two</h3>
         <p class="text-gray-300 mt-2">A description for the second project goes here. This one was built using different technologies.</p>
