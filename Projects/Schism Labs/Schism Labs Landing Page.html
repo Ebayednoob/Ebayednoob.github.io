@@ -152,7 +152,7 @@
                 <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                     <h3 class="text-3xl font-bold text-center mb-12 text-cyan-400">The 20 Vectors of Human Context</h3>
                     <p class="text-center text-gray-400 max-w-3xl mx-auto mb-12">Most miscommunication occurs not from content errors but from invisible context differences. Making these vectors visible and navigable is central to our mission.</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div id="vectors-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <!-- Vector cards will be injected here by JS -->
                     </div>
                 </div>
@@ -242,7 +242,7 @@
                                  <button id="saveSocialsBtn" class="w-full px-8 py-3 bg-cyan-500 text-black font-semibold rounded-lg hover:bg-cyan-400 transition-all">
                                      Save Socials
                                  </button>
-                                 <p id="saveStatus" class="text-sm text-green-400 h-4"></p>
+                                 <p id="saveStatus" class="text-sm h-4"></p>
                              </div>
 
                              <button id="signOutBtn" class="mt-8 w-full px-8 py-2 bg-transparent border-2 border-red-500 text-red-500 font-semibold rounded-lg hover:bg-red-500 hover:text-black transition-all">
@@ -263,184 +263,100 @@
 
     <script type="module">
         // Firebase Imports
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase Setup & Auth ---
-        let auth, db, app;
-        let unsubscribeSocials; // To detach Firestore listener on sign-out
+        // --- Global State ---
+        let pageInitialized = false;
+        let auth, db;
+        let marketChartInstance, revenueChartInstance;
+        let unsubscribeSocials;
 
-        // These global variables are expected to be provided by the environment
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        
-        const loggedOutView = document.getElementById('logged-out-view');
-        const loggedInView = document.getElementById('logged-in-view');
-        const signInBtn = document.getElementById('signInBtn');
-        const signOutBtn = document.getElementById('signOutBtn');
-        const userIdDisplay = document.getElementById('user-id-display');
-        const saveSocialsBtn = document.getElementById('saveSocialsBtn');
-        const twitterInput = document.getElementById('twitter-handle');
-        const githubInput = document.getElementById('github-handle');
-        const saveStatus = document.getElementById('saveStatus');
-
-        if (firebaseConfig) {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                
-                onAuthStateChanged(auth, user => {
-                    if (user) {
-                        // User is signed in
-                        console.log("User is signed in:", user.uid);
-                        loggedOutView.classList.add('hidden');
-                        loggedInView.classList.remove('hidden');
-                        userIdDisplay.textContent = user.uid;
-                        
-                        // Listen for social media data
-                        const socialsDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/socials`, 'handles');
-                        unsubscribeSocials = onSnapshot(socialsDocRef, (doc) => {
-                            if (doc.exists()) {
-                                const data = doc.data();
-                                twitterInput.value = data.twitter || '';
-                                githubInput.value = data.github || '';
-                                console.log("Socials data loaded:", data);
-                            } else {
-                                console.log("No social handles document yet.");
-                            }
-                        });
-
-                    } else {
-                        // User is signed out
-                        console.log("User is signed out.");
-                        loggedOutView.classList.remove('hidden');
-                        loggedInView.classList.add('hidden');
-                        userIdDisplay.textContent = '';
-                        // Unsubscribe from Firestore listener if it exists
-                        if (unsubscribeSocials) {
-                            unsubscribeSocials();
-                        }
-                    }
-                });
-
-                // --- Event Listeners for Auth and Data ---
-                signInBtn.addEventListener('click', async () => {
-                    console.log("Sign-in button clicked.");
-                    try {
-                        if (initialAuthToken) {
-                            console.log("Attempting sign-in with custom token.");
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            console.log("No custom token found. Signing in anonymously.");
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                        console.error("Error signing in:", error);
-                        alert("Sign in failed. Check console for details.");
-                    }
-                });
-
-                signOutBtn.addEventListener('click', () => {
-                    signOut(auth).catch(error => console.error("Sign out error:", error));
-                });
-
-                saveSocialsBtn.addEventListener('click', async () => {
-                    const user = auth.currentUser;
-                    if (!user) {
-                        alert("You must be signed in to save data.");
-                        return;
-                    }
-                    const socialsData = {
-                        twitter: twitterInput.value,
-                        github: githubInput.value,
-                        lastUpdated: new Date()
-                    };
-                    
-                    saveStatus.textContent = 'Saving...';
-                    try {
-                        const socialsDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/socials`, 'handles');
-                        await setDoc(socialsDocRef, socialsData, { merge: true });
-                        saveStatus.textContent = 'Saved successfully!';
-                        console.log("Socials saved:", socialsData);
-                    } catch (error) {
-                        console.error("Error saving socials:", error);
-                        saveStatus.textContent = 'Error saving.';
-                    }
-                    setTimeout(() => saveStatus.textContent = '', 3000);
-                });
-
-                // Automatically try to sign in on page load
-                if(auth.currentUser === null){
-                    signInBtn.click();
-                }
-
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                document.getElementById('connect').innerHTML = '<p class="text-red-500">Could not connect to authentication service.</p>';
+        // --- Core Page Initialization Function ---
+        function initializePage() {
+            if (pageInitialized) {
+                console.log("Page already initialized. Skipping.");
+                return;
             }
-        } else {
-             console.warn("Firebase configuration is missing.");
-             document.getElementById('connect').innerHTML = '<p class="text-yellow-500">Firebase configuration missing. Connection features are disabled.</p>';
+            console.log("Initializing page...");
+
+            // --- Firebase Setup ---
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            
+            if (firebaseConfig) {
+                try {
+                    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    setupAuthListeners(appId);
+                } catch (e) {
+                    console.error("Firebase initialization failed:", e);
+                    document.getElementById('connect').innerHTML = `<p class="text-red-500">Could not connect to services.</p>`;
+                }
+            } else {
+                console.warn("Firebase configuration is missing.");
+                document.getElementById('connect').innerHTML = `<p class="text-yellow-500">Connection features disabled.</p>`;
+            }
+            
+            setupUI();
+            
+            pageInitialized = true;
+            console.log("Page initialized successfully.");
         }
 
-        // --- Standard Page JS ---
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- Mobile Menu Toggle ---
+        // --- UI Setup Function ---
+        function setupUI() {
+            // Mobile Menu
             const mobileMenuButton = document.getElementById('mobile-menu-button');
             const mobileMenu = document.getElementById('mobile-menu');
-            mobileMenuButton.addEventListener('click', () => {
-                mobileMenu.classList.toggle('hidden');
-            });
+            mobileMenuButton.onclick = () => mobileMenu.classList.toggle('hidden');
             document.querySelectorAll('#mobile-menu a, .container a, .text-2xl').forEach(link => {
-                link.addEventListener('click', () => {
-                    if (!mobileMenu.classList.contains('hidden')) {
-                         mobileMenu.classList.add('hidden');
-                    }
-                });
+                link.onclick = () => mobileMenu.classList.add('hidden');
             });
 
-            // --- Context Vectors Data & Population ---
+            // Populate Vectors
             const vectors = [
-                { title: "Temporal Context", desc: "Time-based circumstances influencing communication (e.g., time of day, lifecycle moments)." },
-                { title: "Relational Role", desc: "Power dynamics and established patterns between communicators." },
-                { title: "Emotional State", desc: "Current affective condition of both sender and receiver." },
-                { title: "Cognitive Load/Bandwidth", desc: "Mental capacity available for processing complex communication." },
-                { title: "Hormonal/Biophysical State", desc: "Physical conditions affecting cognitive and emotional processing." },
-                { title: "Cultural/Normative Frames", desc: "Deeply ingrained expectations around communication patterns." },
-                { title: "Identity-Based Safety Calibration", desc: "How one's marginalized identities affect vigilance and interpretation." },
-                { title: "Intention Complexity", desc: "The layered or mixed motivations behind communication." },
-                { title: "Language Precision/Ambiguity", desc: "Preferences for exactness versus open interpretation in language." },
-                { title: "Past Injuries or Pattern Recognition", desc: "How previous experiences create interpretive frameworks." },
-                { title: "Platform or Medium", desc: "The technological or environmental context of communication." },
-                { title: "Audience Awareness", desc: "Knowledge of who else might receive or observe communication." },
-                { title: "Urgency and Stakes", desc: "The perceived importance and time sensitivity of the communication." },
-                { title: "Communication Modality", desc: "Individual differences in processing and expressing information." },
-                { title: "Social Energy Type", desc: "Current capacity for social interaction and engagement." },
-                { title: "Receptive State of Receiver", desc: "Readiness and capacity of the audience to receive the message." },
-                { title: "Norms of Silence vs. Response", desc: "Cultural and individual expectations around reply timing." },
-                { title: "Internalized Scripts", desc: "Deeply held beliefs about appropriate communication." },
-                { title: "Sensory/Environmental Factors", desc: "Physical conditions affecting perception and processing." },
-                { title: "Temporal Distance from Origin", desc: "How time affects the relevance and interpretation of messages." }
+                { title: "Temporal Context", desc: "Time-based circumstances." },
+                { title: "Relational Role", desc: "Power dynamics and patterns." },
+                { title: "Emotional State", desc: "Current affective condition." },
+                { title: "Cognitive Load", desc: "Mental capacity available." },
+                { title: "Biophysical State", desc: "Physical conditions affecting cognition." },
+                { title: "Cultural Frames", desc: "Ingrained communication expectations." },
+                { title: "Safety Calibration", desc: "Vigilance based on identity." },
+                { title: "Intention Complexity", desc: "Layered motivations." },
+                { title: "Language Precision", desc: "Preference for exactness vs. ambiguity." },
+                { title: "Past Injuries", desc: "Historical interpretive frameworks." },
+                { title: "Platform/Medium", desc: "Technological context." },
+                { title: "Audience Awareness", desc: "Knowledge of observers." },
+                { title: "Urgency/Stakes", desc: "Perceived importance." },
+                { title: "Communication Modality", desc: "Processing preferences." },
+                { title: "Social Energy", desc: "Capacity for interaction." },
+                { title: "Receptive State", desc: "Audience readiness to receive." },
+                { title: "Norms of Silence", desc: "Reply timing expectations." },
+                { title: "Internalized Scripts", desc: "Learned communication beliefs." },
+                { title: "Sensory Factors", desc: "Physical environment." },
+                { title: "Temporal Distance", desc: "Time's effect on relevance." }
             ];
-            const vectorContainer = document.querySelector('#vectors .grid');
+            const vectorContainer = document.getElementById('vectors-grid');
+            vectorContainer.innerHTML = ''; // Clear previous content
             vectors.forEach(vector => {
                 const card = document.createElement('div');
                 card.className = 'p-4 rounded-lg glass-effect transform hover:-translate-y-1 transition-transform cursor-pointer';
                 card.innerHTML = `<h4 class="text-md font-bold text-white">${vector.title}</h4><p class="text-sm text-gray-400 mt-1">${vector.desc}</p>`;
                 vectorContainer.appendChild(card);
             });
-            
-            // --- Accordion Data & Population ---
+
+            // Populate Accordion
             const accordionData = [
-                { title: 'Roadmap & Vision', content: `<strong>Phase 1: Foundation (Year 1)</strong> - Focus on building the core Human Context Protocol with capabilities like Context Cards and Sovereignty-Centered Architecture for neurodivergent professionals and cross-cultural teams.<br><br><strong>Phase 2: Expansion (Years 2-3)</strong> - Focus on Contextual Connectivity, introducing cross-platform portability, team visualization, and a context marketplace for organizations and healthcare teams.<br><br><strong>Phase 3: Maturity (Years 3-5)</strong> - Focus on creating the Context Protocol Infrastructure, rolling out Self-Sovereign Identity, a full API ecosystem, and advanced analytics for enterprise clients and developers.` },
-                { title: 'Go-to-Market Strategy', content: `Our strategy is rooted in community co-creation. We start by partnering with neurodivergent-led organizations and running Context Labs to design the protocol with our core users. We will grow through trust-based marketing, focusing on education, authentic community engagement, and demonstrating measurable impact, rather than traditional advertising.`},
-                { title: 'Competitive Landscape', content: `We are creating a new category, but exist at the intersection of several markets. <br><strong>Direct Competitors (e.g., Grammarly):</strong> Focus on corrective writing mechanics, whereas we are assistive and relational. <br><strong>Adjacent Competitors (e.g., Notion, Slack):</strong> Focus on collaboration and message transmission, not the contextual understanding layer. Our privacy-first, protocol-based approach is a key differentiator that surveillance-based models cannot easily replicate.` },
-                { title: 'Ethical Monetization', content: `Our revenue model is designed to reject surveillance capitalism. We use an open-core model with a free protocol layer and paid tiers for individuals and organizations. Revenue is generated from premium features, enterprise implementations, a creator-first marketplace (80/20 split), and protocol infrastructure services. All pricing is transparent and value-based, with no selling of user data.` }
+                { title: 'Roadmap & Vision', content: `<strong>Phase 1: Foundation</strong> - Build the core Human Context Protocol for neurodivergent professionals & cross-cultural teams.<br><br><strong>Phase 2: Expansion</strong> - Introduce cross-platform portability & team visualization for organizations.<br><br><strong>Phase 3: Maturity</strong> - Roll out Self-Sovereign Identity, a full API ecosystem, & advanced analytics.` },
+                { title: 'Go-to-Market Strategy', content: `Our strategy is rooted in community co-creation. We partner with neurodivergent-led organizations and run Context Labs to design the protocol with our core users, growing through trust-based marketing and education.`},
+                { title: 'Competitive Landscape', content: `We are creating a new category. Unlike corrective tools (e.g., Grammarly) or simple messengers (e.g., Slack), our privacy-first, protocol-based approach is a key differentiator that surveillance-based models cannot replicate.` },
+                { title: 'Ethical Monetization', content: `We use an open-core model with a free protocol layer and paid tiers for individuals and organizations, rejecting surveillance capitalism. Revenue is generated from premium features, enterprise implementations, and a creator-first marketplace (80/20 split).` }
             ];
             const accordionContainer = document.getElementById('accordion-container');
+            accordionContainer.innerHTML = ''; // Clear previous content
             accordionData.forEach(item => {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'rounded-lg glass-effect overflow-hidden';
@@ -449,27 +365,93 @@
                         <span>${item.title}</span>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </button>
-                    <div class="accordion-content">
-                        <div class="p-5 pt-0 text-gray-300">${item.content}</div>
-                    </div>
-                `;
+                    <div class="accordion-content"><div class="p-5 pt-0 text-gray-300">${item.content}</div></div>`;
                 accordionContainer.appendChild(wrapper);
             });
-            // Accordion functionality
-            accordionContainer.addEventListener('click', e => {
+            accordionContainer.onclick = e => {
                 const button = e.target.closest('.accordion-button');
                 if (button) {
                     const content = button.nextElementSibling;
                     button.classList.toggle('open');
-                    if (content.style.maxHeight) {
-                        content.style.maxHeight = null;
-                    } else {
-                        content.style.maxHeight = content.scrollHeight + "px";
-                    }
+                    content.style.maxHeight = content.style.maxHeight ? null : content.scrollHeight + "px";
+                }
+            };
+            
+            // Setup Charts
+            setupCharts();
+        }
+
+        // --- Firebase Auth & Data Logic ---
+        function setupAuthListeners(appId) {
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            const loggedOutView = document.getElementById('logged-out-view');
+            const loggedInView = document.getElementById('logged-in-view');
+            const signInBtn = document.getElementById('signInBtn');
+            const signOutBtn = document.getElementById('signOutBtn');
+            const userIdDisplay = document.getElementById('user-id-display');
+
+            onAuthStateChanged(auth, user => {
+                if (user) {
+                    loggedOutView.classList.add('hidden');
+                    loggedInView.classList.remove('hidden');
+                    userIdDisplay.textContent = user.uid;
+                    listenToSocials(user.uid, appId);
+                } else {
+                    loggedOutView.classList.remove('hidden');
+                    loggedInView.classList.add('hidden');
+                    userIdDisplay.textContent = '';
+                    if (unsubscribeSocials) unsubscribeSocials();
                 }
             });
 
-            // --- Chart.js Implementation ---
+            signInBtn.onclick = async () => {
+                try {
+                    if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken);
+                    else await signInAnonymously(auth);
+                } catch (error) { console.error("Sign in failed:", error); }
+            };
+            signOutBtn.onclick = () => signOut(auth);
+
+            if (!auth.currentUser) {
+                signInBtn.click();
+            }
+        }
+        
+        function listenToSocials(uid, appId) {
+            const twitterInput = document.getElementById('twitter-handle');
+            const githubInput = document.getElementById('github-handle');
+            const saveSocialsBtn = document.getElementById('saveSocialsBtn');
+            const saveStatus = document.getElementById('saveStatus');
+
+            const socialsDocRef = doc(db, `artifacts/${appId}/users/${uid}/socials`, 'handles');
+            if (unsubscribeSocials) unsubscribeSocials(); 
+            unsubscribeSocials = onSnapshot(socialsDocRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    twitterInput.value = data.twitter || '';
+                    githubInput.value = data.github || '';
+                }
+            });
+            
+            saveSocialsBtn.onclick = async () => {
+                const socialsData = { twitter: twitterInput.value, github: githubInput.value, lastUpdated: new Date() };
+                saveStatus.textContent = 'Saving...';
+                saveStatus.className = "text-sm text-cyan-400 h-4";
+                try {
+                    await setDoc(socialsDocRef, socialsData, { merge: true });
+                    saveStatus.textContent = 'Saved successfully!';
+                    saveStatus.className = "text-sm text-green-400 h-4";
+                } catch (error) {
+                    saveStatus.textContent = 'Error saving.';
+                    saveStatus.className = "text-sm text-red-400 h-4";
+                    console.error("Error saving socials:", error);
+                }
+                setTimeout(() => saveStatus.textContent = '', 3000);
+            };
+        }
+
+        // --- Chart Setup Logic ---
+        function setupCharts() {
             const chartTextColor = '#e5e7eb';
             const chartGridColor = 'rgba(255, 255, 255, 0.1)';
             Chart.defaults.color = chartTextColor;
@@ -477,102 +459,45 @@
             
             // Market Chart
             const marketCtx = document.getElementById('marketChart').getContext('2d');
-            new Chart(marketCtx, {
+            if (marketChartInstance) marketChartInstance.destroy();
+            marketChartInstance = new Chart(marketCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Total Addressable Market (TAM)', 'Serviceable Addressable Market (SAM)', 'Serviceable Obtainable Market (SOM)'],
-                    datasets: [{
-                        label: 'Market Size ($B)',
-                        data: [50, 4, 0.026], // in Billions
-                        backgroundColor: [
-                            'rgba(0, 255, 255, 0.3)',
-                            'rgba(0, 255, 255, 0.6)',
-                            'rgba(0, 255, 255, 0.9)'
-                        ],
-                        borderColor: [
-                            'rgba(0, 255, 255, 0.7)',
-                            'rgba(0, 255, 255, 0.9)',
-                            '#00FFFF'
-                        ],
-                        borderWidth: 1
-                    }]
+                    labels: ['TAM ($50B)', 'SAM ($4B)', 'SOM ($26M)'],
+                    datasets: [{ label: 'Market Size', data: [50, 4, 0.026], backgroundColor: ['#06b6d433', '#06b6d488', '#06b6d4'], borderColor: '#0891b2', borderWidth: 1 }]
                 },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'top' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) { label += ': '; }
-                                    if (context.parsed !== null) {
-                                        label += '$' + context.parsed + 'B';
-                                    }
-                                    return label;
-                                }
-                            }
-                        }
-                    }
-                }
+                options: { responsive: true, plugins: { legend: { position: 'top' } } }
             });
 
             // Revenue Chart
             const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-            new Chart(revenueCtx, {
+            if (revenueChartInstance) revenueChartInstance.destroy();
+            revenueChartInstance = new Chart(revenueCtx, {
                 type: 'line',
                 data: {
-                    labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+                    labels: ['Y1', 'Y2', 'Y3', 'Y4', 'Y5'],
                     datasets: [
-                        {
-                            label: 'Base Case ($M)',
-                            data: [0, 0.25, 2.2, 10, 26.46],
-                            borderColor: 'rgba(0, 255, 255, 1)',
-                            backgroundColor: 'rgba(0, 255, 255, 0.5)',
-                            tension: 0.1,
-                            fill: true,
-                        },
-                        {
-                            label: 'Conservative ($M)',
-                            data: [0, 0.15, 1.5, 6, 18],
-                            borderColor: 'rgba(255, 255, 255, 0.5)',
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                            tension: 0.1,
-                            hidden: true,
-                        },
-                         {
-                            label: 'Optimistic ($M)',
-                            data: [0, 0.35, 3, 15, 35],
-                            borderColor: 'rgba(0, 255, 255, 0.5)',
-                             backgroundColor: 'rgba(0, 255, 255, 0.2)',
-                            tension: 0.1,
-                            hidden: true,
-                        }
+                        { label: 'Base Case ($M)', data: [0, 0.25, 2.2, 10, 26.46], borderColor: '#06b6d4', backgroundColor: '#06b6d488', tension: 0.1, fill: true },
+                        { label: 'Conservative ($M)', data: [0, 0.15, 1.5, 6, 18], borderColor: '#64748b', backgroundColor: '#64748b33', tension: 0.1, hidden: true },
+                        { label: 'Optimistic ($M)', data: [0, 0.35, 3, 15, 35], borderColor: '#22d3ee', backgroundColor: '#22d3ee33', tension: 0.1, hidden: true }
                     ]
                 },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'top' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': $' + context.parsed.y + 'M';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: { display: true, text: 'ARR ($M)' }
-                        }
-                    }
-                }
+                options: { responsive: true, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: $${ctx.parsed.y}M` } } }, scales: { y: { beginAtZero: true, title: { display: true, text: 'ARR ($M)' } } } }
             });
+        }
+        
+        // --- Event Listeners to Trigger Initialization ---
+        // Fires on initial page load
+        window.addEventListener('DOMContentLoaded', initializePage);
+        // Fires when page is shown from back-forward cache, ensuring a fresh start
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                console.log("Page was restored from bfcache. Re-initializing.");
+                pageInitialized = false; // Reset flag to allow re-initialization
+                initializePage();
+            }
         });
-
-
+        
         // --- Interactive Canvas Background ---
         const canvas = document.getElementById('interactive-bg');
         const ctx = canvas.getContext('2d');
