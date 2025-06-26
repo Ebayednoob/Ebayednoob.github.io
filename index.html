@@ -21,21 +21,18 @@
             font-family: 'Inter', sans-serif;
             background-color: #0a0a0a; /* A very dark base background */
         }
-        /* The canvas will be our background, fixed and behind everything */
         #bg-canvas {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: -1; /* Place it behind all other content */
+            z-index: -1;
         }
-        /* Content areas have a semi-transparent background to ensure readability */
         .content-overlay {
-            background-color: rgba(17, 24, 39, 0.7); /* Corresponds to bg-gray-900 with 70% opacity */
-            backdrop-filter: blur(8px); /* Frosted glass effect */
+            background-color: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(8px);
         }
-        /* Simple fade-in animation for content */
         #content-area {
             animation: fadeIn 0.5s ease-in-out;
         }
@@ -47,22 +44,20 @@
 </head>
 <body class="bg-gray-900 text-white selection:bg-blue-500 selection:text-white">
 
-    <!-- The canvas for our three.js scene -->
     <canvas id="bg-canvas"></canvas>
 
     <div class="container mx-auto px-4 min-h-screen flex flex-col relative z-10">
 
-        <!-- Header and Navigation with a semi-transparent background -->
         <header class="py-6 border-b border-gray-700/50 content-overlay rounded-b-xl">
             <nav class="flex justify-between items-center px-6">
                 <a href="/" class="block transition-opacity hover:opacity-80">
                     <img src="Resources/Pictures/Logo Files/Ebayednoob-logo.png" alt="Ebayednoob Logo" class="h-8 w-auto">
                 </a>
                 <div class="flex items-center space-x-6">
+                    <!-- RESTORED: These are now buttons again for dynamic loading -->
                     <button id="projects-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Projects</button>
                     <button id="tutorials-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Tutorials</button>
                     
-                    <!-- Auth Section -->
                     <div id="auth-container" class="pl-4 border-l border-gray-700">
                          <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
                             Login
@@ -78,9 +73,7 @@
             </nav>
         </header>
 
-        <!-- Main Content Area -->
         <main id="content-area" class="flex-grow py-10">
-            <!-- Initial landing page content -->
             <div class="text-center h-full flex flex-col justify-center">
                 <h1 class="text-5xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">
                     Ethical General Intelligence
@@ -91,7 +84,6 @@
             </div>
         </main>
 
-        <!-- Footer -->
         <footer class="text-center py-6 text-gray-500">
             <p>&copy; 2025 Ebayednoob. All Rights Reserved.</p>
         </footer>
@@ -155,12 +147,10 @@
 
         loginBtn.addEventListener('click', () => signInWithPopup(auth, provider).catch(error => console.error("Authentication failed:", error)));
         logoutBtn.addEventListener('click', () => {
-            signOut(auth).then(() => {
-                contentArea.innerHTML = `<div class="text-center"><h1 class="text-5xl font-bold mb-4">You have been logged out.</h1><p class="text-xl text-gray-400">Thank you for visiting.</p></div>`;
-            }).catch(error => console.error("Sign out failed:", error));
+            signOut(auth).catch(error => console.error("Sign out failed:", error));
         });
 
-        // --- Content Loading Logic ---
+        // --- RESTORED: Content Loading Logic ---
         async function loadContent(filePath) {
             try {
                 contentArea.innerHTML = '<p class="text-center text-gray-400">Loading...</p>';
@@ -173,14 +163,10 @@
             }
         }
 
-        // --- Event Delegation for Dynamic Content ---
+        // --- RESTORED: Event Delegation for Dynamic Content ---
         contentArea.addEventListener('click', (event) => {
-            const loadTarget = event.target.closest('[data-load-path]');
-            if (loadTarget) {
-                event.preventDefault();
-                loadContent(loadTarget.getAttribute('data-load-path'));
-                return;
-            }
+            // This listener only handles the accordion toggle now.
+            // Links are handled by the browser's default behavior.
             const toggleTarget = event.target.closest('[data-toggle-id]');
             if (toggleTarget) {
                 event.preventDefault();
@@ -189,22 +175,21 @@
             }
         });
 
-        // --- Main Navigation Button Events ---
+        // --- RESTORED: Main Navigation Button Events ---
         projectsBtn.addEventListener('click', () => loadContent('projects.html'));
         tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html'));
 
+
         // --- Interactive Background Logic (three.js) ---
+        // (This code remains the same)
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true });
-        
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setClearColor(0x000000, 0); // Transparent background
-
+        renderer.setClearColor(0x000000, 0);
         const particleCount = 5000;
         const positions = new Float32Array(particleCount * 3);
         const velocities = new Float32Array(particleCount * 3);
-
         for (let i = 0; i < particleCount; i++) {
             positions[i * 3] = (Math.random() - 0.5) * 20;
             positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
@@ -213,85 +198,56 @@
             velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.002;
             velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.002;
         }
-
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        
-        const material = new THREE.PointsMaterial({
-            color: 0x00aaff,
-            size: 0.025,
-            transparent: true,
-            blending: THREE.AdditiveBlending
-        });
-
+        const material = new THREE.PointsMaterial({ color: 0x00aaff, size: 0.025, transparent: true, blending: THREE.AdditiveBlending });
         const particles = new THREE.Points(geometry, material);
         scene.add(particles);
-
         camera.position.z = 10;
-
-        const mouse = new THREE.Vector2(-100, -100); // Initialize mouse off-screen
-
-        function onMouseMove(event) {
-            // Normalize mouse position from -1 to +1
+        const mouse = new THREE.Vector2(-100, -100);
+        window.addEventListener('mousemove', (event) => {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        }
-        window.addEventListener('mousemove', onMouseMove, false);
-
-        function onWindowResize() {
+        }, false);
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        window.addEventListener('resize', onWindowResize, false);
-
+        }, false);
         function animate() {
             requestAnimationFrame(animate);
-
             const positionAttribute = particles.geometry.attributes.position;
             const force = new THREE.Vector3();
-
             for (let i = 0; i < particleCount; i++) {
                 const x = positionAttribute.getX(i);
                 const y = positionAttribute.getY(i);
                 const z = positionAttribute.getZ(i);
-
-                // Mouse interaction physics
                 const screenPos = new THREE.Vector3(x, y, z).project(camera);
                 const dx = screenPos.x - mouse.x;
                 const dy = screenPos.y - mouse.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                
                 if (distance < 0.2) {
                     const forceMagnitude = (0.2 - distance) * 0.05;
                     force.set(dx, dy, 0).normalize().multiplyScalar(forceMagnitude);
                     velocities[i * 3] += force.x;
                     velocities[i * 3 + 1] += force.y;
                 }
-
-                // Apply velocity and some damping
                 positionAttribute.setX(i, x + velocities[i * 3]);
                 positionAttribute.setY(i, y + velocities[i * 3 + 1]);
                 positionAttribute.setZ(i, z + velocities[i * 3 + 2]);
-                
                 velocities[i*3] *= 0.98;
                 velocities[i*3+1] *= 0.98;
                 velocities[i*3+2] *= 0.98;
-
-                // Wrap particles around
                 if (Math.abs(x) > 10) positionAttribute.setX(i, -x);
                 if (Math.abs(y) > 10) positionAttribute.setY(i, -y);
                 if (Math.abs(z) > 10) positionAttribute.setZ(i, -z);
             }
-
             positionAttribute.needsUpdate = true;
-            
             particles.rotation.y += 0.0001;
             particles.rotation.x += 0.0002;
-
             renderer.render(scene, camera);
         }
-        animate(); // Start the animation loop
+        animate();
     </script>
 </body>
 </html>
