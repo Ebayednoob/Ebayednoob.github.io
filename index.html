@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Portfolio</title>
+    <title>Ebayednoob - Ethical GAI</title>
     
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,10 +13,27 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     
+    <!-- three.js for the interactive background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
     <style>
-        /* Use the Inter font family */
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a; /* A very dark base background */
+        }
+        /* The canvas will be our background, fixed and behind everything */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1; /* Place it behind all other content */
+        }
+        /* Content areas have a semi-transparent background to ensure readability */
+        .content-overlay {
+            background-color: rgba(17, 24, 39, 0.7); /* Corresponds to bg-gray-900 with 70% opacity */
+            backdrop-filter: blur(8px); /* Frosted glass effect */
         }
         /* Simple fade-in animation for content */
         #content-area {
@@ -30,12 +47,17 @@
 </head>
 <body class="bg-gray-900 text-white selection:bg-blue-500 selection:text-white">
 
-    <div class="container mx-auto px-4 min-h-screen flex flex-col">
+    <!-- The canvas for our three.js scene -->
+    <canvas id="bg-canvas"></canvas>
 
-        <!-- Header and Navigation -->
-        <header class="py-6 border-b border-gray-700">
-            <nav class="flex justify-between items-center">
-                <a href="/" class="text-2xl font-bold text-white hover:text-blue-400 transition-colors">Your Name</a>
+    <div class="container mx-auto px-4 min-h-screen flex flex-col relative z-10">
+
+        <!-- Header and Navigation with a semi-transparent background -->
+        <header class="py-6 border-b border-gray-700/50 content-overlay rounded-b-xl">
+            <nav class="flex justify-between items-center px-6">
+                <a href="/" class="block transition-opacity hover:opacity-80">
+                    <img src="Resources/Pictures/Logo Files/Ebayednoob-logo.png" alt="Ebayednoob Logo" class="h-8 w-auto">
+                </a>
                 <div class="flex items-center space-x-6">
                     <button id="projects-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Projects</button>
                     <button id="tutorials-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Tutorials</button>
@@ -58,20 +80,24 @@
 
         <!-- Main Content Area -->
         <main id="content-area" class="flex-grow py-10">
-            <!-- Content from other HTML files will be loaded here -->
-            <div class="text-center">
-                <h1 class="text-5xl font-bold mb-4">Welcome to My Interactive Portfolio</h1>
-                <p class="text-xl text-gray-400">Select a section from the navigation to get started.</p>
+            <!-- Initial landing page content -->
+            <div class="text-center h-full flex flex-col justify-center">
+                <h1 class="text-5xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">
+                    Ethical General Intelligence
+                </h1>
+                <p class="text-xl text-gray-300 max-w-2xl mx-auto">
+                    An interactive journey towards understanding and developing advanced, ethical AI systems.
+                </p>
             </div>
         </main>
 
         <!-- Footer -->
-        <footer class="text-center py-6 border-t border-gray-700 text-gray-500">
-            <p>&copy; 2025 Your Name. All Rights Reserved.</p>
+        <footer class="text-center py-6 text-gray-500">
+            <p>&copy; 2025 Ebayednoob. All Rights Reserved.</p>
         </footer>
     </div>
 
-    <!-- Firebase SDKs and custom script -->
+    <!-- Firebase and Main Logic Script -->
     <script type="module">
         // Import Firebase services
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
@@ -79,24 +105,22 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
 
-        // Your web app's Firebase configuration
+        // --- Firebase Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
             authDomain: "gitlabs-3e081.firebaseapp.com",
             projectId: "gitlabs-3e081",
-            storageBucket: "gitlabs-3e081.appspot.com", // Corrected storage bucket domain
+            storageBucket: "gitlabs-3e081.appspot.com",
             messagingSenderId: "46943115268",
             appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
             measurementId: "G-M3MLTNVRH0"
         };
 
-        // Initialize Firebase
+        // --- Firebase Initialization ---
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app); // Initialize Analytics
+        const analytics = getAnalytics(app);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
-        // Ensure user session persists across browser tabs/reloads
         setPersistence(auth, browserLocalPersistence);
 
         // --- DOM Element References ---
@@ -110,91 +134,164 @@
 
         // --- Authentication Logic ---
         const provider = new GoogleAuthProvider();
-
-        // Listen for changes in authentication state (login/logout)
         onAuthStateChanged(auth, user => {
             if (user) {
-                // User is signed in
-                console.log('User signed in:', user.uid);
                 userProfileDiv.classList.remove('hidden');
                 userProfileDiv.classList.add('flex');
                 loginBtn.classList.add('hidden');
                 userEmailSpan.textContent = user.email;
-
-                // Optional: Create a user document in Firestore if it doesn't exist
                 const userRef = doc(db, "users", user.uid);
                 getDoc(userRef).then(docSnap => {
                     if (!docSnap.exists()) {
-                        setDoc(userRef, {
-                            email: user.email,
-                            createdAt: new Date(),
-                            tutorialProgress: {} // Example field
-                        }).then(() => console.log('New user document created in Firestore.'));
+                        setDoc(userRef, { email: user.email, createdAt: new Date(), tutorialProgress: {} });
                     }
                 });
-
             } else {
-                // User is signed out
-                console.log('User signed out.');
                 userProfileDiv.classList.add('hidden');
                 loginBtn.classList.remove('hidden');
                 userEmailSpan.textContent = '';
             }
         });
 
-        // Event listener for the login button
-        loginBtn.addEventListener('click', () => {
-            signInWithPopup(auth, provider)
-                .then((result) => {
-                    console.log("Login successful!", result.user);
-                }).catch((error) => {
-                    console.error("Authentication failed:", error);
-                    const errorCode = error.code;
-                    const errorMessage = error.message;
-                    // Handle errors here.
-                });
-        });
-
-        // Event listener for the logout button
+        loginBtn.addEventListener('click', () => signInWithPopup(auth, provider).catch(error => console.error("Authentication failed:", error)));
         logoutBtn.addEventListener('click', () => {
             signOut(auth).then(() => {
-                // Sign-out successful.
-                // The onAuthStateChanged listener will handle the UI update.
-                // Navigate to home page after logout
-                contentArea.innerHTML = `
-                    <div class="text-center">
-                        <h1 class="text-5xl font-bold mb-4">You have been logged out.</h1>
-                        <p class="text-xl text-gray-400">Thank you for visiting.</p>
-                    </div>
-                `;
-            }).catch((error) => {
-                console.error("Sign out failed:", error);
-            });
+                contentArea.innerHTML = `<div class="text-center"><h1 class="text-5xl font-bold mb-4">You have been logged out.</h1><p class="text-xl text-gray-400">Thank you for visiting.</p></div>`;
+            }).catch(error => console.error("Sign out failed:", error));
         });
 
         // --- Content Loading Logic ---
         async function loadContent(filePath) {
             try {
-                // Add a loading state
                 contentArea.innerHTML = '<p class="text-center text-gray-400">Loading...</p>';
-                
                 const response = await fetch(filePath);
-                if (!response.ok) {
-                    throw new Error(`Could not load ${filePath}. Status: ${response.status}`);
-                }
-                const htmlContent = await response.text();
-                contentArea.innerHTML = htmlContent;
-
+                if (!response.ok) throw new Error(`Could not load ${filePath}. Status: ${response.status}`);
+                contentArea.innerHTML = await response.text();
             } catch (error) {
                 console.error('Failed to fetch content:', error);
-                contentArea.innerHTML = `<p class="text-center text-red-400">Sorry, we couldn't load this section. Please try again later.</p>`;
+                contentArea.innerHTML = `<p class="text-center text-red-400">Sorry, we couldn't load this section.</p>`;
             }
         }
 
-        // Event listeners for navigation buttons
+        // --- Event Delegation for Dynamic Content ---
+        contentArea.addEventListener('click', (event) => {
+            const loadTarget = event.target.closest('[data-load-path]');
+            if (loadTarget) {
+                event.preventDefault();
+                loadContent(loadTarget.getAttribute('data-load-path'));
+                return;
+            }
+            const toggleTarget = event.target.closest('[data-toggle-id]');
+            if (toggleTarget) {
+                event.preventDefault();
+                const elementToToggle = document.getElementById(toggleTarget.getAttribute('data-toggle-id'));
+                if (elementToToggle) elementToToggle.classList.toggle('hidden');
+            }
+        });
+
+        // --- Main Navigation Button Events ---
         projectsBtn.addEventListener('click', () => loadContent('projects.html'));
         tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html'));
 
+        // --- Interactive Background Logic (three.js) ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0); // Transparent background
+
+        const particleCount = 5000;
+        const positions = new Float32Array(particleCount * 3);
+        const velocities = new Float32Array(particleCount * 3);
+
+        for (let i = 0; i < particleCount; i++) {
+            positions[i * 3] = (Math.random() - 0.5) * 20;
+            positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+            velocities[i * 3] = (Math.random() - 0.5) * 0.002;
+            velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.002;
+            velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.002;
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        
+        const material = new THREE.PointsMaterial({
+            color: 0x00aaff,
+            size: 0.025,
+            transparent: true,
+            blending: THREE.AdditiveBlending
+        });
+
+        const particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+
+        camera.position.z = 10;
+
+        const mouse = new THREE.Vector2(-100, -100); // Initialize mouse off-screen
+
+        function onMouseMove(event) {
+            // Normalize mouse position from -1 to +1
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+        window.addEventListener('mousemove', onMouseMove, false);
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', onWindowResize, false);
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const positionAttribute = particles.geometry.attributes.position;
+            const force = new THREE.Vector3();
+
+            for (let i = 0; i < particleCount; i++) {
+                const x = positionAttribute.getX(i);
+                const y = positionAttribute.getY(i);
+                const z = positionAttribute.getZ(i);
+
+                // Mouse interaction physics
+                const screenPos = new THREE.Vector3(x, y, z).project(camera);
+                const dx = screenPos.x - mouse.x;
+                const dy = screenPos.y - mouse.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 0.2) {
+                    const forceMagnitude = (0.2 - distance) * 0.05;
+                    force.set(dx, dy, 0).normalize().multiplyScalar(forceMagnitude);
+                    velocities[i * 3] += force.x;
+                    velocities[i * 3 + 1] += force.y;
+                }
+
+                // Apply velocity and some damping
+                positionAttribute.setX(i, x + velocities[i * 3]);
+                positionAttribute.setY(i, y + velocities[i * 3 + 1]);
+                positionAttribute.setZ(i, z + velocities[i * 3 + 2]);
+                
+                velocities[i*3] *= 0.98;
+                velocities[i*3+1] *= 0.98;
+                velocities[i*3+2] *= 0.98;
+
+                // Wrap particles around
+                if (Math.abs(x) > 10) positionAttribute.setX(i, -x);
+                if (Math.abs(y) > 10) positionAttribute.setY(i, -y);
+                if (Math.abs(z) > 10) positionAttribute.setZ(i, -z);
+            }
+
+            positionAttribute.needsUpdate = true;
+            
+            particles.rotation.y += 0.0001;
+            particles.rotation.x += 0.0002;
+
+            renderer.render(scene, camera);
+        }
+        animate(); // Start the animation loop
     </script>
 </body>
 </html>
