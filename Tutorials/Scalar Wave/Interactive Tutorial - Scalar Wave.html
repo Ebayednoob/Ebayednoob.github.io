@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tutorial: Scalar Waves, Quantum & AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overscroll-behavior: none;
+        }
+        .tutorial-step {
+            display: none;
+        }
+        .tutorial-step.active {
+            display: block;
+        }
+        .btn {
+            @apply px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+        }
+        .btn-secondary {
+            @apply bg-gray-600 hover:bg-gray-700 focus:ring-gray-400;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .three-container {
+            height: 400px;
+            background-color: #1a202c;
+            border-radius: 0.5rem;
+            position: relative;
+            overflow: hidden;
+            cursor: move;
+        }
+        .animation-container {
+            height: 200px;
+            background-color: #f0f4f8;
+            border-radius: 0.5rem;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white">A Visual Journey into Scalar Waves</h1>
+            <p class="text-lg text-gray-400 mt-2">An interactive tutorial on the bridge between quantum communication and AI.</p>
+        </header>
+
+        <main class="bg-gray-800 rounded-xl shadow-2xl p-6">
+            <div id="steps-container">
+                <!-- Tutorial Step 1: Introduction -->
+                <div id="step-1" class="tutorial-step active">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 1: Welcome!</h2>
+                    <p class="mb-4">This tutorial will guide you through a speculative but fascinating framework that connects electromagnetism, quantum mechanics, and artificial intelligence.</p>
+                    <p class="mb-4">We'll explore what scalars, vectors, and tensors are in an interactive 3D space. Then, we'll see how a special coil could theoretically generate "scalar waves." Finally, we'll visualize how these waves might enable faster-than-light communication and instantaneous learning in AI.</p>
+                    <p class="text-sm text-gray-500">Note: The concepts presented here are based on theoretical and historical research and are not part of mainstream accepted science. This tutorial is for educational and exploratory purposes.</p>
+                </div>
+
+                <!-- Tutorial Step 2: Scalars, Vectors, Tensors -->
+                <div id="step-2" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 2: The Building Blocks of Reality & Data</h2>
+                    <p class="mb-4">Everything in physics and AI is described using mathematical objects. Let's visualize the three most fundamental ones. Drag the scene below to rotate the view.</p>
+                    <div class="grid md:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <h3 class="font-semibold text-lg mb-2">Scalar (Rank 0)</h3>
+                            <div class="bg-gray-700 p-4 rounded-lg h-24 flex items-center justify-center">
+                                <span id="scalar-value" class="text-4xl font-mono">1.21</span>
+                            </div>
+                            <p class="text-sm mt-2">A single number, like Temperature or an AI's error score. It has magnitude, but no direction.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg mb-2">Vector (Rank 1)</h3>
+                            <div id="vector-container" class="three-container"></div>
+                            <p class="text-sm mt-2">Has magnitude <span class="font-mono text-green-400">(length)</span> and <span class="font-mono text-green-400">direction</span>. Think of Force or a feature set for an AI.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg mb-2">Tensor (Rank 2)</h3>
+                            <div id="tensor-container" class="three-container"></div>
+                            <p class="text-sm mt-2">Describes directional properties, like stress in a material or an AI's transformation layer (weights).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tutorial Step 3: Generating The Wave -->
+                <div id="step-3" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 3: The Tesla Bifilar Coil</h2>
+                    <p class="mb-4">To generate a scalar wave, we need a special device. The theory uses a Tesla Bifilar Pancake Coil, but not in the way you might think. It's designed to <span class="text-green-400">amplify</span> fields, not cancel them. Drag to rotate the system, and toggle the current direction below to see the difference.</p>
+                    <div id="coil-container" class="three-container relative">
+                        <div class="absolute top-2 left-2 bg-gray-900/70 p-3 rounded-lg z-10">
+                            <label class="font-semibold text-white">Current Direction: </label>
+                            <select id="current-direction-selector" class="bg-gray-700 text-white rounded p-1">
+                                <option value="parallel" selected>Parallel (Tesla's Design)</option>
+                                <option value="opposite">Opposite (Non-Inductive)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="coil-explanation" class="mt-4 text-center p-3 bg-gray-700 rounded-lg"></div>
+                </div>
+
+                <!-- Tutorial Step 4: Transverse vs Longitudinal Waves -->
+                <div id="step-4" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 4: Understanding The Wave</h2>
+                    <p class="mb-4">Conventional EM waves (light, radio) are <span class="text-yellow-400">transverse</span> - they wiggle perpendicular to their direction of travel. A scalar wave is theorized to be <span class="text-green-400">longitudinal</span> - a compression wave, like sound, that oscillates in the same direction it travels.</p>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="font-semibold text-lg mb-2 text-center">Transverse Wave</h3>
+                            <div class="animation-container"><canvas id="transverse-canvas"></canvas></div>
+                            <p class="text-sm mt-2 text-center">Oscillation is UP/DOWN. Propagation is RIGHT.</p>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-lg mb-2 text-center">Longitudinal Wave</h3>
+                            <div class="animation-container"><canvas id="longitudinal-canvas"></canvas></div>
+                            <p class="text-sm mt-2 text-center">Oscillation is LEFT/RIGHT. Propagation is RIGHT.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tutorial Step 5: Quantum Communication -->
+                <div id="step-5" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 5: Application 1 - Quantum Communication</h2>
+                    <p class="mb-4">Can we use this for faster-than-light communication? The "No-Communication Theorem" says no, but this is a proposed loophole. An entangled pair is shared. Bob's result is normally random. You (Alice) can fire a scalar wave to <span class="text-green-400">force</span> Bob's result, sending a '1'.</p>
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div class="flex justify-around items-center text-center">
+                            <div>
+                                <h3 class="text-lg font-semibold">ALICE (You)</h3>
+                                <button id="send-bit-btn" class="btn mt-2">Send '1' (Fire Scalar Wave)</button>
+                            </div>
+                            <div id="signal-path" class="text-3xl font-bold text-gray-500 w-1/3">--- ? ---></div>
+                            <div>
+                                <h3 class="text-lg font-semibold">BOB</h3>
+                                <div class="mt-2 text-4xl font-mono bg-gray-900 rounded p-2" id="bob-result">?</div>
+                                <p id="bob-status" class="text-sm mt-1">Measuring random results...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tutorial Step 6: 3D Entangled Systems -->
+                <div id="step-6" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 6: 3D Entangled Systems with Feedback</h2>
+                    <p class="mb-4">Let's arrange our entangled particles into complex 3D structures. Here, four triangular groups form a tetrahedron. Within each group (A, B, C), entanglement creates a feedback loop: a change in B affects C, and a change in C affects B and then A. Drag to rotate the system.</p>
+                    <div id="tetra-container" class="three-container"></div>
+                    <div class="mt-4 p-4 bg-gray-700 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col gap-2">
+                            <label class="font-semibold">1. Select a Particle to Trigger:</label>
+                            <select id="particle-selector" class="bg-gray-600 text-white rounded p-2">
+                            </select>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="font-semibold">2. Choose Propagation Method:</label>
+                            <div class="flex gap-2">
+                                <button id="step-cascade-btn" class="btn btn-secondary w-full">Step-by-Step</button>
+                                <button id="instant-cascade-btn" class="btn w-full">Instant</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tutorial Step 7: Instant Backpropagation -->
+                <div id="step-7" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 7: Application 2 - Instant AI Learning</h2>
+                    <p class="mb-4">Training an AI involves "backpropagation" - sending an error signal backwards through the network to update it. This takes time. A scalar wave could broadcast the error to all neurons <span class="text-green-400">instantly</span>.</p>
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <div id="nn-container" class="flex justify-between items-center h-48 relative">
+                        </div>
+                        <div class="flex justify-center gap-4 mt-4">
+                            <button id="standard-bp-btn" class="btn btn-secondary">Run Standard Backprop</button>
+                            <button id="scalar-bp-btn" class="btn">Run Scalar Backprop</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tutorial Step 8: Conclusion & Experimental Setup -->
+                <div id="step-8" class="tutorial-step">
+                    <h2 class="text-2xl font-bold mb-4 text-cyan-400">Step 8: Conclusion & Experimental Setup</h2>
+                    <p class="mb-4">This simulation visualizes the proposed test environment. Two coils face each other, creating an amplified field between them and a weaker return field on their outer faces. Pulsing the coils causes the fields to collapse and recombine, theoretically creating a harmonic scalar wave. This wave may translate orthogonal data into amplitude, which is then expressed by the resonant receiver.</p>
+                    <div id="experiment-container" class="three-container"></div>
+                     <div class="mt-4 p-4 bg-gray-700 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                            <label for="pulse-frequency" class="font-semibold text-white">Pulse Frequency: <span id="frequency-readout">10</span> Hz</label>
+                            <input type="range" id="pulse-frequency" min="1" max="45" value="10" class="w-full">
+                        </div>
+                         <div>
+                            <label for="coil-distance" class="font-semibold text-white">Coil Distance: <span id="distance-readout">8.0</span></label>
+                            <input type="range" id="coil-distance" min="2" max="12" step="0.1" value="8" class="w-full">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <div class="mt-8 flex justify-between items-center">
+                <button id="prev-btn" class="btn btn-secondary" disabled>Previous</button>
+                <span id="step-counter" class="text-sm text-gray-400">Step 1 of 8</span>
+                <button id="next-btn" class="btn">Next</button>
+            </div>
+        </main>
+    </div>
+
+<script>
+    // --- Basic Tutorial Navigation ---
+    let currentStep = 1;
+    const totalSteps = 8;
+    const steps = Array.from(document.querySelectorAll('.tutorial-step'));
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const stepCounter = document.getElementById('step-counter');
+
+    function updateStep() {
+        steps.forEach((step, index) => {
+            step.classList.toggle('active', (index + 1) === currentStep);
+        });
+        stepCounter.textContent = `Step ${currentStep} of ${totalSteps}`;
+        prevBtn.disabled = currentStep === 1;
+        nextBtn.disabled = currentStep === totalSteps;
+        
+        if (currentStep === 2) initStep2();
+        if (currentStep === 3) initStep3();
+        if (currentStep === 4) initStep4();
+        if (currentStep === 5) initStep5();
+        if (currentStep === 6) initStep6();
+        if (currentStep === 7) initStep7();
+        if (currentStep === 8) initStep8();
+    }
+
+    nextBtn.addEventListener('click', () => { if (currentStep < totalSteps) { currentStep++; updateStep(); } });
+    prevBtn.addEventListener('click', () => { if (currentStep > 1) { currentStep--; updateStep(); } });
+    
+    function addMouseControls(container, object) {
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        const onPointerDown = (e) => {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        };
+        const onPointerUp = () => { isDragging = false; };
+        const onPointerMove = (e) => {
+            if (!isDragging) return;
+            const deltaMove = { x: e.clientX - previousMousePosition.x, y: e.clientY - previousMousePosition.y };
+            const deltaRotationQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler( (deltaMove.y * Math.PI) / 180, (deltaMove.x * Math.PI) / 180, 0, 'XYZ' ));
+            object.quaternion.multiplyQuaternions(deltaRotationQuaternion, object.quaternion);
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        };
+        container.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('pointerup', onPointerUp, false);
+        container.addEventListener('pointermove', onPointerMove);
+    }
+    
+    // --- Initializer Functions for each step ---
+    
+    let step2Initialized = false;
+    function initStep2() {
+        if (step2Initialized) return;
+        const vectorContainer = document.getElementById('vector-container');
+        const tensorContainer = document.getElementById('tensor-container');
+        if (!vectorContainer || !tensorContainer) return;
+        const vectorScene = new THREE.Scene();
+        const vectorCamera = new THREE.PerspectiveCamera(75, vectorContainer.clientWidth / vectorContainer.clientHeight, 0.1, 1000);
+        const vectorRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        vectorRenderer.setSize(vectorContainer.clientWidth, vectorContainer.clientHeight);
+        vectorContainer.innerHTML = ''; vectorContainer.appendChild(vectorRenderer.domElement);
+        const vectorArrow = new THREE.ArrowHelper(new THREE.Vector3(1, 1, 1).normalize(), new THREE.Vector3(0, 0, 0), 2, 0x00ff00, 0.5, 0.3);
+        vectorScene.add(vectorArrow);
+        vectorCamera.position.z = 4;
+        addMouseControls(vectorContainer, vectorArrow);
+        const tensorScene = new THREE.Scene();
+        const tensorCamera = new THREE.PerspectiveCamera(75, tensorContainer.clientWidth / tensorContainer.clientHeight, 0.1, 1000);
+        const tensorRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        tensorRenderer.setSize(tensorContainer.clientWidth, tensorContainer.clientHeight);
+        tensorContainer.innerHTML = ''; tensorContainer.appendChild(tensorRenderer.domElement);
+        const tensorBox = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), new THREE.MeshNormalMaterial());
+        tensorScene.add(tensorBox);
+        tensorCamera.position.z = 4;
+        addMouseControls(tensorContainer, tensorBox);
+        function animate() {
+            if(currentStep !== 2) { step2Initialized = false; return; }
+            requestAnimationFrame(animate);
+            vectorRenderer.render(vectorScene, vectorCamera);
+            tensorRenderer.render(tensorScene, tensorCamera);
+        }
+        animate();
+        step2Initialized = true;
+    }
+    
+    let step3Initialized = false;
+    function initStep3() {
+        if(step3Initialized) return;
+        const container = document.getElementById('coil-container');
+        if (!container) return;
+        const coilSelector = document.getElementById('current-direction-selector');
+        const coilExplanation = document.getElementById('coil-explanation');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        while (container.children.length > 1) { container.removeChild(container.lastChild); }
+        container.appendChild(renderer.domElement);
+        const masterGroup = new THREE.Group();
+        const coilGroup = new THREE.Group();
+        const material1 = new THREE.LineBasicMaterial({ color: 0xff0000 });
+        const material2 = new THREE.LineBasicMaterial({ color: 0x0000ff });
+        for (let i = 0; i < 12; i++) {
+            const radius = 0.8 + i * 0.22;
+            const wireOffset = 0.08;
+            const points1 = [], points2 = [];
+            for (let j = 0; j <= 360; j++) {
+                const angle = (j * Math.PI) / 180;
+                points1.push(new THREE.Vector3(Math.cos(angle) * (radius), Math.sin(angle) * (radius), 0));
+                points2.push(new THREE.Vector3(Math.cos(angle) * (radius + wireOffset), Math.sin(angle) * (radius + wireOffset), 0));
+            }
+            coilGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points1), material1));
+            coilGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points2), material2));
+        }
+        masterGroup.add(coilGroup);
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particleCount = 5000;
+        const posArray = new Float32Array(particleCount * 3);
+        const particleMeta = new Float32Array(particleCount * 2); 
+        for(let i=0; i < particleCount; i++) {
+            posArray[i*3] = 0; posArray[i*3+1] = 0; posArray[i*3+2] = 0;
+            particleMeta[i*2] = Math.random() * Math.PI * 2; 
+            particleMeta[i*2+1] = Math.random() * Math.PI * 2; 
+        }
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        particlesGeometry.setAttribute('meta', new THREE.BufferAttribute(particleMeta, 2));
+        const fieldParticles = new THREE.Points(particlesGeometry, new THREE.PointsMaterial({ size: 0.05, color: 0x00ff00 }));
+        masterGroup.add(fieldParticles);
+        scene.add(masterGroup);
+        camera.position.set(8, 4, 8);
+        camera.lookAt(masterGroup.position);
+        addMouseControls(container, masterGroup);
+        let particleClock = new THREE.Clock();
+        function updateCoilVisualization() {
+            const mode = coilSelector.value;
+            if (mode === 'parallel') coilExplanation.innerHTML = `<span class="font-bold text-green-400">Toroidal Field Generation:</span> Currents flow the same way. The amplified fields create a stable, rotating toroidal vortex.`;
+            else coilExplanation.innerHTML = `<span class="font-bold text-red-400">Field Cancellation:</span> Currents flow opposite ways. The magnetic fields cancel.`;
+        }
+        coilSelector.addEventListener('change', updateCoilVisualization);
+        updateCoilVisualization();
+        function animate() {
+            if(currentStep !== 3) { step3Initialized = false; return; }
+            requestAnimationFrame(animate);
+            const mode = coilSelector.value;
+            const positions = fieldParticles.geometry.attributes.position.array;
+            const meta = fieldParticles.geometry.attributes.meta.array;
+            const time = particleClock.getElapsedTime();
+            const majorRadius = 3.5, minorRadius = 1.8;
+            for(let i = 0; i < positions.length / 3; i++) {
+                const p_i = i * 3, m_i = i * 2;
+                if (mode === 'parallel') {
+                    const speed = 0.5;
+                    const toroidalAngle = (meta[m_i + 1] + time * speed) % (Math.PI * 2);
+                    const poloidalAngle = meta[m_i];
+                    const R = majorRadius + minorRadius * Math.cos(poloidalAngle);
+                    positions[p_i] = R * Math.cos(toroidalAngle);
+                    positions[p_i+1] = R * Math.sin(toroidalAngle);
+                    positions[p_i+2] = minorRadius * Math.sin(poloidalAngle);
+                } else {
+                    positions[p_i] += (Math.random() - 0.5) * 0.05;
+                    positions[p_i+1] += (Math.random() - 0.5) * 0.05;
+                    positions[p_i+2] += (Math.random() - 0.5) * 0.05;
+                    const dist = Math.sqrt(positions[p_i]**2 + positions[p_i+1]**2 + positions[p_i+2]**2);
+                    if (dist > 7) { positions[p_i] = 0; positions[p_i+1] = 0; positions[p_i+2] = 0; }
+                }
+            }
+            fieldParticles.geometry.attributes.position.needsUpdate = true;
+            renderer.render(scene, camera);
+        }
+        animate();
+        step3Initialized = true;
+    }
+    
+    let step4Initialized = false;
+    function initStep4() {
+        if (step4Initialized) return;
+        let waveTime = 0;
+        function animate() {
+            if (currentStep !== 4) return;
+            requestAnimationFrame(animate);
+            const transCanvas = document.getElementById('transverse-canvas');
+            const longCanvas = document.getElementById('longitudinal-canvas');
+            if(!transCanvas || !longCanvas) return;
+            const tCtx = transCanvas.getContext('2d'), lCtx = longCanvas.getContext('2d');
+            const w = transCanvas.width, h = transCanvas.height;
+            tCtx.clearRect(0,0,w,h); lCtx.clearRect(0,0,w,h);
+            tCtx.strokeStyle = '#38b2ac'; tCtx.lineWidth = 2; tCtx.beginPath();
+            for(let x=0; x<w; x++) { const y = h/2 + Math.sin(x * 0.05 + waveTime) * (h/2 - 10); if(x===0) tCtx.moveTo(x,y); else tCtx.lineTo(x,y); }
+            tCtx.stroke();
+            lCtx.fillStyle = '#63b3ed';
+            for(let i=0; i<50; i++) { const baseX = (w / 50) * i; const offsetX = Math.cos(i * 0.5 + waveTime) * 10; lCtx.beginPath(); lCtx.arc(baseX + offsetX, h/2, 3, 0, Math.PI * 2); lCtx.fill(); }
+            waveTime += 0.05;
+        }
+        animate();
+        step4Initialized = true;
+    }
+
+    let step5Initialized = false;
+    function initStep5() {
+        if(step5Initialized) return;
+        const sendBitBtn = document.getElementById('send-bit-btn');
+        if (!sendBitBtn) return;
+        let bobMeasurementInterval;
+        const bobResult = document.getElementById('bob-result');
+        const bobStatus = document.getElementById('bob-status');
+        const signalPath = document.getElementById('signal-path');
+        const measureBob = () => {
+            if (currentStep !== 5) { clearInterval(bobMeasurementInterval); return; }
+            bobResult.textContent = Math.random() > 0.5 ? '0' : '1';
+            bobResult.classList.remove('text-green-400');
+        };
+        const resetBob = () => {
+            if (currentStep !== 5) return;
+            bobStatus.textContent = "Measuring random results...";
+            signalPath.textContent = '--- ? --->'; signalPath.classList.remove('text-green-400');
+            clearInterval(bobMeasurementInterval);
+            bobMeasurementInterval = setInterval(measureBob, 1000);
+        };
+        sendBitBtn.addEventListener('click', () => {
+            clearInterval(bobMeasurementInterval);
+            signalPath.textContent = '--- Wave Sent! --->'; signalPath.classList.add('text-green-400');
+            setTimeout(() => {
+                bobResult.textContent = '1';
+                bobResult.classList.add('text-green-400');
+                bobStatus.textContent = "Forced measurement received!";
+            }, 100);
+            setTimeout(resetBob, 2000);
+        });
+        resetBob();
+        step5Initialized = true;
+    }
+    
+    let step6Initialized = false;
+    function initStep6() {
+        if (step6Initialized) return;
+        const container = document.getElementById('tetra-container');
+        if (!container) return;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.innerHTML = '';
+        container.appendChild(renderer.domElement);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(5, 10, 7.5);
+        scene.add(directionalLight);
+        const masterGroup = new THREE.Group();
+        let particleStates = [];
+        const stableColor = new THREE.Color(0x9ca3af);
+        const triggeredColor = new THREE.Color(0x4ade80);
+        let cascadeEvents = [];
+        let cascadeRunning = false;
+        
+        const tetraVertices = [
+            new THREE.Vector3(1, 1, 1), new THREE.Vector3(1, -1, -1),
+            new THREE.Vector3(-1, 1, -1), new THREE.Vector3(-1, -1, 1)
+        ].map(v => v.multiplyScalar(2));
+
+        function createTriangularGroup(groupIndex) {
+            const group = new THREE.Group();
+            const particleRadius = 0.4, groupRadius = 1;
+            const particlePositions = [
+                new THREE.Vector3(0, groupRadius, 0),
+                new THREE.Vector3(-groupRadius * Math.sqrt(3)/2, -groupRadius/2, 0),
+                new THREE.Vector3(groupRadius * Math.sqrt(3)/2, -groupRadius/2, 0)
+            ];
+            particlePositions.forEach((pos, particleIndex) => {
+                const geometry = new THREE.SphereGeometry(particleRadius, 32, 32);
+                const material = new THREE.MeshStandardMaterial({ color: stableColor, metalness: 0.3, roughness: 0.5 });
+                const sphere = new THREE.Mesh(geometry, material);
+                sphere.name = `particle-${groupIndex}-${particleIndex}`;
+                sphere.position.copy(pos);
+                group.add(sphere);
+                particleStates.push({ mesh: sphere, state: 0 });
+            });
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x60a5fa });
+            group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([particlePositions[0], particlePositions[1]]), lineMat));
+            group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([particlePositions[1], particlePositions[2]]), lineMat));
+            return group;
+        }
+
+        tetraVertices.forEach((pos, groupIndex) => {
+            const group = createTriangularGroup(groupIndex);
+            group.position.copy(pos);
+            masterGroup.add(group);
+        });
+        scene.add(masterGroup);
+        camera.position.set(0, 3, 10);
+        camera.lookAt(masterGroup.position);
+        addMouseControls(container, masterGroup);
+
+        function setupStep6UI() {
+            const selector = document.getElementById('particle-selector');
+            selector.innerHTML = '';
+            const particleNames = ['A', 'B', 'C'];
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 3; j++) {
+                    const option = document.createElement('option');
+                    option.value = `${i}-${j}`;
+                    option.textContent = `Group ${i + 1}, Particle ${particleNames[j]}`;
+                    selector.appendChild(option);
+                }
+            }
+            document.getElementById('step-cascade-btn').onclick = () => runCascade(false);
+            document.getElementById('instant-cascade-btn').onclick = () => runCascade(true);
+        }
+
+        function runCascade(isInstant) {
+            if (cascadeRunning) return;
+            particleStates.forEach(p => { p.state = 0; p.mesh.material.color.set(stableColor); });
+            cascadeEvents = []; // Clear old events
+            const [groupIndex, particleIndex] = document.getElementById('particle-selector').value.split('-').map(Number);
+            
+            if (isInstant) {
+                 for(let i = 0; i < 3; i++) {
+                    const p = particleStates[groupIndex * 3 + i];
+                    p.state = 1;
+                    p.mesh.material.color.set(triggeredColor);
+                }
+            } else {
+                cascadeRunning = true;
+                document.querySelectorAll('#step-6 button, #step-6 select').forEach(b => b.disabled = true);
+                const startTime = performance.now();
+                const pIdx = groupIndex * 3 + particleIndex;
+
+                cascadeEvents.push({ time: startTime, index: pIdx, state: 1 });
+
+                if (particleIndex === 0) { // A
+                    cascadeEvents.push({ time: startTime + 500, index: groupIndex * 3 + 1, state: 1 });
+                } else if (particleIndex === 1) { // B
+                    cascadeEvents.push({ time: startTime + 500, index: groupIndex * 3 + 2, state: 1 });
+                } else if (particleIndex === 2) { // C
+                    cascadeEvents.push({ time: startTime + 500, index: groupIndex * 3 + 1, state: 1 });
+                    cascadeEvents.push({ time: startTime + 1000, index: groupIndex * 3 + 0, state: 1 });
+                }
+                const totalDuration = (particleIndex === 2) ? 1500 : 1000;
+                setTimeout(() => {
+                    cascadeRunning = false;
+                    document.querySelectorAll('#step-6 button, #step-6 select').forEach(b => b.disabled = false);
+                }, totalDuration);
+            }
+        }
+        
+        function animateStep6() {
+            if (currentStep !== 6) { step6Initialized = false; return; }
+            requestAnimationFrame(animateStep6);
+            
+            const now = performance.now();
+            for (let i = cascadeEvents.length - 1; i >= 0; i--) {
+                const event = cascadeEvents[i];
+                if (now >= event.time) {
+                    const p = particleStates[event.index];
+                    p.state = event.state;
+                    p.mesh.material.color.set(event.state === 1 ? triggeredColor : stableColor);
+                    cascadeEvents.splice(i, 1);
+                }
+            }
+            renderer.render(scene, camera);
+        }
+        
+        setupStep6UI();
+        animateStep6();
+        step6Initialized = true;
+    }
+
+    let step7Initialized = false;
+    function initStep7() {
+        if(step7Initialized) return;
+        const container = document.getElementById('nn-container');
+        if (!container) return;
+        container.innerHTML = ''; 
+        ['Input', 'Hidden', 'Output'].forEach((layerName, layerIdx) => {
+            const layerDiv = document.createElement('div');
+            layerDiv.className = 'flex flex-col gap-4 justify-center h-full';
+            const numNeurons = layerName === 'Hidden' ? 3 : (layerName === 'Input' ? 2 : 1);
+            for (let i=0; i<numNeurons; i++) {
+                const neuron = document.createElement('div');
+                neuron.id = `neuron-${layerIdx}-${i}`;
+                neuron.className = 'w-10 h-10 bg-blue-500 rounded-full transition-all duration-300';
+                layerDiv.appendChild(neuron);
+            }
+            container.appendChild(layerDiv);
+        });
+        function resetNeurons() {
+            document.querySelectorAll('[id^="neuron-"]').forEach(n => {
+                n.className = 'w-10 h-10 bg-blue-500 rounded-full transition-all duration-300';
+            });
+        }
+        function runStandardBP() {
+            resetNeurons();
+            setTimeout(() => {
+                document.getElementById('neuron-2-0')?.classList.replace('bg-blue-500', 'bg-red-500');
+                setTimeout(() => {
+                    ['neuron-1-0','neuron-1-1','neuron-1-2'].forEach(id => document.getElementById(id)?.classList.replace('bg-blue-500', 'bg-red-500'));
+                    setTimeout(() => {
+                        ['neuron-0-0','neuron-0-1'].forEach(id => document.getElementById(id)?.classList.replace('bg-blue-500', 'bg-red-500'));
+                    }, 700);
+                }, 700);
+            }, 100);
+        }
+        function runScalarBP() {
+            resetNeurons();
+            setTimeout(() => {
+                document.querySelectorAll('[id^="neuron-"]').forEach(n => {
+                    n.classList.replace('bg-blue-500', 'bg-green-500');
+                });
+            }, 100);
+        }
+        document.getElementById('standard-bp-btn').addEventListener('click', runStandardBP);
+        document.getElementById('scalar-bp-btn').addEventListener('click', runScalarBP);
+        step7Initialized = true;
+    }
+    
+    let step8Initialized = false;
+    function initStep8() {
+        if(step8Initialized) return;
+        const container = document.getElementById('experiment-container');
+        if (!container) return;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.innerHTML = '';
+        container.appendChild(renderer.domElement);
+        
+        const masterGroup = new THREE.Group();
+        scene.add(masterGroup);
+        
+        let pulseFrequency = 10;
+        let coilDistance = 8;
+        const frequencySlider = document.getElementById('pulse-frequency');
+        const frequencyReadout = document.getElementById('frequency-readout');
+        const distanceSlider = document.getElementById('coil-distance');
+        const distanceReadout = document.getElementById('distance-readout');
+
+        frequencySlider.addEventListener('input', (e) => {
+             pulseFrequency = e.target.value;
+             frequencyReadout.textContent = pulseFrequency;
+        });
+        distanceSlider.addEventListener('input', (e) => {
+             coilDistance = parseFloat(e.target.value);
+             distanceReadout.textContent = coilDistance.toFixed(1);
+             transmitterSystem.position.x = -coilDistance / 2;
+             receiverSystem.position.x = coilDistance / 2;
+        });
+        
+        const rippleMaterial = new THREE.MeshBasicMaterial({color: 0x00ffff, transparent: true, opacity: 0.5});
+        const rippleGeometry = new THREE.PlaneGeometry(1, 1);
+        const ripple = new THREE.Mesh(rippleGeometry, rippleMaterial);
+        ripple.rotation.x = -Math.PI / 2;
+        ripple.visible = false;
+        masterGroup.add(ripple);
+
+        function createCoilSystem(position, rotationY) {
+            const system = new THREE.Group();
+            const coilGroup = new THREE.Group();
+            const material1 = new THREE.LineBasicMaterial({ color: 0xff0000 });
+            const material2 = new THREE.LineBasicMaterial({ color: 0x0000ff });
+            for (let i = 0; i < 12; i++) {
+                const radius = 0.8 + i * 0.22;
+                const wireOffset = 0.08;
+                const points1 = [], points2 = [];
+                for (let j = 0; j <= 360; j++) {
+                    const angle = (j * Math.PI) / 180;
+                    points1.push(new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0));
+                    points2.push(new THREE.Vector3(Math.cos(angle) * (radius + wireOffset), Math.sin(angle) * (radius + wireOffset), 0));
+                }
+                coilGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points1), material1));
+                coilGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points2), material2));
+            }
+            system.add(coilGroup);
+
+            const particleCount = 4000;
+            const posArray = new Float32Array(particleCount * 3);
+            const particleMeta = new Float32Array(particleCount * 3);
+            for(let i=0; i < particleCount; i++) {
+                const isStrongSide = i < particleCount * 0.75;
+                posArray[i*3] = 0; posArray[i*3+1] = 0; posArray[i*3+2] = 0;
+                particleMeta[i*3] = Math.random() * Math.PI * 2;
+                particleMeta[i*3 + 1] = isStrongSide ? 1 : -1;
+                particleMeta[i*3 + 2] = Math.random() * Math.PI * 2;
+            }
+            
+            const particlesGeometry = new THREE.BufferGeometry();
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            particlesGeometry.setAttribute('meta', new THREE.BufferAttribute(particleMeta, 3));
+            
+            const fieldParticles = new THREE.Points(particlesGeometry, new THREE.PointsMaterial({ size: 0.05, color: 0x00ff00, transparent: true }));
+            system.add(fieldParticles);
+            system.position.copy(position);
+            system.rotation.y = rotationY;
+            masterGroup.add(system);
+            return { system, particles: fieldParticles };
+        }
+
+        const { system: transmitterSystem, particles: transmitterParticles } = createCoilSystem(new THREE.Vector3(-4, 0, 0), Math.PI / 2);
+        const { system: receiverSystem, particles: receiverParticles } = createCoilSystem(new THREE.Vector3(4, 0, 0), -Math.PI / 2);
+        
+        camera.position.set(0, 10, 15);
+        camera.lookAt(masterGroup.position);
+        addMouseControls(container, masterGroup);
+        
+        const clock = new THREE.Clock();
+        
+        function animateStep8() {
+            if(currentStep !== 8) { step8Initialized = false; return; }
+            requestAnimationFrame(animateStep8);
+            const time = clock.getElapsedTime();
+            
+            const pulse = (Math.sin(time * pulseFrequency * Math.PI) + 1) / 2;
+            
+            if (pulse < 0.1 && !ripple.visible) {
+                 ripple.visible = true;
+                 ripple.scale.set(0.1, 0.1, 0.1);
+                 ripple.material.opacity = 0.8;
+            }
+            if (ripple.visible) {
+                ripple.scale.x += 0.8;
+                ripple.scale.z += 0.8;
+                ripple.material.opacity -= 0.02;
+                if (ripple.material.opacity <= 0) ripple.visible = false;
+            }
+
+            function updateParticles(particleSystem) {
+                particleSystem.material.opacity = pulse;
+                const positions = particleSystem.geometry.attributes.position.array;
+                const meta = particleSystem.geometry.attributes.meta.array;
+                
+                for(let i = 0; i < positions.length / 3; i++) {
+                    const p_i = i * 3, m_i = i * 3;
+                    const speed = 0.5;
+                    const toroidalAngle = (meta[m_i] + time * speed) % (Math.PI * 2);
+                    const side = meta[m_i + 1];
+                    const poloidalAngle = meta[m_i + 2];
+                    const majorRadius = side === 1 ? 3.5 : 1.5;
+                    const minorRadius = side === 1 ? 1.8 : 0.6;
+                    const R = majorRadius + minorRadius * Math.cos(poloidalAngle);
+                    positions[p_i] = R * Math.cos(toroidalAngle);
+                    positions[p_i+1] = R * Math.sin(toroidalAngle);
+                    positions[p_i+2] = minorRadius * Math.sin(poloidalAngle);
+                }
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }
+
+            updateParticles(transmitterParticles);
+            updateParticles(receiverParticles);
+            
+            renderer.render(scene, camera);
+        }
+        
+        animateStep8();
+        step8Initialized = true;
+    }
+    
+    // --- Initial Load ---
+    updateStep();
+</script>
+
+</body>
+</html>
