@@ -268,19 +268,14 @@
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global State ---
-        let pageInitialized = false;
         let auth, db;
         let marketChartInstance, revenueChartInstance;
         let unsubscribeSocials;
 
         // --- Core Page Initialization Function ---
         function initializePage() {
-            if (pageInitialized) {
-                console.log("Page already initialized. Skipping.");
-                return;
-            }
-            console.log("Initializing page...");
-
+            console.log("Initializing page content and UI...");
+            
             // --- Firebase Setup ---
             const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -302,7 +297,6 @@
             
             setupUI();
             
-            pageInitialized = true;
             console.log("Page initialized successfully.");
         }
 
@@ -489,12 +483,13 @@
         // --- Event Listeners to Trigger Initialization ---
         // Fires on initial page load
         window.addEventListener('DOMContentLoaded', initializePage);
-        // Fires when page is shown from back-forward cache, ensuring a fresh start
+
+        // This event listener forces a page reload if the page is restored from the back-forward cache.
+        // This is a robust way to ensure scripts are re-executed and content is fresh.
         window.addEventListener('pageshow', function(event) {
             if (event.persisted) {
-                console.log("Page was restored from bfcache. Re-initializing.");
-                pageInitialized = false; // Reset flag to allow re-initialization
-                initializePage();
+                console.log("Page was restored from bfcache. Forcing a full reload.");
+                window.location.reload();
             }
         });
         
