@@ -2,25 +2,39 @@
 <div class="text-left">
     <h2 class="text-4xl font-bold mb-6 border-b border-gray-700 pb-3">My Projects</h2>
     
-    <!-- Project 1: Schism Labs (Interactive Accordion) -->
-    <div class="bg-gray-800 rounded-lg mb-4">
-        <!-- This button uses a data-attribute to toggle the visibility of the options div -->
-        <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-gray-700/50 rounded-t-lg">
-            <!-- pointer-events-none ensures the click is registered on the button itself -->
-            <h3 class="text-2xl font-semibold text-blue-400 pointer-events-none">Schism Labs</h3>
-            <p class="text-gray-300 mt-2 pointer-events-none">A venture into emergent AI and contextual embedding systems.</p>
-        </button>
-        
-        <!-- Collapsible Options. The 'id' here matches the 'data-toggle-id' from the button above -->
-        <div id="schism-labs-options" class="hidden px-6 pb-6 border-t border-gray-700">
-            <p class="text-gray-400 mt-4 mb-4">Select a resource to view:</p>
-            
-            <!-- This button uses a data-attribute to load new content into the main area -->
-            <button data-load-path="Projects/Schism Labs/Schism Labs Landing Page.html" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                View Landing Page
+    <!-- Project 1: Schism Labs (Redesigned with BG and Logo) -->
+    <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/Logo Files/Schism-cardbg.png');">
+        <!-- Overlay for text readability -->
+        <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
+
+        <div class="relative">
+             <!-- This button still toggles the options -->
+            <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
+                <div class="flex items-center space-x-4 pointer-events-none">
+                    <!-- Logo -->
+                    <img src="Resources/Pictures/Logo Files/Schism-logo.png" alt="Schism Labs Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
+                    <!-- Text Content -->
+                    <div>
+                        <h3 class="text-2xl font-semibold text-blue-400">Schism Labs</h3>
+                        <p class="text-gray-300 mt-1">A venture into emergent AI and contextual embedding systems.</p>
+                    </div>
+                </div>
             </button>
             
-            <!-- You can add more buttons here that load other pages -->
+            <!-- Collapsible Options. The 'id' here matches the 'data-toggle-id' from the button above -->
+            <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
+                <!-- Added a container and border for better visual separation -->
+                <div class="border-t border-gray-600 pt-4">
+                     <p class="text-gray-400 mb-4">Select a resource to view:</p>
+                    
+                    <!-- This button uses a data-attribute to load new content into the main area -->
+                    <button data-load-path="Projects/Schism Labs/Schism Labs Landing Page.html" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                        View Landing Page
+                    </button>
+                    
+                    <!-- You can add more buttons here that load other pages -->
+                </div>
+            </div>
         </div>
     </div>
 
