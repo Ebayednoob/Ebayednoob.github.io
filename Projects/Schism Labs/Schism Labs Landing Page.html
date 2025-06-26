@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schism Labs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyan-glow: rgba(0, 255, 255, 0.5);
+        }
+        html {
+           scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a0a;
+            color: #e5e7eb;
+            overflow-x: hidden;
+        }
+        #interactive-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .content-section {
+            position: relative;
+            z-index: 1;
+            padding-top: 6rem;
+            padding-bottom: 6rem;
+        }
+        .glass-effect {
+            background: rgba(17, 17, 17, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+        .accordion-button svg {
+            transition: transform 0.3s ease;
+        }
+        .accordion-button.open svg {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <canvas id="interactive-bg"></canvas>
+
+    <div class="relative min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="fixed top-0 left-0 right-0 z-20 py-4 px-4 sm:px-6 lg:px-8 glass-effect">
+            <div class="container mx-auto flex justify-between items-center">
+                <a href="#hero" class="text-2xl font-bold tracking-wider text-cyan-400">SCHISM LABS</a>
+                <nav class="hidden md:flex space-x-6 lg:space-x-8">
+                    <a href="#manifesto" class="text-gray-300 hover:text-cyan-400 transition-colors">Manifesto</a>
+                    <a href="#capabilities" class="text-gray-300 hover:text-cyan-400 transition-colors">R&D Focus</a>
+                    <a href="#vectors" class="text-gray-300 hover:text-cyan-400 transition-colors">Vectors</a>
+                    <a href="#theses" class="text-gray-300 hover:text-cyan-400 transition-colors">Theses</a>
+                    <a href="#strategy" class="text-gray-300 hover:text-cyan-400 transition-colors">Strategy</a>
+                    <a href="#connect" class="text-gray-300 hover:text-cyan-400 transition-colors">Connect</a>
+                </nav>
+                <button id="mobile-menu-button" class="md:hidden text-gray-300 hover:text-cyan-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                </button>
+            </div>
+            <!-- Mobile Menu -->
+            <div id="mobile-menu" class="hidden md:hidden mt-4 glass-effect rounded-lg">
+                 <a href="#manifesto" class="block py-2 px-4 text-gray-300 hover:bg-gray-800 rounded">Manifesto</a>
+                 <a href="#capabilities" class="block py-2 px-4 text-gray-300 hover:bg-gray-800 rounded">R&D Focus</a>
+                 <a href="#vectors" class="block py-2 px-4 text-gray-300 hover:bg-gray-800 rounded">Vectors</a>
+                 <a href="#theses" class="block py-2 px-4 text-gray-300 hover:bg-gray-800 rounded">Theses</a>
+                 <a href="#strategy" class="block py-2 px-4 text-gray-300 hover:bg-gray-800 rounded">Strategy</a>
+                 <a href="#connect" class="block py-2 px-4 text-gray-300 hover:bg-gray-800 rounded">Connect</a>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow">
+            <!-- Hero Section -->
+            <section id="hero" class="content-section container mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col justify-center items-center min-h-screen">
+                <h2 class="text-4xl md:text-6xl font-bold text-white mb-4 leading-tight">
+                    Schism doesn’t fix people, it fixes the gap
+                </h2>
+                <p class="text-lg md:text-xl text-gray-400 max-w-3xl">
+                    What TCP/IP did for data, Schism will do for human meaning. We build the missing infrastructure for human understanding in a digital world.
+                </p>
+                <a href="#manifesto" class="mt-8 px-8 py-3 bg-cyan-500 text-black font-semibold rounded-lg hover:bg-cyan-400 transition-all transform hover:scale-105">Discover Our Principles</a>
+            </section>
+
+            <!-- Manifesto Section -->
+            <section id="manifesto" class="content-section bg-black bg-opacity-30">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="text-center mb-12">
+                        <h3 class="text-3xl font-bold text-cyan-400">Schism: The Living Manifesto</h3>
+                        <p class="text-xl text-gray-300 mt-2">Schism doesn’t fix people—it fixes the gap between them.</p>
+                    </div>
+                    <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div class="text-gray-300"><strong class="text-cyan-400">1.</strong> Miscommunication Isn’t a Flaw — It’s a System Error.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">2.</strong> Communication Is Infrastructure.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">3.</strong> Context Is a Right, Not a Feature.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">4.</strong> Consent Is the Protocol.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">5.</strong> Privacy Is Non-Negotiable.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">6.</strong> We Assist, Not Correct.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">7.</strong> Divergence Is a Design Input.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">8.</strong> Trust Is Our Metric.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">9.</strong> We Build With, Not For.</div>
+                        <div class="text-gray-300"><strong class="text-cyan-400">10.</strong> This Is Protocol, Not Platform.</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Capabilities Section (R&D Focus) -->
+            <section id="capabilities" class="content-section">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <h3 class="text-3xl font-bold text-center mb-12 text-cyan-400">Research & Development Focus</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="p-6 rounded-lg glass-effect transform hover:-translate-y-2 transition-transform">
+                            <h4 class="text-xl font-bold mb-3 text-white">High-Dimensional Context Protocols</h4>
+                            <p class="text-gray-400">Developing novel protocols for embedding nuanced human context into high-dimensional data structures, enabling systems to understand relational dynamics beyond simple sentiment analysis.</p>
+                        </div>
+                        <div class="p-6 rounded-lg glass-effect transform hover:-translate-y-2 transition-transform">
+                            <h4 class="text-xl font-bold mb-3 text-white">Quaternion Processing & Symbolic AI</h4>
+                            <p class="text-gray-400">Leveraging quaternion mathematics for efficient visual learning and behavior analysis, combined with symbolic AI to solve for processing speed and relational logic in communication.</p>
+                        </div>
+                        <div class="p-6 rounded-lg glass-effect transform hover:-translate-y-2 transition-transform">
+                            <h4 class="text-xl font-bold mb-3 text-white">Neurodivergent Mind Mapping</h4>
+                            <p class="text-gray-400">Creating dynamic mind-mapping tools that model neurodivergent thought patterns, preventing misalignments by enhancing self-awareness and optimizing team workflows.</p>
+                        </div>
+                         <div class="p-6 rounded-lg glass-effect transform hover:-translate-y-2 transition-transform">
+                            <h4 class="text-xl font-bold mb-3 text-white">Consent-Based AI Architectures</h4>
+                            <p class="text-gray-400">Pioneering local-first, privacy-preserving AI that offers interpretive nudges and perspective previews without surveillance, building trust by design and preserving user agency.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Context Vectors Section -->
+            <section id="vectors" class="content-section bg-black bg-opacity-30">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <h3 class="text-3xl font-bold text-center mb-12 text-cyan-400">The 20 Vectors of Human Context</h3>
+                    <p class="text-center text-gray-400 max-w-3xl mx-auto mb-12">Most miscommunication occurs not from content errors but from invisible context differences. Making these vectors visible and navigable is central to our mission.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Vector cards will be injected here by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Theses Section -->
+            <section id="theses" class="content-section">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <h3 class="text-3xl font-bold text-center mb-12 text-cyan-400">Five Expanded Core Theses</h4>
+                    <div class="max-w-4xl mx-auto space-y-8">
+                        <div class="glass-effect rounded-lg p-6">
+                            <h4 class="text-xl font-semibold text-white mb-2"><strong class="text-cyan-400">1.</strong> Miscommunication is a structural failure, not a personal flaw.</h4>
+                            <p class="text-gray-300">Current digital systems encode content, not context. The result is systemic friction, especially for neurodivergent, cross-cultural, and remote communicators. Communication breaks not because people are broken—but because the infrastructure is blind to meaning.</p>
+                        </div>
+                        <div class="glass-effect rounded-lg p-6">
+                            <h4 class="text-xl font-semibold text-white mb-2"><strong class="text-cyan-400">2.</strong> Emotional labor is the invisible cost of digital survival.</h4>
+                            <p class="text-gray-300">Miscommunication imposes a disproportionate cognitive and emotional tax on those whose communication styles deviate from dominant norms. This labor is uncompensated, unacknowledged, and structurally required in current platforms.</p>
+                        </div>
+                        <div class="glass-effect rounded-lg p-6">
+                            <h4 class="text-xl font-semibold text-white mb-2"><strong class="text-cyan-400">3.</strong> Clarity can be protocolized without compromising authenticity.</h4>
+                            <p class="text-gray-300">Human nuance is not too messy to model—it’s just been ignored in design. By encoding and sharing user-declared context vectors, we can scaffold mutual understanding without enforcing uniformity.</p>
+                        </div>
+                        <div class="glass-effect rounded-lg p-6">
+                            <h4 class="text-xl font-semibold text-white mb-2"><strong class="text-cyan-400">4.</strong> Consent-based AI can offer interpretive nudges that reduce harm.</h4>
+                            <p class="text-gray-300">By processing on-device and offering perspective previews (not corrections), assistive AI can illuminate potential misreads before messages are sent—building trust and preserving autonomy.</p>
+                        </div>
+                         <div class="glass-effect rounded-lg p-6">
+                            <h4 class="text-xl font-semibold text-white mb-2"><strong class="text-cyan-400">5.</strong> Protocol-layer solutions can shift communication equity.</h4>
+                            <p class="text-gray-300">Instead of teaching marginalized users to navigate dominant norms, Schism proposes flipping the model: embedding adaptive, interpretable, and equitable infrastructure into the systems themselves.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Strategy & Market Section -->
+            <section id="strategy" class="content-section bg-black bg-opacity-30">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <h3 class="text-3xl font-bold text-center mb-12 text-cyan-400">Our Strategy & Market Opportunity</h3>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
+                        <div>
+                            <h4 class="text-2xl font-bold mb-4 text-white">Market Opportunity</h4>
+                             <p class="text-gray-400 mb-6">Schism addresses a profound gap by creating a new category—contextual communication infrastructure. The annual cost of miscommunication is $1.2 trillion in the US alone, representing a massive, untapped market for solutions that enhance clarity and trust.</p>
+                             <canvas id="marketChart"></canvas>
+                        </div>
+                        <div>
+                             <h4 class="text-2xl font-bold mb-4 text-white">5-Year Revenue Projections</h4>
+                             <p class="text-gray-400 mb-6">Our growth is projected across conservative, base, and optimistic scenarios, driven by individual subscriptions and enterprise adoption. We aim for sustainable growth aligned with our ethical monetization principles.</p>
+                             <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="max-w-4xl mx-auto space-y-4" id="accordion-container">
+                        <!-- Accordion Items will be injected here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Connect Section -->
+            <section id="connect" class="content-section">
+                 <div class="container mx-auto px-4 sm:px-6 lg:px-8 max-w-2xl text-center">
+                     <h3 class="text-3xl font-bold text-center mb-8 text-cyan-400">Connect Your Profile</h3>
+                     
+                     <!-- Logged out state -->
+                     <div id="logged-out-view">
+                         <p class="text-gray-400 mb-8">Sign in to connect your social media profiles and trace your journey through the Schism Labs ecosystem.</p>
+                         <button id="signInBtn" class="px-8 py-3 bg-cyan-500 text-black font-semibold rounded-lg hover:bg-cyan-400 transition-all transform hover:scale-105">
+                             Sign In to Connect
+                         </button>
+                     </div>
+
+                     <!-- Logged in state -->
+                     <div id="logged-in-view" class="hidden">
+                         <div class="glass-effect rounded-lg p-8">
+                             <p class="text-gray-300 mb-2">Welcome! You are connected.</p>
+                             <p class="text-gray-400 text-sm mb-6">Your User ID: <span id="user-id-display" class="font-mono"></span></p>
+                             
+                             <div id="socials-form" class="space-y-4 text-left">
+                                 <div>
+                                     <label for="twitter-handle" class="block text-sm font-medium text-gray-300 mb-1">Twitter Handle</label>
+                                     <input type="text" id="twitter-handle" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="@username">
+                                 </div>
+                                 <div>
+                                     <label for="github-handle" class="block text-sm font-medium text-gray-300 mb-1">GitHub Handle</label>
+                                     <input type="text" id="github-handle" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500" placeholder="username">
+                                 </div>
+                                 <button id="saveSocialsBtn" class="w-full px-8 py-3 bg-cyan-500 text-black font-semibold rounded-lg hover:bg-cyan-400 transition-all">
+                                     Save Socials
+                                 </button>
+                                 <p id="saveStatus" class="text-sm text-green-400 h-4"></p>
+                             </div>
+
+                             <button id="signOutBtn" class="mt-8 w-full px-8 py-2 bg-transparent border-2 border-red-500 text-red-500 font-semibold rounded-lg hover:bg-red-500 hover:text-black transition-all">
+                                 Sign Out
+                             </button>
+                         </div>
+                     </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="py-6 px-4 sm:px-6 lg:px-8 text-center text-gray-500">
+            <p>&copy; 2024 Schism Labs. All rights reserved.</p>
+        </footer>
+    </div>
+
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase Setup & Auth ---
+        let auth, db, app;
+        let unsubscribeSocials; // To detach Firestore listener on sign-out
+
+        // These global variables are expected to be provided by the environment
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        const loggedOutView = document.getElementById('logged-out-view');
+        const loggedInView = document.getElementById('logged-in-view');
+        const signInBtn = document.getElementById('signInBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const saveSocialsBtn = document.getElementById('saveSocialsBtn');
+        const twitterInput = document.getElementById('twitter-handle');
+        const githubInput = document.getElementById('github-handle');
+        const saveStatus = document.getElementById('saveStatus');
+
+        if (firebaseConfig) {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                onAuthStateChanged(auth, user => {
+                    if (user) {
+                        // User is signed in
+                        console.log("User is signed in:", user.uid);
+                        loggedOutView.classList.add('hidden');
+                        loggedInView.classList.remove('hidden');
+                        userIdDisplay.textContent = user.uid;
+                        
+                        // Listen for social media data
+                        const socialsDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/socials`, 'handles');
+                        unsubscribeSocials = onSnapshot(socialsDocRef, (doc) => {
+                            if (doc.exists()) {
+                                const data = doc.data();
+                                twitterInput.value = data.twitter || '';
+                                githubInput.value = data.github || '';
+                                console.log("Socials data loaded:", data);
+                            } else {
+                                console.log("No social handles document yet.");
+                            }
+                        });
+
+                    } else {
+                        // User is signed out
+                        console.log("User is signed out.");
+                        loggedOutView.classList.remove('hidden');
+                        loggedInView.classList.add('hidden');
+                        userIdDisplay.textContent = '';
+                        // Unsubscribe from Firestore listener if it exists
+                        if (unsubscribeSocials) {
+                            unsubscribeSocials();
+                        }
+                    }
+                });
+
+                // --- Event Listeners for Auth and Data ---
+                signInBtn.addEventListener('click', async () => {
+                    console.log("Sign-in button clicked.");
+                    try {
+                        if (initialAuthToken) {
+                            console.log("Attempting sign-in with custom token.");
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            console.log("No custom token found. Signing in anonymously.");
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Error signing in:", error);
+                        alert("Sign in failed. Check console for details.");
+                    }
+                });
+
+                signOutBtn.addEventListener('click', () => {
+                    signOut(auth).catch(error => console.error("Sign out error:", error));
+                });
+
+                saveSocialsBtn.addEventListener('click', async () => {
+                    const user = auth.currentUser;
+                    if (!user) {
+                        alert("You must be signed in to save data.");
+                        return;
+                    }
+                    const socialsData = {
+                        twitter: twitterInput.value,
+                        github: githubInput.value,
+                        lastUpdated: new Date()
+                    };
+                    
+                    saveStatus.textContent = 'Saving...';
+                    try {
+                        const socialsDocRef = doc(db, `artifacts/${appId}/users/${user.uid}/socials`, 'handles');
+                        await setDoc(socialsDocRef, socialsData, { merge: true });
+                        saveStatus.textContent = 'Saved successfully!';
+                        console.log("Socials saved:", socialsData);
+                    } catch (error) {
+                        console.error("Error saving socials:", error);
+                        saveStatus.textContent = 'Error saving.';
+                    }
+                    setTimeout(() => saveStatus.textContent = '', 3000);
+                });
+
+                // Automatically try to sign in on page load
+                if(auth.currentUser === null){
+                    signInBtn.click();
+                }
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                document.getElementById('connect').innerHTML = '<p class="text-red-500">Could not connect to authentication service.</p>';
+            }
+        } else {
+             console.warn("Firebase configuration is missing.");
+             document.getElementById('connect').innerHTML = '<p class="text-yellow-500">Firebase configuration missing. Connection features are disabled.</p>';
+        }
+
+        // --- Standard Page JS ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Mobile Menu Toggle ---
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenuButton.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+            document.querySelectorAll('#mobile-menu a, .container a, .text-2xl').forEach(link => {
+                link.addEventListener('click', () => {
+                    if (!mobileMenu.classList.contains('hidden')) {
+                         mobileMenu.classList.add('hidden');
+                    }
+                });
+            });
+
+            // --- Context Vectors Data & Population ---
+            const vectors = [
+                { title: "Temporal Context", desc: "Time-based circumstances influencing communication (e.g., time of day, lifecycle moments)." },
+                { title: "Relational Role", desc: "Power dynamics and established patterns between communicators." },
+                { title: "Emotional State", desc: "Current affective condition of both sender and receiver." },
+                { title: "Cognitive Load/Bandwidth", desc: "Mental capacity available for processing complex communication." },
+                { title: "Hormonal/Biophysical State", desc: "Physical conditions affecting cognitive and emotional processing." },
+                { title: "Cultural/Normative Frames", desc: "Deeply ingrained expectations around communication patterns." },
+                { title: "Identity-Based Safety Calibration", desc: "How one's marginalized identities affect vigilance and interpretation." },
+                { title: "Intention Complexity", desc: "The layered or mixed motivations behind communication." },
+                { title: "Language Precision/Ambiguity", desc: "Preferences for exactness versus open interpretation in language." },
+                { title: "Past Injuries or Pattern Recognition", desc: "How previous experiences create interpretive frameworks." },
+                { title: "Platform or Medium", desc: "The technological or environmental context of communication." },
+                { title: "Audience Awareness", desc: "Knowledge of who else might receive or observe communication." },
+                { title: "Urgency and Stakes", desc: "The perceived importance and time sensitivity of the communication." },
+                { title: "Communication Modality", desc: "Individual differences in processing and expressing information." },
+                { title: "Social Energy Type", desc: "Current capacity for social interaction and engagement." },
+                { title: "Receptive State of Receiver", desc: "Readiness and capacity of the audience to receive the message." },
+                { title: "Norms of Silence vs. Response", desc: "Cultural and individual expectations around reply timing." },
+                { title: "Internalized Scripts", desc: "Deeply held beliefs about appropriate communication." },
+                { title: "Sensory/Environmental Factors", desc: "Physical conditions affecting perception and processing." },
+                { title: "Temporal Distance from Origin", desc: "How time affects the relevance and interpretation of messages." }
+            ];
+            const vectorContainer = document.querySelector('#vectors .grid');
+            vectors.forEach(vector => {
+                const card = document.createElement('div');
+                card.className = 'p-4 rounded-lg glass-effect transform hover:-translate-y-1 transition-transform cursor-pointer';
+                card.innerHTML = `<h4 class="text-md font-bold text-white">${vector.title}</h4><p class="text-sm text-gray-400 mt-1">${vector.desc}</p>`;
+                vectorContainer.appendChild(card);
+            });
+            
+            // --- Accordion Data & Population ---
+            const accordionData = [
+                { title: 'Roadmap & Vision', content: `<strong>Phase 1: Foundation (Year 1)</strong> - Focus on building the core Human Context Protocol with capabilities like Context Cards and Sovereignty-Centered Architecture for neurodivergent professionals and cross-cultural teams.<br><br><strong>Phase 2: Expansion (Years 2-3)</strong> - Focus on Contextual Connectivity, introducing cross-platform portability, team visualization, and a context marketplace for organizations and healthcare teams.<br><br><strong>Phase 3: Maturity (Years 3-5)</strong> - Focus on creating the Context Protocol Infrastructure, rolling out Self-Sovereign Identity, a full API ecosystem, and advanced analytics for enterprise clients and developers.` },
+                { title: 'Go-to-Market Strategy', content: `Our strategy is rooted in community co-creation. We start by partnering with neurodivergent-led organizations and running Context Labs to design the protocol with our core users. We will grow through trust-based marketing, focusing on education, authentic community engagement, and demonstrating measurable impact, rather than traditional advertising.`},
+                { title: 'Competitive Landscape', content: `We are creating a new category, but exist at the intersection of several markets. <br><strong>Direct Competitors (e.g., Grammarly):</strong> Focus on corrective writing mechanics, whereas we are assistive and relational. <br><strong>Adjacent Competitors (e.g., Notion, Slack):</strong> Focus on collaboration and message transmission, not the contextual understanding layer. Our privacy-first, protocol-based approach is a key differentiator that surveillance-based models cannot easily replicate.` },
+                { title: 'Ethical Monetization', content: `Our revenue model is designed to reject surveillance capitalism. We use an open-core model with a free protocol layer and paid tiers for individuals and organizations. Revenue is generated from premium features, enterprise implementations, a creator-first marketplace (80/20 split), and protocol infrastructure services. All pricing is transparent and value-based, with no selling of user data.` }
+            ];
+            const accordionContainer = document.getElementById('accordion-container');
+            accordionData.forEach(item => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'rounded-lg glass-effect overflow-hidden';
+                wrapper.innerHTML = `
+                    <button class="accordion-button w-full flex justify-between items-center text-left text-white font-semibold p-5">
+                        <span>${item.title}</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="accordion-content">
+                        <div class="p-5 pt-0 text-gray-300">${item.content}</div>
+                    </div>
+                `;
+                accordionContainer.appendChild(wrapper);
+            });
+            // Accordion functionality
+            accordionContainer.addEventListener('click', e => {
+                const button = e.target.closest('.accordion-button');
+                if (button) {
+                    const content = button.nextElementSibling;
+                    button.classList.toggle('open');
+                    if (content.style.maxHeight) {
+                        content.style.maxHeight = null;
+                    } else {
+                        content.style.maxHeight = content.scrollHeight + "px";
+                    }
+                }
+            });
+
+            // --- Chart.js Implementation ---
+            const chartTextColor = '#e5e7eb';
+            const chartGridColor = 'rgba(255, 255, 255, 0.1)';
+            Chart.defaults.color = chartTextColor;
+            Chart.defaults.borderColor = chartGridColor;
+            
+            // Market Chart
+            const marketCtx = document.getElementById('marketChart').getContext('2d');
+            new Chart(marketCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Total Addressable Market (TAM)', 'Serviceable Addressable Market (SAM)', 'Serviceable Obtainable Market (SOM)'],
+                    datasets: [{
+                        label: 'Market Size ($B)',
+                        data: [50, 4, 0.026], // in Billions
+                        backgroundColor: [
+                            'rgba(0, 255, 255, 0.3)',
+                            'rgba(0, 255, 255, 0.6)',
+                            'rgba(0, 255, 255, 0.9)'
+                        ],
+                        borderColor: [
+                            'rgba(0, 255, 255, 0.7)',
+                            'rgba(0, 255, 255, 0.9)',
+                            '#00FFFF'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) { label += ': '; }
+                                    if (context.parsed !== null) {
+                                        label += '$' + context.parsed + 'B';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5'],
+                    datasets: [
+                        {
+                            label: 'Base Case ($M)',
+                            data: [0, 0.25, 2.2, 10, 26.46],
+                            borderColor: 'rgba(0, 255, 255, 1)',
+                            backgroundColor: 'rgba(0, 255, 255, 0.5)',
+                            tension: 0.1,
+                            fill: true,
+                        },
+                        {
+                            label: 'Conservative ($M)',
+                            data: [0, 0.15, 1.5, 6, 18],
+                            borderColor: 'rgba(255, 255, 255, 0.5)',
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                            tension: 0.1,
+                            hidden: true,
+                        },
+                         {
+                            label: 'Optimistic ($M)',
+                            data: [0, 0.35, 3, 15, 35],
+                            borderColor: 'rgba(0, 255, 255, 0.5)',
+                             backgroundColor: 'rgba(0, 255, 255, 0.2)',
+                            tension: 0.1,
+                            hidden: true,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': $' + context.parsed.y + 'M';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'ARR ($M)' }
+                        }
+                    }
+                }
+            });
+        });
+
+
+        // --- Interactive Canvas Background ---
+        const canvas = document.getElementById('interactive-bg');
+        const ctx = canvas.getContext('2d');
+        let particlesArray;
+        let mouse = { x: null, y: null, radius: 100 }
+
+        function setCanvasValues() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            mouse.radius = (canvas.width / 12) * (canvas.height / 12) / 100;
+        }
+        setCanvasValues();
+        window.addEventListener('resize', () => { setCanvasValues(); init(); });
+        window.addEventListener('mousemove', (e) => { mouse.x = e.x; mouse.y = e.y; });
+        window.addEventListener('mouseout', () => { mouse.x = undefined; mouse.y = undefined; });
+
+        class Particle {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.size = (Math.random() * 1.5) + 1;
+                this.baseX = this.x; this.baseY = this.y;
+                this.density = (Math.random() * 40) + 5;
+                this.color = 'rgba(0, 255, 255, 0.5)';
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+            update() {
+                let dx = mouse.x - this.x;
+                let dy = mouse.y - this.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < mouse.radius) {
+                    let force = (mouse.radius - distance) / mouse.radius;
+                    this.x -= (dx / distance) * force * this.density * 0.1;
+                    this.y -= (dy / distance) * force * this.density * 0.1;
+                } else {
+                    if (this.x !== this.baseX) this.x -= (this.x - this.baseX) / 10;
+                    if (this.y !== this.baseY) this.y -= (this.y - this.baseY) / 10;
+                }
+                this.draw();
+            }
+        }
+
+        function init() {
+            particlesArray = [];
+            let numberOfParticles = (canvas.height * canvas.width) / 9000;
+            for (let i = 0; i < numberOfParticles; i++) {
+                let x = Math.random() * canvas.width;
+                let y = Math.random() * canvas.height;
+                particlesArray.push(new Particle(x, y));
+            }
+        }
+
+        function connect() {
+            for (let a = 0; a < particlesArray.length; a++) {
+                for (let b = a; b < particlesArray.length; b++) {
+                    let distance = Math.sqrt(
+                        Math.pow(particlesArray[a].x - particlesArray[b].x, 2) +
+                        Math.pow(particlesArray[a].y - particlesArray[b].y, 2)
+                    );
+                    if (distance < (Math.min(canvas.width, canvas.height) / 8)) {
+                        let opacity = 1 - (distance / 100);
+                        ctx.strokeStyle = `rgba(0, 150, 150, ${opacity * 0.3})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+            }
+            connect();
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
