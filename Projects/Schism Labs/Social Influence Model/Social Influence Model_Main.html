@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tutorial: Social Influence Model</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .graph-container {
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        .node {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .node-label {
+            pointer-events: none;
+            font-size: 10px;
+            fill: #E5E7EB; /* gray-200 */
+        }
+        .link {
+            stroke-opacity: 0.6;
+        }
+        .link-label {
+            font-size: 8px;
+            fill: #9CA3AF; /* gray-400 */
+            pointer-events: none;
+        }
+        .node.highlight circle {
+            stroke: #FBBF24; /* amber-400 */
+            stroke-width: 3px;
+        }
+        .link.highlight {
+            stroke: #FBBF24; /* amber-400 */
+            stroke-opacity: 1;
+            stroke-width: 2.5px;
+        }
+        .node:not(.highlight-neighbor) circle,
+        .link:not(.highlight) {
+            transition: opacity 0.3s ease;
+        }
+        body.selecting .node:not(.highlight):not(.highlight-neighbor) {
+            opacity: 0.2;
+        }
+        body.selecting .link:not(.highlight) {
+            opacity: 0.1;
+        }
+        .node.highlight-neighbor circle {
+            stroke: #FBBF24; /* amber-400 */
+            stroke-width: 1.5px;
+            stroke-opacity: 0.8;
+        }
+
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <div class="flex flex-col md:flex-row h-screen max-h-screen overflow-hidden">
+
+        <!-- Main Graph Section -->
+        <main class="flex-grow flex flex-col relative" id="graph-area">
+            <div class="p-4 bg-gray-900/80 backdrop-blur-sm border-b border-gray-700">
+                <h1 class="text-xl md:text-2xl font-bold text-white">Social Influence Model: An Interactive Exploration</h1>
+                <p class="text-sm text-gray-400">Click on any concept (node) to explore its details and connections. Drag nodes to rearrange the graph.</p>
+            </div>
+            <div id="graph-container" class="flex-grow bg-gray-800/20"></div>
+            <div class="p-4 text-xs text-gray-500 border-t border-gray-700">
+                <strong>Reference:</strong> Dholakia, U.M., Bagozzi, R.P., Klein, L. & Pearo, A. (2004). A social influence model of consumer participation in network- and small-group-based virtual communities. <em>International Journal of Research in Marketing, 21(3)</em>, 241–263.
+            </div>
+        </main>
+
+        <!-- Info Panel Section -->
+        <aside id="info-panel" class="w-full md:w-96 bg-gray-800 shadow-lg p-6 flex-shrink-0 overflow-y-auto border-l border-gray-700">
+            <div id="info-content" class="sticky top-6">
+                 <h2 class="text-lg font-semibold text-white mb-2">Welcome!</h2>
+                 <p class="text-gray-300 text-sm">This is an interactive visualization of the <strong>Social Influence Model</strong>, a theory of behaviour change.</p>
+                 <div class="mt-4 p-3 bg-gray-700/50 rounded-lg">
+                    <p class="text-sm text-gray-300">
+                        Select a node in the graph to see its details here. The graph shows the theory's <span class="font-semibold text-sky-400">constructs</span> as circles and their <span class="font-semibold text-emerald-400">relationships</span> as connecting lines.
+                    </p>
+                 </div>
+                 <div class="mt-6">
+                    <h3 class="font-semibold text-gray-200 mb-2">Legend</h3>
+                    <ul class="text-sm space-y-2 text-gray-400">
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#60A5FA" stroke-width="2"></line></svg> influences</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#34D399" stroke-width="2"></line></svg> positively influences</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#F472B6" stroke-width="2"></line></svg> part of / type of</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#A78BFA" stroke-width="2"></line></svg> correlates with</li>
+                        <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#60A5FA" stroke-width="2" stroke-dasharray="3,3"></line></svg> modified influence</li>
+                    </ul>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <script>
+        // --- DATA PARSING ---
+        // This section parses the raw text data into structured JavaScript objects.
+        const constructs_data_raw = `
+Value perception / motives [ BCIO:050318 (Reflective behavioural motivation) 69 8 ]
+Group norms [ BCIO:050671 (group evaluative behavioural norm) 69 42 78 62 9 22 64 71 ]
+Social identity [ ADDICTO:0001087 (Social identity) 69 68 ]
+Mutual agreement [ BCIO:050671 (group evaluative behavioural norm) 69 42 78 62 9 22 64 71 ]
+Mutual accommodation [ BCIO:050672 (Group facilitation behaviour) 69 ]
+Desires [ MF:0000045 (Wanting) 69 , BCIO:006064 (Psychological need) 69 82 1 67 22 5 56 ]
+We-intentions [ BCIO:006016 (Behavioural intention) 69 1 66 14 59 73 72 23 77 52 81 74 79 80 3 24 18 ]
+Behaviour [ BCIO:036000 (Individual human behaviour) 69 70 8 5 14 62 63 64 78 81 65 77 13 55 74 79 24 18 53 54 57 71 ]
+Social influences [ BCIO:006090 (Social behavioural opportunity) 69 32 8 82 60 83 39 34 3 10 ]
+Self-referent values [ BCIO:006063 (Personal value) 69 42 1 83 75 ]
+Community [ BCIO:006001 (Social environmental system) 69 62 13 68 10 14 72 33 60 28 80 41 64 4 65 77 3 57 ]
+Group-referent values [ BCIO:006035 (Evaluation of self) 69 34 68 33 ]
+Informational value
+Purposive value [ BCIO:006100 (Internal reward for a response) 69 , BCIO:006063 (Personal value) 69 , BCIO:050872 (positive evaluative belief about achieving a goal) 69 42 1 83 75 ]
+Instrumental value
+Self-discovery [ BCIO:050873 (positive evaluative belief about interacting with others) 69 ]
+Social enhancement [ BCIO:050877 (Social approval pleasure) 69 ]
+Entertainment value [ BCIO:050882 (Social pleasure) 69 ]
+Maintaining interpersonal connectivity [ BCIO:050879 (Social connectedness pleasure) 69 ]
+Identification
+Internalisation
+Cognitive [ ADDICTO:0001087 (Social identity) 69 68 ]
+Evaluative [ BCIO:006035 (Evaluation of self) 69 34 68 33 ]
+Affective [ BCIO:006074 (Social embeddedness) 69 10 ]
+Decision-making and participation [ MF:0000045 (Wanting) 69 , BCIO:006016 (Behavioural intention) 69 1 66 14 59 82 73 72 23 77 22 52 81 74 79 80 3 24 18 ]
+Small-group-based virtual communitites [ BCIO:006001 (Social environmental system) 69 62 13 68 10 14 72 33 60 28 80 41 64 4 65 77 3 57 ]
+Network-based virtual communities [ BCIO:006001 (Social environmental system) 69 62 13 68 10 14 72 33 60 28 80 41 64 4 65 77 3 57 ]
+        `;
+        const nodes = constructs_data_raw.trim().split('\n').map(line => {
+            const match = line.match(/^(.*?)\s*(\[.*\])?$/);
+            if (match) {
+                return {
+                    id: match[1].trim(),
+                    annotation: match[2] ? match[2].trim() : "No annotation"
+                };
+            }
+            return null;
+        }).filter(Boolean);
+
+        const triples_data_raw = `
+Value perception / motives influences Group norms
+Group norms influences Social identity
+Mutual agreement positively influences the 'Group norms' to 'Desires' Influences relationship
+Mutual accommodation positively influences the 'Group norms' to 'Desires' Influences relationship
+Group norms influences Desires
+Desires positively influences We-intentions
+Mutual agreement correlates with Group norms
+Mutual accommodation correlates with Group norms
+Social identity positively influences Desires
+We-intentions influences Behaviour
+Group norms positively influences We-intentions
+Social identity positively influences We-intentions
+Social influences influences Behaviour
+Self-referent values influences Social influences
+Community influences the 'Self-referent values' to 'Social influences' Influences relationship
+Group-referent values influences Social influences
+Community influences the 'Group-referent values' to 'Social influences' Influences relationship
+Informational value part of Purposive value
+Instrumental value part of Purposive value
+Purposive value type of Social identity
+Purposive value type of Value perception / motives
+Self-discovery type of Social identity
+Self-discovery type of Value perception / motives
+Social enhancement type of Social identity
+Social enhancement type of Value perception / motives
+Entertainment value type of Social identity
+Entertainment value type of Value perception / motives
+Maintaining interpersonal connectivity type of Social identity
+Maintaining interpersonal connectivity type of Value perception / motives
+Purposive value part of Self-referent values
+Self-discovery part of Self-referent values
+Social enhancement part of Group-referent values
+Maintaining interpersonal connectivity part of Group-referent values
+Identification part of Social influences
+Identification part of Social influences
+Internalisation part of Social influences
+Internalisation part of Social influences
+Group norms part of Social influences
+Group norms part of Social influences
+Mutual agreement part of Social influences
+Mutual agreement part of Social influences
+Mutual accommodation part of Social influences
+Mutual accommodation part of Social influences
+Social identity part of Social influences
+Social identity part of Social influences
+Cognitive part of Social identity
+Evaluative part of Social identity
+Affective part of Social identity
+Behaviour part of Decision-making and participation
+We-intentions part of Decision-making and participation
+Desires part of Decision-making and participation
+Small-group-based virtual communitites part of Community
+Network-based virtual communities part of Community
+        `.trim().split('\n');
+        
+        const unique_triples_raw = [...new Set(triples_data_raw)];
+
+        const simplePattern = /^(.*?) (influences|part of|type of|correlates with) (.*?)$/;
+        const positivePattern = /^(.*?) (positively influences) (.*?)$/;
+        const modifiedPattern = /^(.*?) influences the '(.*?)' to '(.*?)' Influences relationship$/;
+
+        const triples_data = unique_triples_raw.map(line => {
+            line = line.trim();
+            let match;
+            if (match = line.match(modifiedPattern)) {
+                return { source: match[2].trim(), target: match[3].trim(), type: 'influences', modifier: match[1].trim() };
+            } else if (match = line.match(positivePattern)) {
+                return { source: match[1].trim(), target: match[3].trim(), type: match[2].trim() };
+            } else if (match = line.match(simplePattern)) {
+                let type = match[2].trim();
+                if (type === 'type of') type = 'part of';
+                return { source: match[1].trim(), target: match[3].trim(), type: type };
+            }
+            console.warn("Could not parse triple:", line);
+            return null;
+        }).filter(Boolean);
+
+        // --- DATA VALIDATION AND GRAPH SETUP ---
+        // Create a map for quick lookup of nodes by their ID.
+        const nodeMap = new Map(nodes.map(node => [node.id, node]));
+
+        // **FIX**: Filter and process links to ensure they connect valid nodes. This prevents errors.
+        const links = triples_data.map(link => {
+            const sourceNode = nodeMap.get(link.source);
+            const targetNode = nodeMap.get(link.target);
+
+            if (sourceNode && targetNode) {
+                return {
+                    ...link, // copy original properties like type, modifier
+                    source: sourceNode,
+                    target: targetNode,
+                };
+            }
+            console.warn(`Invalid link due to missing node, ignoring: '${link.source}' -> '${link.target}'`);
+            return null;
+        }).filter(Boolean); // Filter out any null (invalid) links
+        
+        // --- D3.js VISUALIZATION ---
+        const container = document.getElementById('graph-container');
+        const infoPanel = document.getElementById('info-content');
+
+        function runVisualization() {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            container.innerHTML = ''; // Clear previous render
+
+            const svg = d3.select(container).append("svg")
+                .attr("viewBox", [-width / 2, -height / 2, width, height])
+                .style("font", "12px sans-serif");
+
+            // Define arrow markers for directed links
+            svg.append("defs").selectAll("marker")
+                .data(["influences", "positively influences", "part of", "correlates with"])
+                .join("marker")
+                    .attr("id", d => `arrow-${d.replace(/\s+/g, '-')}`)
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 19)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("orient", "auto")
+                .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", d => linkColor(d));
+
+            // Set up the simulation. We no longer need the .id() accessor because the links array
+            // already contains direct references to the source and target node objects.
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).distance(100))
+                .force("charge", d3.forceManyBody().strength(-200))
+                .force("x", d3.forceX())
+                .force("y", d3.forceY());
+
+            // --- RENDER GRAPH ELEMENTS ---
+            const linkElements = svg.append("g")
+                .attr("class", "links")
+                .selectAll("line")
+                .data(links)
+                .join("line")
+                .attr("class", "link")
+                .attr("stroke", d => linkColor(d.type))
+                .attr("stroke-width", 1.5)
+                .attr("stroke-dasharray", d => d.modifier ? "5,5" : "none")
+                .attr("marker-end", d => `url(#arrow-${d.type.replace(/\s+/g, '-')})`);
+
+            const nodeElements = svg.append("g")
+                .attr("class", "nodes")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
+                .attr("class", "node")
+                .call(drag(simulation))
+                .on("click", nodeClicked);
+            
+            nodeElements.append("circle")
+                .attr("r", 8)
+                .attr("fill", "#1F2937") // gray-800
+                .attr("stroke", "#4B5563") // gray-600
+                .attr("stroke-width", 1.5);
+            
+            nodeElements.append("text")
+                .text(d => d.id)
+                .attr("x", 12)
+                .attr("y", 4)
+                .attr("class", "node-label");
+            
+            // --- SIMULATION TICK ---
+            simulation.on("tick", () => {
+                linkElements
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+                nodeElements
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+            
+            // --- HELPER FUNCTIONS & INTERACTIVITY ---
+            function linkColor(type) {
+                switch (type) {
+                    case 'influences': return '#60A5FA'; // blue-400
+                    case 'positively influences': return '#34D399'; // emerald-400
+                    case 'part of': return '#F472B6'; // pink-400
+                    case 'correlates with': return '#A78BFA'; // violet-400
+                    default: return '#6B7280'; // gray-500
+                }
+            }
+
+            function drag(simulation) {
+                function dragstarted(event, d) {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                }
+                function dragged(event, d) {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                }
+                function dragended(event, d) {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                }
+                return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+            }
+
+            let selectedNode = null;
+
+            function nodeClicked(event, d) {
+                event.stopPropagation();
+                
+                if (selectedNode && selectedNode.id === d.id) {
+                    selectedNode = null;
+                    d3.selectAll('.node').classed('highlight', false).classed('highlight-neighbor', false);
+                    d3.selectAll('.link').classed('highlight', false);
+                    document.body.classList.remove('selecting');
+                    resetInfoPanel();
+                    return;
+                }
+                
+                selectedNode = d;
+                document.body.classList.add('selecting');
+                updateInfoPanel(d);
+
+                const connectedLinks = links.filter(l => l.source.id === d.id || l.target.id === d.id);
+                const neighborIds = new Set();
+                connectedLinks.forEach(l => {
+                    neighborIds.add(l.source.id);
+                    neighborIds.add(l.target.id);
+                });
+
+                nodeElements.classed("highlight", n => n.id === d.id);
+                nodeElements.classed("highlight-neighbor", n => neighborIds.has(n.id) && n.id !== d.id);
+                linkElements.classed("highlight", l => l.source.id === d.id || l.target.id === d.id);
+            }
+
+            svg.on("click", () => {
+                 if (selectedNode) {
+                    selectedNode = null;
+                    d3.selectAll('.node').classed('highlight', false).classed('highlight-neighbor', false);
+                    d3.selectAll('.link').classed('highlight', false);
+                    document.body.classList.remove('selecting');
+                    resetInfoPanel();
+                 }
+            });
+
+            function updateInfoPanel(d) {
+                const incoming = links.filter(l => l.target.id === d.id);
+                const outgoing = links.filter(l => l.source.id === d.id);
+
+                let html = `<h2 class="text-lg font-semibold text-white break-words">${d.id}</h2>`;
+                html += `<p class="text-xs text-gray-400 mt-2 p-2 bg-gray-700/50 rounded-md font-mono">${d.annotation}</p>`;
+                html += `<div class="mt-4 space-y-4">`;
+
+                if (outgoing.length > 0) {
+                    html += `<div><h3 class="font-semibold text-gray-300 mb-1">Influences / Leads to:</h3><ul class="list-disc list-inside space-y-1 text-sm">`;
+                    outgoing.forEach(l => {
+                       html += `<li style="color:${linkColor(l.type)}"><span class="text-gray-200">${l.type} <strong class="font-medium">${l.target.id}</strong>${l.modifier ? ` (modified by ${l.modifier})` : ''}</span></li>`;
+                    });
+                    html += `</ul></div>`;
+                }
+
+                if (incoming.length > 0) {
+                    html += `<div><h3 class="font-semibold text-gray-300 mb-1">Is Influenced by:</h3><ul class="list-disc list-inside space-y-1 text-sm">`;
+                    incoming.forEach(l => {
+                       html += `<li style="color:${linkColor(l.type)}"><span class="text-gray-200">${l.type} <strong class="font-medium">${l.source.id}</strong>${l.modifier ? ` (modified by ${l.modifier})` : ''}</span></li>`;
+                    });
+                    html += `</ul></div>`;
+                }
+                
+                html += `</div>`;
+                infoPanel.innerHTML = html;
+            }
+
+            function resetInfoPanel() {
+                infoPanel.innerHTML = `
+                    <h2 class="text-lg font-semibold text-white mb-2">Select a Concept</h2>
+                    <p class="text-gray-300 text-sm">Click on a circle in the graph to see its details and relationships within the theory.</p>
+                     <div class="mt-6">
+                        <h3 class="font-semibold text-gray-200 mb-2">Legend</h3>
+                        <ul class="text-sm space-y-2 text-gray-400">
+                            <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#60A5FA" stroke-width="2"></line></svg> influences</li>
+                            <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#34D399" stroke-width="2"></line></svg> positively influences</li>
+                            <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#F472B6" stroke-width="2"></line></svg> part of / type of</li>
+                            <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#A78BFA" stroke-width="2"></line></svg> correlates with</li>
+                            <li class="flex items-center"><svg width="20" height="10" class="mr-2"><line x1="0" y1="5" x2="20" y2="5" stroke="#60A5FA" stroke-width="2" stroke-dasharray="3,3"></line></svg> modified influence</li>
+                        </ul>
+                    </div>
+                `;
+            }
+
+        } // end of runVisualization
+
+        // Initial render and redraw on resize
+        runVisualization();
+        window.addEventListener('resize', runVisualization);
+
+    </script>
+</body>
+</html>
