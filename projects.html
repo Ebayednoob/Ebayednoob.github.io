@@ -1,62 +1,67 @@
-<!-- projects.html -->
-<div class="text-left">
-    <h2 class="text-4xl font-bold mb-6 border-b border-gray-700 pb-3">My Projects</h2>
-    
-    <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/Logo Files/Schism-cardbg.png');">
-        <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
-        <div class="relative">
-            <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
-                <div class="flex items-center space-x-4 pointer-events-none">
-                    <img src="Resources/Pictures/Logo Files/Schism-logo.png" alt="Schism Labs Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
-                    <div>
-                        <h3 class="text-2xl font-semibold text-blue-400">Schism Labs</h3>
-                        <p class="text-gray-300 mt-1">A venture into emergent AI and contextual embedding systems.</p>
+        <!-- Project Structure -->
+        <div class="text-left">
+            <h2 class="text-4xl font-bold mb-6 border-b border-gray-700 pb-3">My Projects</h2>
+        
+            <!-- Project 1: Schism Labs -->
+            <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('https://placehold.co/1200x300/1a202c/4a5568?text=Schism+BG');">
+                <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
+                <div class="relative">
+                    <!-- This button toggles the visibility of the div below -->
+                    <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
+                        <div class="flex items-center space-x-4 pointer-events-none">
+                            <img src="https://placehold.co/64x64/000000/ffffff?text=SL" alt="Schism Labs Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
+                            <div>
+                                <h3 class="text-2xl font-semibold text-blue-400">Schism Labs</h3>
+                                <p class="text-gray-300 mt-1">A venture into emergent AI and contextual embedding systems.</p>
+                            </div>
+                        </div>
+                    </button>
+                    
+                    <!-- This is the collapsible content area for Schism Labs -->
+                    <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
+                        <div class="border-t border-gray-600 pt-4">
+                            <p class="text-gray-400 mb-4">Select a resource to view:</p>
+                            
+                            <!-- Link to the project page -->
+                            <a href="https://schism-data.github.io/"
+                               target="_blank" rel="noopener noreferrer"
+                               class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                 View Landing Page
+                            </a>
+                        </div>
                     </div>
                 </div>
-            </button>
-            
-            <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
-                <div class="border-t border-gray-600 pt-4">
-                     <p class="text-gray-400 mb-4">Select a resource to view:</p>
+            </div>
+
+            <!-- Project 2: Bio Entrainment Therapeutics -->
+            <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('https://placehold.co/1200x300/1a202c/4a5568?text=Bio-E+BG');">
+                <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
+                <div class="relative">
+                     <!-- This button toggles the visibility of the div below -->
+                    <button data-toggle-id="bio-entrainment-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
+                        <div class="flex items-center space-x-4 pointer-events-none">
+                            <img src="https://placehold.co/64x64/000000/ffffff?text=BE" alt="Bio Entrainment Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
+                            <div>
+                                <h3 class="text-2xl font-semibold text-blue-400">Bio Entrainment Therapeutics</h3>
+                                <p class="text-gray-300 mt-1">A venture into Brainwave Entrainment and Hemi-Sync medical applications</p>
+                            </div>
+                        </div>
+                    </button>
                     
-                    <!-- THIS IS NOW A STANDARD LINK FOR FULL PAGE RELOAD -->
-                    <a href="https://schism-data.github.io/"
-                       target="_blank" rel="noopener noreferrer"
-                       class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                        View Landing Page
-                    </a>
+                    <!-- FIX: The ID of this div was corrected to match the button's data-toggle-id -->
+                    <div id="bio-entrainment-options" class="hidden px-6 pb-6 bg-black/20">
+                        <div class="border-t border-gray-600 pt-4">
+                            <p class="text-gray-400 mb-4">Select a resource to view:</p>
+                            
+                            <!-- Link to the project page -->
+                            <a href="https://bio-entrainment-therapeutics.github.io/"
+                               target="_blank" rel="noopener noreferrer"
+                               class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                 View Landing Page
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/Bio-Entrainment/Bio-entrainment bg.png');">
-        <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
-        <div class="relative">
-            <button data-toggle-id="Bio-Entrainment-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
-                <div class="flex items-center space-x-4 pointer-events-none">
-                    <img src="Resources/Pictures/Bio-Entrainment/Bio-Entrainment Logo.png" alt="Bio Entrainment Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
-                    <div>
-                        <h3 class="text-2xl font-semibold text-blue-400">Bio Entrainment Therapeutics</h3>
-                        <p class="text-gray-300 mt-1">A venture into Brainwave Entrainment and Hemi-Sync medical applications</p>
-                    </div>
-                </div>
-            </button>
-            
-            <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
-                <div class="border-t border-gray-600 pt-4">
-                     <p class="text-gray-400 mb-4">Select a resource to view:</p>
-                    
-                    <!-- THIS IS NOW A STANDARD LINK FOR FULL PAGE RELOAD -->
-                    <a href="https://bio-entrainment-therapeutics.github.io/"
-                       target="_blank" rel="noopener noreferrer"
-                       class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                        View Landing Page
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    
-</div>
