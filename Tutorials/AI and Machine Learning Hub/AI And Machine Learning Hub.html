@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI & ML Tutorial Hub</title>
+    <title>AI and Machine Learning</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -13,22 +13,20 @@
             color: #00ff41; /* Green text */
         }
         
-        /* Canvas for the background animation */
         #neural-background {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: -1; /* Place it behind all other content */
+            z-index: -1;
         }
         
-        /* Style for the iframe container to make it responsive */
         #tutorial-view-container {
             position: relative;
             width: 100%;
             height: 0;
-            padding-bottom: 75%; /* 4:3 aspect ratio */
+            padding-bottom: 75%;
         }
         
         #tutorial-iframe {
@@ -39,63 +37,52 @@
             height: 100%;
         }
 
-        /* Glassmorphism effect for cards - Matrix style */
         .card-style {
-            background: rgba(0, 20, 0, 0.5); /* Semi-transparent dark green */
+            background: rgba(0, 20, 0, 0.5);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border: 1px solid rgba(0, 255, 65, 0.2);
         }
 
-        /* Custom notification bar for alerts */
         #notification-bar {
             position: fixed;
-            bottom: -100px; /* Start off-screen */
+            bottom: -100px;
             left: 50%;
             transform: translateX(-50%);
             padding: 1rem 2rem;
             border-radius: 0.5rem;
-            background-color: #e53e3e; /* Red for errors, keep for visibility */
+            background-color: #e53e3e;
             color: white;
             z-index: 1000;
             transition: bottom 0.5s ease-in-out;
             font-weight: 500;
         }
 
-        /* Custom green focus ring */
         .focus-ring-green {
             --tw-ring-color: #00ff41;
+        }
+
+        /* Styles for active/inactive tabs */
+        .tab-button.active {
+             background-color: #00ff41;
+             color: #000000;
+        }
+        .tab-button {
+            background-color: rgba(0, 50, 0, 0.7);
+            color: #00ff41;
         }
     </style>
 </head>
 <body>
 
-    <!-- The interactive background canvas -->
     <canvas id="neural-background"></canvas>
-    
-    <!-- Notification Bar for custom messages -->
     <div id="notification-bar"></div>
 
     <div id="page-container" class="container mx-auto p-4 md:p-8 relative z-10">
         
-        <!-- Header Section -->
         <header class="text-center mb-8 relative">
-            <h1 class="text-4xl md:text-5xl font-bold text-green-400">AI & Machine Learning Hub</h1>
-            <p class="mt-2 text-lg text-green-500">Your central place for curated tutorials and research papers.</p>
-            
-            <!-- Auth Status Display -->
-            <div id="auth-container" class="absolute top-0 right-0 text-right">
-                <p id="user-status" class="text-sm text-green-500 mb-1">Connecting...</p>
-                <button id="auth-button" class="px-3 py-1 bg-green-800 text-green-200 rounded-md text-sm hover:bg-green-700 transition-colors">Sign In</button>
-            </div>
-
-            <!-- Container for top-right elements -->
-            <div class="absolute top-0 right-0 p-2 md:p-4 flex items-center space-x-4">
-                <!-- Auth Status Display -->
-                <div id="auth-container" class="text-right">
-                    <p id="user-status" class="text-sm text-green-500 mb-1">Connecting...</p>
-                    <button id="auth-button" class="px-3 py-1 bg-green-800 text-green-200 rounded-md text-sm hover:bg-green-700 transition-colors">Sign In</button>
-                </div>
+            <!-- Container for top-left elements -->
+            <div class="absolute top-0 left-0 p-2 md:p-4 flex items-center space-x-4">
                 <!-- Logo Link -->
                 <a href="https://ebayednoob.github.io" target="_blank" rel="noopener noreferrer" title="Visit Ebayednoob's Page">
                     <img src="Resources/Pictures/Logo Files/Ebayednoob-logo.png" 
@@ -103,27 +90,77 @@
                          alt="Ebayednoob Logo" 
                          class="h-12 w-12 rounded-full object-cover hover:opacity-80 transition-opacity border-2 border-green-700">
                 </a>
+                <!-- Auth Status Display -->
+                <div id="auth-container" class="text-left">
+                    <p id="user-status" class="text-sm text-green-500 mb-1">Connecting...</p>
+                    <button id="auth-button" class="px-3 py-1 bg-green-800 text-green-200 rounded-md text-sm hover:bg-green-700 transition-colors">Sign In</button>
+                </div>
             </div>
+
+            <h1 class="text-4xl md:text-5xl font-bold text-green-400 pt-16 md:pt-0">AI and Machine Learning</h1>
+            <p class="mt-2 text-lg text-green-500">Your central hub for tutorials in AI and Machine Learning.</p>
         </header>
 
-        <!-- Main Content: Grid for Search/Tutorials and Tutorial Viewer -->
+        <!-- Main Content Area -->
         <div id="main-content">
-            <!-- Search and Filter Input -->
-            <div class="mb-8">
-                <input type="text" id="search-input" placeholder="Search tutorials..." class="w-full px-4 py-3 bg-black/50 border border-green-700 rounded-lg text-green-300 placeholder-green-700 shadow-sm focus:outline-none focus:ring-2 focus-ring-green transition-shadow">
+            <!-- Navigation Tabs -->
+            <div class="flex space-x-4 mb-8 border-b border-green-800 pb-4 justify-center">
+                <button id="show-tutorials-btn" class="tab-button active font-bold py-2 px-6 rounded-lg transition-colors">Tutorials</button>
+                <button id="show-projects-btn" class="tab-button font-bold py-2 px-6 rounded-lg transition-colors">Projects</button>
             </div>
 
-            <!-- Tutorials Grid -->
-            <div id="tutorials-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Tutorial cards will be injected here by JavaScript -->
+            <!-- Tutorials Section -->
+            <div id="tutorials-section">
+                 <div class="mb-8">
+                    <input type="text" id="search-input" placeholder="Search tutorials..." class="w-full px-4 py-3 bg-black/50 border border-green-700 rounded-lg text-green-300 placeholder-green-700 shadow-sm focus:outline-none focus:ring-2 focus-ring-green transition-shadow">
+                </div>
+                <div id="tutorials-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Tutorial cards will be injected here -->
+                </div>
+                <p id="no-results" class="text-center text-green-500 hidden mt-8">No tutorials found matching your search.</p>
             </div>
-            <p id="no-results" class="text-center text-green-500 hidden mt-8">No tutorials found matching your search.</p>
+
+            <!-- Projects Section (Initially Hidden) -->
+            <div id="projects-section" class="hidden">
+                 <div class="text-left">
+                    <h2 class="text-4xl font-bold mb-6 border-b border-green-700 pb-3 text-green-400">My Projects</h2>
+                    
+                    <!-- Project 1: Schism Labs -->
+                    <div class="card-style rounded-lg mb-4 overflow-hidden">
+                        <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-green-900/20">
+                            <div class="flex items-center space-x-4 pointer-events-none">
+                                <img src="https://placehold.co/64x64/000000/00ff41?text=SL" alt="Schism Labs Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover border border-green-700">
+                                <div>
+                                    <h3 class="text-2xl font-semibold text-green-400">Schism Labs</h3>
+                                    <p class="text-green-500 mt-1">A venture into emergent AI and contextual embedding systems.</p>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
+                            <div class="border-t border-green-600 pt-4">
+                                <p class="text-green-500 mb-4">Select a resource to view:</p>
+                                <button data-load-path="Projects/Schism Labs/Schism Labs Landing Page.html"
+                                    class="bg-green-700 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                    View Landing Page
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Project 2: Placeholder -->
+                    <div class="card-style p-6 rounded-lg">
+                        <h3 class="text-2xl font-semibold text-green-400">Project Two</h3>
+                        <p class="text-green-500 mt-2">A description for the second project goes here.</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Tutorial Viewer Section (Initially Hidden) -->
         <div id="tutorial-viewer" class="hidden mt-8">
             <button id="back-button" class="mb-4 px-4 py-2 bg-green-800 text-green-200 rounded-lg hover:bg-green-700 transition-colors shadow-lg">
-                &larr; Back to Tutorials
+                &larr; Back to Main Hub
             </button>
             <div id="tutorial-view-container" class="bg-black rounded-lg shadow-2xl overflow-hidden border border-green-800">
                 <iframe id="tutorial-iframe" src="" frameborder="0" class="w-full h-full"></iframe>
@@ -157,48 +194,67 @@
 
         function showNotification(message) {
             notificationBar.textContent = message;
-            notificationBar.style.bottom = '20px'; // Slide in
+            notificationBar.style.bottom = '20px';
             setTimeout(() => {
-                notificationBar.style.bottom = '-100px'; // Slide out
-            }, 3000); // Hide after 3 seconds
+                notificationBar.style.bottom = '-100px';
+            }, 3000);
         }
 
         // --- TUTORIAL DATA ---
         const tutorials = [
             {
-                title: 'Enhancing LLM Efficiency Via Symbolic Compression',
-                category: 'Research Papers',
-                description: 'A deep dive into the paper exploring symbolic compression techniques to improve the efficiency of Large Language Models.',
-                path: 'Tutorials/Research Papers/Enhancing LLM Efficiency Via Symbolic Compression/Enhancing LLM Efficiency Via Symbolic Compression.html'
-            },
-            {
                 title: 'Introduction to Neural Networks',
-                category: 'Beginner Tutorials',
-                description: 'Learn the fundamentals of neural networks, from perceptrons to backpropagation. A great starting point for aspiring ML engineers.',
-                path: 'path/to/your/intro-nn-tutorial.html'
+                category: 'Deep Learning',
+                description: 'Learn the fundamentals of neural networks, from perceptrons to backpropagation.',
+                path: 'path/to/your/intro-nn.html'
             },
             {
-                title: 'Understanding Transformer Architectures',
-                category: 'Advanced Topics',
-                description: 'An in-depth explanation of the Transformer model, the foundation of modern NLP models like GPT and BERT.',
-                path: 'path/to/your/transformer-tutorial.html'
+                title: 'Understanding LLMs',
+                category: 'Natural Language Processing',
+                description: 'A deep dive into the architecture and impact of Large Language Models like GPT.',
+                path: 'path/to/your/llm-explainer.html'
             },
             {
-                title: 'A Guide to Convolutional Neural Networks (CNNs)',
+                title: 'Getting Started with TensorFlow',
+                category: 'Frameworks',
+                description: 'A beginner\'s guide to building and training models with Google\'s TensorFlow.',
+                path: 'path/to/your/tensorflow-guide.html'
+            },
+            {
+                title: 'Computer Vision with CNNs',
                 category: 'Computer Vision',
-                description: 'Explore CNNs and their application in image recognition and computer vision tasks. Includes interactive examples.',
-                path: 'path/to/your/cnn-tutorial.html'
-            }
+                description: 'Explore Convolutional Neural Networks for image classification and object detection.',
+                path: 'path/to/your/cnn-vision.html'
+            },
+            {
+                title: 'Scalar Wave Tutorial',
+                category: 'Physics',
+                description: 'An interactive guide to understanding the principles and applications of scalar waves.',
+                path: 'Tutorials/Scalar Wave/Interactive Tutorial - Scalar Wave.html'
+            },
+            {
+                title: 'Toroid Simulator',
+                category: 'Physics',
+                description: 'Simulate the electromagnetic fields of a single coil toroid in this interactive tool.',
+                path: 'Tutorials/Scalar Wave/Single Coil Simulation.html'
+            },
         ];
 
         // --- DOM ELEMENT REFERENCES ---
+        const mainContent = document.getElementById('main-content');
+        const tutorialViewer = document.getElementById('tutorial-viewer');
+        const backButton = document.getElementById('back-button');
+        const tutorialIframe = document.getElementById('tutorial-iframe');
+        
+        const tutorialsSection = document.getElementById('tutorials-section');
+        const projectsSection = document.getElementById('projects-section');
+        const showTutorialsBtn = document.getElementById('show-tutorials-btn');
+        const showProjectsBtn = document.getElementById('show-projects-btn');
+
         const tutorialsGrid = document.getElementById('tutorials-grid');
         const searchInput = document.getElementById('search-input');
         const noResultsMessage = document.getElementById('no-results');
-        const mainContent = document.getElementById('main-content');
-        const tutorialViewer = document.getElementById('tutorial-viewer');
-        const tutorialIframe = document.getElementById('tutorial-iframe');
-        const backButton = document.getElementById('back-button');
+        
         const userStatus = document.getElementById('user-status');
         const authButton = document.getElementById('auth-button');
 
@@ -224,7 +280,39 @@
             }
         });
 
-        // --- TUTORIAL MANAGEMENT FUNCTIONS ---
+        // --- UI/NAVIGATION LOGIC ---
+        function showMainHub() {
+            mainContent.classList.remove('hidden');
+            tutorialViewer.classList.add('hidden');
+            tutorialIframe.src = ''; // Clear iframe to stop content
+        }
+
+        function loadContent(path) {
+            if (!path || path.startsWith('path/to/your/')) {
+                showNotification('This is an example link. Please update the path to a real file.');
+                return;
+            }
+            mainContent.classList.add('hidden');
+            tutorialViewer.classList.remove('hidden');
+            tutorialIframe.src = path;
+            window.scrollTo(0, 0);
+        }
+
+        showTutorialsBtn.addEventListener('click', () => {
+            projectsSection.classList.add('hidden');
+            tutorialsSection.classList.remove('hidden');
+            showTutorialsBtn.classList.add('active');
+            showProjectsBtn.classList.remove('active');
+        });
+
+        showProjectsBtn.addEventListener('click', () => {
+            tutorialsSection.classList.add('hidden');
+            projectsSection.classList.remove('hidden');
+            showProjectsBtn.classList.add('active');
+            showTutorialsBtn.classList.remove('active');
+        });
+
+        // --- TUTORIAL MANAGEMENT ---
         function renderTutorials(tutorialsToRender) {
             tutorialsGrid.innerHTML = '';
             noResultsMessage.classList.toggle('hidden', tutorialsToRender.length > 0);
@@ -232,15 +320,15 @@
             tutorialsToRender.forEach(tutorial => {
                 const card = document.createElement('div');
                 card.className = 'card-style p-6 rounded-lg shadow-lg hover:shadow-green-500/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between';
+                card.dataset.loadPath = tutorial.path;
                 card.innerHTML = `
                     <div>
                         <span class="inline-block bg-green-900/50 text-green-300 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">${tutorial.category}</span>
-                        <h3 class="text-xl font-bold mt-3 mb-2 text-green-300">${tutorial.title}</h3>
-                        <p class="text-green-500">${tutorial.description}</p>
+                        <h3 class="text-xl font-bold mt-3 mb-2 text-green-300 pointer-events-none">${tutorial.title}</h3>
+                        <p class="text-green-500 pointer-events-none">${tutorial.description}</p>
                     </div>
-                    <button class="mt-4 text-left font-semibold text-green-400 hover:text-green-300 transition-colors">View Tutorial &rarr;</button>
+                    <div class="mt-4 text-left font-semibold text-green-400 hover:text-green-300 transition-colors pointer-events-none">View Tutorial &rarr;</div>
                 `;
-                card.addEventListener('click', () => loadTutorial(tutorial.path));
                 tutorialsGrid.appendChild(card);
             });
         }
@@ -254,42 +342,37 @@
             );
             renderTutorials(filteredTutorials);
         }
-        
-        function loadTutorial(path) {
-            if (path.startsWith('path/to/your/')) {
-                showNotification('This is an example tutorial. Update the path to a real file.');
-                return;
+
+        // --- GLOBAL EVENT LISTENER FOR LOADING & TOGGLING ---
+        document.addEventListener('click', (e) => {
+            // Logic to load content into iframe
+            const loadButton = e.target.closest('[data-load-path]');
+            if (loadButton) {
+                loadContent(loadButton.dataset.loadPath);
             }
-            mainContent.classList.add('hidden');
-            tutorialViewer.classList.remove('hidden');
-            tutorialIframe.src = path;
-            window.scrollTo(0, 0);
-        }
 
-        function showMainContent() {
-            tutorialViewer.classList.add('hidden');
-            mainContent.classList.remove('hidden');
-            tutorialIframe.src = '';
-        }
+            // Logic to toggle collapsible sections
+            const toggleButton = e.target.closest('[data-toggle-id]');
+            if (toggleButton) {
+                const targetId = toggleButton.dataset.toggleId;
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.classList.toggle('hidden');
+                }
+            }
+        });
 
-        // --- EVENT LISTENERS ---
+        backButton.addEventListener('click', showMainHub);
         searchInput.addEventListener('input', filterTutorials);
-        backButton.addEventListener('click', showMainContent);
-
+        
         // --- INITIAL RENDER ---
         renderTutorials(tutorials);
 
 
-        // --- NEURAL NETWORK BACKGROUND ANIMATION (MATRIX THEME) ---
+        // --- NEURAL NETWORK BACKGROUND ANIMATION ---
         const canvas = document.getElementById('neural-background');
         const ctx = canvas.getContext('2d');
         let particlesArray;
-
-        const mouse = { x: null, y: null };
-        window.addEventListener('mousemove', event => {
-            mouse.x = event.x;
-            mouse.y = event.y;
-        });
 
         function setCanvasSize() {
             canvas.width = window.innerWidth;
@@ -297,8 +380,8 @@
         }
 
         class Particle {
-            constructor(x, y, directionX, directionY, size, color) {
-                this.x = x; this.y = y; this.directionX = directionX; this.directionY = directionY; this.size = size; this.color = color;
+            constructor(x, y, dX, dY, size, color) {
+                this.x = x; this.y = y; this.directionX = dX; this.directionY = dY; this.size = size; this.color = color;
             }
             draw() {
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill();
@@ -314,35 +397,33 @@
         function init() {
             setCanvasSize();
             particlesArray = [];
-            let numberOfParticles = (canvas.height * canvas.width) / 9000;
-            for (let i = 0; i < numberOfParticles; i++) {
+            let num = (canvas.height * canvas.width) / 9000;
+            for (let i = 0; i < num; i++) {
                 let size = (Math.random() * 2) + 1;
                 let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
                 let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
-                let directionX = (Math.random() * 0.4) - 0.2;
-                let directionY = (Math.random() * 0.4) - 0.2;
-                let color = 'rgba(0, 255, 65, 0.5)'; // Matrix green particles
-                particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+                let dX = (Math.random() * 0.4) - 0.2;
+                let dY = (Math.random() * 0.4) - 0.2;
+                let color = 'rgba(0, 255, 65, 0.5)';
+                particlesArray.push(new Particle(x, y, dX, dY, size, color));
             }
         }
 
         function animate() {
             requestAnimationFrame(animate);
             ctx.clearRect(0, 0, innerWidth, innerHeight);
-            for (let i = 0; i < particlesArray.length; i++) {
-                particlesArray[i].update();
-            }
+            for (let p of particlesArray) { p.update(); }
             connect();
         }
 
         function connect() {
-            let opacityValue = 1;
+            let opacity = 1;
             for (let a = 0; a < particlesArray.length; a++) {
                 for (let b = a; b < particlesArray.length; b++) {
-                    let distance = ((particlesArray[a].x - particlesArray[b].x) ** 2) + ((particlesArray[a].y - particlesArray[b].y) ** 2);
-                    if (distance < (canvas.width / 7) * (canvas.height / 7)) {
-                        opacityValue = 1 - (distance / 20000);
-                        ctx.strokeStyle = `rgba(0, 255, 65, ${opacityValue})`; // Matrix green connections
+                    let dist = ((particlesArray[a].x - particlesArray[b].x) ** 2) + ((particlesArray[a].y - particlesArray[b].y) ** 2);
+                    if (dist < (canvas.width / 7) * (canvas.height / 7)) {
+                        opacity = 1 - (dist / 20000);
+                        ctx.strokeStyle = `rgba(0, 255, 65, ${opacity})`;
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
