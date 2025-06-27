@@ -32,6 +32,7 @@
         .content-overlay {
             background-color: rgba(17, 24, 39, 0.7);
             backdrop-filter: blur(8px);
+            --webkit-backdrop-filter: blur(8px);
         }
         #content-area {
             animation: fadeIn 0.5s ease-in-out;
@@ -39,6 +40,11 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        /* Custom class for active nav button */
+        .nav-active {
+            color: #ffffff;
+            border-bottom: 2px solid #3b82f6; /* Blue-500 */
         }
     </style>
 </head>
@@ -48,32 +54,33 @@
 
     <div class="container mx-auto px-4 min-h-screen flex flex-col relative z-10">
 
-        <header class="py-6 border-b border-gray-700/50 content-overlay rounded-b-xl">
+        <header class="py-6 border-b border-gray-700/50 content-overlay rounded-b-xl sticky top-0 z-50">
             <nav class="flex justify-between items-center px-6">
-                <a href="/" class="block transition-opacity hover:opacity-80">
-                    <img src="Resources/Pictures/Logo Files/Ebayednoob-logo.png" alt="Ebayednoob Logo" class="h-8 w-auto">
+                <a href="#" id="home-btn" class="block transition-opacity hover:opacity-80">
+                    <!-- Using a placeholder for the logo -->
+                    <img src="https://placehold.co/150x40/0a0a0a/ffffff?text=Ebayednoob" alt="Ebayednoob Logo" class="h-8 w-auto" onerror="this.onerror=null; this.src='https://placehold.co/150x40/0a0a0a/ffffff?text=Logo';">
                 </a>
                 <div class="flex items-center space-x-6">
-                    <!-- RESTORED: These are now buttons again for dynamic loading -->
-                    <button id="projects-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Projects</button>
-                    <button id="tutorials-btn" class="text-lg text-gray-300 hover:text-white transition-colors">Tutorials</button>
+                    <button id="projects-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Projects</button>
+                    <button id="tutorials-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Tutorials</button>
                     
                     <div id="auth-container" class="pl-4 border-l border-gray-700">
                          <button id="login-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                            Login
-                        </button>
-                        <div id="user-profile" class="hidden items-center space-x-3">
-                            <span id="user-email" class="text-sm text-gray-400"></span>
-                            <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                                Logout
-                            </button>
-                        </div>
+                             Login
+                         </button>
+                         <div id="user-profile" class="hidden items-center space-x-3">
+                             <span id="user-email" class="text-sm text-gray-400"></span>
+                             <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                 Logout
+                             </button>
+                         </div>
                     </div>
                 </div>
             </nav>
         </header>
 
         <main id="content-area" class="flex-grow py-10">
+            <!-- Initial content, will be replaced by dynamic loading -->
             <div class="text-center h-full flex flex-col justify-center">
                 <h1 class="text-5xl md:text-6xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">
                     Ethical General Intelligence
@@ -117,13 +124,18 @@
 
         // --- DOM Element References ---
         const contentArea = document.getElementById('content-area');
+        const homeBtn = document.getElementById('home-btn');
         const projectsBtn = document.getElementById('projects-btn');
         const tutorialsBtn = document.getElementById('tutorials-btn');
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
         const userProfileDiv = document.getElementById('user-profile');
         const userEmailSpan = document.getElementById('user-email');
+        const navButtons = document.querySelectorAll('.nav-btn');
 
+        // Store the initial home content so we can restore it
+        const homeContent = contentArea.innerHTML;
+        
         // --- Authentication Logic ---
         const provider = new GoogleAuthProvider();
         onAuthStateChanged(auth, user => {
@@ -150,46 +162,65 @@
             signOut(auth).catch(error => console.error("Sign out failed:", error));
         });
 
-        // --- RESTORED: Content Loading Logic ---
-        async function loadContent(filePath) {
+        // --- Content Loading Logic ---
+        async function loadContent(filePath, buttonToActivate) {
             try {
                 contentArea.innerHTML = '<p class="text-center text-gray-400">Loading...</p>';
                 const response = await fetch(filePath);
                 if (!response.ok) throw new Error(`Could not load ${filePath}. Status: ${response.status}`);
                 contentArea.innerHTML = await response.text();
+                
+                // Update active nav button style
+                navButtons.forEach(btn => btn.classList.remove('nav-active'));
+                if(buttonToActivate) {
+                    buttonToActivate.classList.add('nav-active');
+                }
+
             } catch (error) {
                 console.error('Failed to fetch content:', error);
-                contentArea.innerHTML = `<p class="text-center text-red-400">Sorry, we couldn't load this section.</p>`;
+                contentArea.innerHTML = `<div class="text-center"><p class="text-red-400 text-xl">Sorry, we couldn't load this section.</p><p class="text-gray-500 mt-2">Please make sure the file '${filePath}' exists.</p></div>`;
             }
         }
+        
+        // --- Navigation Event Listeners ---
+        homeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            contentArea.innerHTML = homeContent;
+            navButtons.forEach(btn => btn.classList.remove('nav-active'));
+        });
 
-        // --- RESTORED: Event Delegation for Dynamic Content ---
+        // Corrected file name for tutorials
+        projectsBtn.addEventListener('click', () => loadContent('projects.html', projectsBtn));
+        tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html', tutorialsBtn));
+
+
+        // --- Event Delegation for Dynamic Content (like accordions) ---
         contentArea.addEventListener('click', (event) => {
-            // This listener only handles the accordion toggle now.
-            // Links are handled by the browser's default behavior.
             const toggleTarget = event.target.closest('[data-toggle-id]');
             if (toggleTarget) {
                 event.preventDefault();
                 const elementToToggle = document.getElementById(toggleTarget.getAttribute('data-toggle-id'));
-                if (elementToToggle) elementToToggle.classList.toggle('hidden');
+                if (elementToToggle) {
+                    elementToToggle.classList.toggle('hidden');
+                    const icon = toggleTarget.querySelector('span:last-child');
+                    if(icon) {
+                       icon.textContent = elementToToggle.classList.contains('hidden') ? '+' : '-';
+                    }
+                }
             }
         });
-
-        // --- RESTORED: Main Navigation Button Events ---
-        projectsBtn.addEventListener('click', () => loadContent('projects.html'));
-        tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html'));
-
-
+        
         // --- Interactive Background Logic (three.js) ---
-        // (This code remains the same)
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setClearColor(0x000000, 0);
+
         const particleCount = 5000;
         const positions = new Float32Array(particleCount * 3);
         const velocities = new Float32Array(particleCount * 3);
+
         for (let i = 0; i < particleCount; i++) {
             positions[i * 3] = (Math.random() - 0.5) * 20;
             positions[i * 3 + 1] = (Math.random() - 0.5) * 20;
@@ -198,53 +229,68 @@
             velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.002;
             velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.002;
         }
+
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const material = new THREE.PointsMaterial({ color: 0x00aaff, size: 0.025, transparent: true, blending: THREE.AdditiveBlending });
         const particles = new THREE.Points(geometry, material);
         scene.add(particles);
         camera.position.z = 10;
+        
         const mouse = new THREE.Vector2(-100, -100);
-        window.addEventListener('mousemove', (event) => {
+
+        function onMouseMove(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        }, false);
-        window.addEventListener('resize', () => {
+        }
+        window.addEventListener('mousemove', onMouseMove, false);
+
+        function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }, false);
+        }
+        window.addEventListener('resize', onWindowResize, false);
+
         function animate() {
             requestAnimationFrame(animate);
             const positionAttribute = particles.geometry.attributes.position;
             const force = new THREE.Vector3();
+
             for (let i = 0; i < particleCount; i++) {
                 const x = positionAttribute.getX(i);
                 const y = positionAttribute.getY(i);
                 const z = positionAttribute.getZ(i);
+                
                 const screenPos = new THREE.Vector3(x, y, z).project(camera);
                 const dx = screenPos.x - mouse.x;
                 const dy = screenPos.y - mouse.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
+
                 if (distance < 0.2) {
                     const forceMagnitude = (0.2 - distance) * 0.05;
                     force.set(dx, dy, 0).normalize().multiplyScalar(forceMagnitude);
                     velocities[i * 3] += force.x;
                     velocities[i * 3 + 1] += force.y;
                 }
+                
                 positionAttribute.setX(i, x + velocities[i * 3]);
                 positionAttribute.setY(i, y + velocities[i * 3 + 1]);
                 positionAttribute.setZ(i, z + velocities[i * 3 + 2]);
+                
                 velocities[i*3] *= 0.98;
                 velocities[i*3+1] *= 0.98;
                 velocities[i*3+2] *= 0.98;
-                if (Math.abs(x) > 10) positionAttribute.setX(i, -x);
-                if (Math.abs(y) > 10) positionAttribute.setY(i, -y);
-                if (Math.abs(z) > 10) positionAttribute.setZ(i, -z);
+
+                if (Math.abs(x + velocities[i*3]) > 10) velocities[i*3] *= -1;
+                if (Math.abs(y + velocities[i*3+1]) > 10) velocities[i*3+1] *= -1;
+                if (Math.abs(z + velocities[i*3+2]) > 10) velocities[i*3+2] *= -1;
             }
+            
             positionAttribute.needsUpdate = true;
             particles.rotation.y += 0.0001;
             particles.rotation.x += 0.0002;
+            
             renderer.render(scene, camera);
         }
         animate();
