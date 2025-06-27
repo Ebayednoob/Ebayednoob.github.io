@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI & ML Tutorial Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0a1a; /* Dark blue background */
+            color: #e0e0e0;
+        }
+        
+        /* Canvas for the background animation */
+        #neural-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1; /* Place it behind all other content */
+        }
+        
+        /* Style for the iframe container to make it responsive */
+        #tutorial-view-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 75%; /* 4:3 aspect ratio */
+        }
+        
+        #tutorial-iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Glassmorphism effect for cards */
+        .card-style {
+            background: rgba(23, 23, 43, 0.5); /* Semi-transparent dark blue */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom notification bar for alerts */
+        #notification-bar {
+            position: fixed;
+            bottom: -100px; /* Start off-screen */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            background-color: #e53e3e; /* Red for errors */
+            color: white;
+            z-index: 1000;
+            transition: bottom 0.5s ease-in-out;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- The interactive background canvas -->
+    <canvas id="neural-background"></canvas>
+    
+    <!-- Notification Bar for custom messages -->
+    <div id="notification-bar"></div>
+
+    <div id="page-container" class="container mx-auto p-4 md:p-8 relative z-10">
+        
+        <!-- Header Section -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-white">AI & Machine Learning Hub</h1>
+            <p class="mt-2 text-lg text-gray-400">Your central place for curated tutorials and research papers.</p>
+        </header>
+
+        <!-- Main Content: Grid for Search/Tutorials and Tutorial Viewer -->
+        <div id="main-content">
+            <!-- Search and Filter Input -->
+            <div class="mb-8">
+                <input type="text" id="search-input" placeholder="Search tutorials by title or keyword..." class="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+            </div>
+
+            <!-- Tutorials Grid -->
+            <div id="tutorials-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Tutorial cards will be injected here by JavaScript -->
+            </div>
+            <p id="no-results" class="text-center text-gray-400 hidden mt-8">No tutorials found matching your search.</p>
+        </div>
+
+        <!-- Tutorial Viewer Section (Initially Hidden) -->
+        <div id="tutorial-viewer" class="hidden mt-8">
+            <button id="back-button" class="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-800 transition-colors shadow-lg">
+                &larr; Back to Tutorials
+            </button>
+            <div id="tutorial-view-container" class="bg-gray-900 rounded-lg shadow-2xl overflow-hidden border border-gray-700">
+                <iframe id="tutorial-iframe" src="" frameborder="0" class="w-full h-full"></iframe>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- NOTIFICATION FUNCTION ---
+        const notificationBar = document.getElementById('notification-bar');
+
+        /**
+         * Displays a temporary notification message.
+         * @param {string} message - The message to display.
+         */
+        function showNotification(message) {
+            notificationBar.textContent = message;
+            notificationBar.style.bottom = '20px'; // Slide in
+            setTimeout(() => {
+                notificationBar.style.bottom = '-100px'; // Slide out
+            }, 3000); // Hide after 3 seconds
+        }
+
+        // --- TUTORIAL DATA ---
+        const tutorials = [
+            {
+                title: 'Enhancing LLM Efficiency Via Symbolic Compression',
+                category: 'Research Papers',
+                description: 'A deep dive into the paper exploring symbolic compression techniques to improve the efficiency of Large Language Models.',
+                path: 'Tutorials/Research Papers/Enhancing LLM Efficiency Via Symbolic Compression/Enhancing LLM Efficiency Via Symbolic Compression.html'
+            },
+            {
+                title: 'Introduction to Neural Networks',
+                category: 'Beginner Tutorials',
+                description: 'Learn the fundamentals of neural networks, from perceptrons to backpropagation. A great starting point for aspiring ML engineers.',
+                path: 'path/to/your/intro-nn-tutorial.html'
+            },
+            {
+                title: 'Understanding Transformer Architectures',
+                category: 'Advanced Topics',
+                description: 'An in-depth explanation of the Transformer model, the foundation of modern NLP models like GPT and BERT.',
+                path: 'path/to/your/transformer-tutorial.html'
+            },
+            {
+                title: 'A Guide to Convolutional Neural Networks (CNNs)',
+                category: 'Computer Vision',
+                description: 'Explore CNNs and their application in image recognition and computer vision tasks. Includes interactive examples.',
+                path: 'path/to/your/cnn-tutorial.html'
+            }
+        ];
+
+        // --- DOM ELEMENT REFERENCES ---
+        const tutorialsGrid = document.getElementById('tutorials-grid');
+        const searchInput = document.getElementById('search-input');
+        const noResultsMessage = document.getElementById('no-results');
+        const mainContent = document.getElementById('main-content');
+        const tutorialViewer = document.getElementById('tutorial-viewer');
+        const tutorialIframe = document.getElementById('tutorial-iframe');
+        const backButton = document.getElementById('back-button');
+
+        // --- TUTORIAL MANAGEMENT FUNCTIONS ---
+        function renderTutorials(tutorialsToRender) {
+            tutorialsGrid.innerHTML = '';
+            noResultsMessage.classList.toggle('hidden', tutorialsToRender.length > 0);
+
+            tutorialsToRender.forEach(tutorial => {
+                const card = document.createElement('div');
+                card.className = 'card-style p-6 rounded-lg shadow-lg hover:shadow-blue-500/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between';
+                card.innerHTML = `
+                    <div>
+                        <span class="inline-block bg-blue-900/50 text-blue-300 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">${tutorial.category}</span>
+                        <h3 class="text-xl font-bold mt-3 mb-2 text-white">${tutorial.title}</h3>
+                        <p class="text-gray-400">${tutorial.description}</p>
+                    </div>
+                    <button class="mt-4 text-left font-semibold text-blue-400 hover:text-blue-300 transition-colors">View Tutorial &rarr;</button>
+                `;
+                card.addEventListener('click', () => loadTutorial(tutorial.path));
+                tutorialsGrid.appendChild(card);
+            });
+        }
+
+        function filterTutorials() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredTutorials = tutorials.filter(t => 
+                t.title.toLowerCase().includes(searchTerm) ||
+                t.description.toLowerCase().includes(searchTerm) ||
+                t.category.toLowerCase().includes(searchTerm)
+            );
+            renderTutorials(filteredTutorials);
+        }
+        
+        function loadTutorial(path) {
+            if (path.startsWith('path/to/your/')) {
+                showNotification('This is an example tutorial. Update the path to a real file.');
+                return;
+            }
+            mainContent.classList.add('hidden');
+            tutorialViewer.classList.remove('hidden');
+            tutorialIframe.src = path;
+            window.scrollTo(0, 0);
+        }
+
+        function showMainContent() {
+            tutorialViewer.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            tutorialIframe.src = '';
+        }
+
+        // --- EVENT LISTENERS ---
+        searchInput.addEventListener('input', filterTutorials);
+        backButton.addEventListener('click', showMainContent);
+
+        // --- INITIAL RENDER ---
+        renderTutorials(tutorials);
+
+
+        // --- NEURAL NETWORK BACKGROUND ANIMATION ---
+        const canvas = document.getElementById('neural-background');
+        const ctx = canvas.getContext('2d');
+        let particlesArray;
+
+        // Get mouse position
+        const mouse = { x: null, y: null, radius: 150 };
+
+        window.addEventListener('mousemove', event => {
+            mouse.x = event.x;
+            mouse.y = event.y;
+        });
+
+        // Set canvas size to fill the window
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // Particle class
+        class Particle {
+            constructor(x, y, directionX, directionY, size, color) {
+                this.x = x;
+                this.y = y;
+                this.directionX = directionX;
+                this.directionY = directionY;
+                this.size = size;
+                this.color = color;
+            }
+            // Method to draw individual particle
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+            // Method to update particle position
+            update() {
+                if (this.x > canvas.width || this.x < 0) {
+                    this.directionX = -this.directionX;
+                }
+                if (this.y > canvas.height || this.y < 0) {
+                    this.directionY = -this.directionY;
+                }
+                this.x += this.directionX;
+                this.y += this.directionY;
+                this.draw();
+            }
+        }
+
+        // Create particle array
+        function init() {
+            setCanvasSize();
+            particlesArray = [];
+            let numberOfParticles = (canvas.height * canvas.width) / 9000;
+            for (let i = 0; i < numberOfParticles; i++) {
+                let size = (Math.random() * 2) + 1;
+                let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
+                let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
+                let directionX = (Math.random() * 0.4) - 0.2;
+                let directionY = (Math.random() * 0.4) - 0.2;
+                let color = 'rgba(100, 100, 255, 0.5)';
+                particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+            }
+            connect();
+        }
+
+        // Function to draw connections
+        function connect() {
+            let opacityValue = 1;
+            for (let a = 0; a < particlesArray.length; a++) {
+                for (let b = a; b < particlesArray.length; b++) {
+                    let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) +
+                                 ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y));
+                    if (distance < (canvas.width / 7) * (canvas.height / 7)) {
+                        opacityValue = 1 - (distance / 20000);
+                        ctx.strokeStyle = `rgba(140, 140, 255, ${opacityValue})`;
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        // Resize event listener
+        window.addEventListener('resize', () => {
+            init();
+        });
+
+        // Start animation
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
