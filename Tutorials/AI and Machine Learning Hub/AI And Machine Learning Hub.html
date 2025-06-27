@@ -9,8 +9,8 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0a0a1a; /* Dark blue background */
-            color: #e0e0e0;
+            background-color: #000000; /* Black background for Matrix theme */
+            color: #00ff41; /* Green text */
         }
         
         /* Canvas for the background animation */
@@ -39,12 +39,12 @@
             height: 100%;
         }
 
-        /* Glassmorphism effect for cards */
+        /* Glassmorphism effect for cards - Matrix style */
         .card-style {
-            background: rgba(23, 23, 43, 0.5); /* Semi-transparent dark blue */
+            background: rgba(0, 20, 0, 0.5); /* Semi-transparent dark green */
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 65, 0.2);
         }
 
         /* Custom notification bar for alerts */
@@ -55,15 +55,20 @@
             transform: translateX(-50%);
             padding: 1rem 2rem;
             border-radius: 0.5rem;
-            background-color: #e53e3e; /* Red for errors */
+            background-color: #e53e3e; /* Red for errors, keep for visibility */
             color: white;
             z-index: 1000;
             transition: bottom 0.5s ease-in-out;
             font-weight: 500;
         }
+
+        /* Custom green focus ring */
+        .focus-ring-green {
+            --tw-ring-color: #00ff41;
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body>
 
     <!-- The interactive background canvas -->
     <canvas id="neural-background"></canvas>
@@ -74,45 +79,66 @@
     <div id="page-container" class="container mx-auto p-4 md:p-8 relative z-10">
         
         <!-- Header Section -->
-        <header class="text-center mb-8">
-            <h1 class="text-4xl md:text-5xl font-bold text-white">AI & Machine Learning Hub</h1>
-            <p class="mt-2 text-lg text-gray-400">Your central place for curated tutorials and research papers.</p>
+        <header class="text-center mb-8 relative">
+            <h1 class="text-4xl md:text-5xl font-bold text-green-400">AI & Machine Learning Hub</h1>
+            <p class="mt-2 text-lg text-green-500">Your central place for curated tutorials and research papers.</p>
+            
+            <!-- Auth Status Display -->
+            <div id="auth-container" class="absolute top-0 right-0 text-right">
+                <p id="user-status" class="text-sm text-green-500 mb-1">Connecting...</p>
+                <button id="auth-button" class="px-3 py-1 bg-green-800 text-green-200 rounded-md text-sm hover:bg-green-700 transition-colors">Sign In</button>
+            </div>
         </header>
 
         <!-- Main Content: Grid for Search/Tutorials and Tutorial Viewer -->
         <div id="main-content">
             <!-- Search and Filter Input -->
             <div class="mb-8">
-                <input type="text" id="search-input" placeholder="Search tutorials by title or keyword..." class="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow">
+                <input type="text" id="search-input" placeholder="Search tutorials..." class="w-full px-4 py-3 bg-black/50 border border-green-700 rounded-lg text-green-300 placeholder-green-700 shadow-sm focus:outline-none focus:ring-2 focus-ring-green transition-shadow">
             </div>
 
             <!-- Tutorials Grid -->
             <div id="tutorials-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <!-- Tutorial cards will be injected here by JavaScript -->
             </div>
-            <p id="no-results" class="text-center text-gray-400 hidden mt-8">No tutorials found matching your search.</p>
+            <p id="no-results" class="text-center text-green-500 hidden mt-8">No tutorials found matching your search.</p>
         </div>
 
         <!-- Tutorial Viewer Section (Initially Hidden) -->
         <div id="tutorial-viewer" class="hidden mt-8">
-            <button id="back-button" class="mb-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-800 transition-colors shadow-lg">
+            <button id="back-button" class="mb-4 px-4 py-2 bg-green-800 text-green-200 rounded-lg hover:bg-green-700 transition-colors shadow-lg">
                 &larr; Back to Tutorials
             </button>
-            <div id="tutorial-view-container" class="bg-gray-900 rounded-lg shadow-2xl overflow-hidden border border-gray-700">
+            <div id="tutorial-view-container" class="bg-black rounded-lg shadow-2xl overflow-hidden border border-green-800">
                 <iframe id="tutorial-iframe" src="" frameborder="0" class="w-full h-full"></iframe>
             </div>
         </div>
 
     </div>
 
-    <script>
+    <script type="module">
+        // --- FIREBASE IMPORTS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
+            authDomain: "gitlabs-3e081.firebaseapp.com",
+            projectId: "gitlabs-3e081",
+            storageBucket: "gitlabs-3e081.appspot.com",
+            messagingSenderId: "46943115268",
+            appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
+            measurementId: "G-M3MLTNVRH0"
+        };
+
+        // --- FIREBASE INITIALIZATION ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
         // --- NOTIFICATION FUNCTION ---
         const notificationBar = document.getElementById('notification-bar');
 
-        /**
-         * Displays a temporary notification message.
-         * @param {string} message - The message to display.
-         */
         function showNotification(message) {
             notificationBar.textContent = message;
             notificationBar.style.bottom = '20px'; // Slide in
@@ -157,6 +183,30 @@
         const tutorialViewer = document.getElementById('tutorial-viewer');
         const tutorialIframe = document.getElementById('tutorial-iframe');
         const backButton = document.getElementById('back-button');
+        const userStatus = document.getElementById('user-status');
+        const authButton = document.getElementById('auth-button');
+
+        // --- FIREBASE AUTHENTICATION LOGIC ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                userStatus.innerHTML = `Signed In<br><span class="text-xs text-green-600" title="${user.uid}">UID: ${user.uid.substring(0, 12)}...</span>`;
+                authButton.textContent = 'Sign Out';
+            } else {
+                userStatus.textContent = 'Signed Out';
+                authButton.textContent = 'Sign In';
+            }
+        });
+
+        authButton.addEventListener('click', () => {
+            if (auth.currentUser) {
+                signOut(auth);
+            } else {
+                signInAnonymously(auth).catch(error => {
+                    console.error("Anonymous sign-in failed:", error);
+                    showNotification(`Error: ${error.message}`);
+                });
+            }
+        });
 
         // --- TUTORIAL MANAGEMENT FUNCTIONS ---
         function renderTutorials(tutorialsToRender) {
@@ -165,14 +215,14 @@
 
             tutorialsToRender.forEach(tutorial => {
                 const card = document.createElement('div');
-                card.className = 'card-style p-6 rounded-lg shadow-lg hover:shadow-blue-500/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between';
+                card.className = 'card-style p-6 rounded-lg shadow-lg hover:shadow-green-500/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between';
                 card.innerHTML = `
                     <div>
-                        <span class="inline-block bg-blue-900/50 text-blue-300 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">${tutorial.category}</span>
-                        <h3 class="text-xl font-bold mt-3 mb-2 text-white">${tutorial.title}</h3>
-                        <p class="text-gray-400">${tutorial.description}</p>
+                        <span class="inline-block bg-green-900/50 text-green-300 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">${tutorial.category}</span>
+                        <h3 class="text-xl font-bold mt-3 mb-2 text-green-300">${tutorial.title}</h3>
+                        <p class="text-green-500">${tutorial.description}</p>
                     </div>
-                    <button class="mt-4 text-left font-semibold text-blue-400 hover:text-blue-300 transition-colors">View Tutorial &rarr;</button>
+                    <button class="mt-4 text-left font-semibold text-green-400 hover:text-green-300 transition-colors">View Tutorial &rarr;</button>
                 `;
                 card.addEventListener('click', () => loadTutorial(tutorial.path));
                 tutorialsGrid.appendChild(card);
@@ -214,57 +264,37 @@
         renderTutorials(tutorials);
 
 
-        // --- NEURAL NETWORK BACKGROUND ANIMATION ---
+        // --- NEURAL NETWORK BACKGROUND ANIMATION (MATRIX THEME) ---
         const canvas = document.getElementById('neural-background');
         const ctx = canvas.getContext('2d');
         let particlesArray;
 
-        // Get mouse position
-        const mouse = { x: null, y: null, radius: 150 };
-
+        const mouse = { x: null, y: null };
         window.addEventListener('mousemove', event => {
             mouse.x = event.x;
             mouse.y = event.y;
         });
 
-        // Set canvas size to fill the window
         function setCanvasSize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
 
-        // Particle class
         class Particle {
             constructor(x, y, directionX, directionY, size, color) {
-                this.x = x;
-                this.y = y;
-                this.directionX = directionX;
-                this.directionY = directionY;
-                this.size = size;
-                this.color = color;
+                this.x = x; this.y = y; this.directionX = directionX; this.directionY = directionY; this.size = size; this.color = color;
             }
-            // Method to draw individual particle
             draw() {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
-                ctx.fillStyle = this.color;
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill();
             }
-            // Method to update particle position
             update() {
-                if (this.x > canvas.width || this.x < 0) {
-                    this.directionX = -this.directionX;
-                }
-                if (this.y > canvas.height || this.y < 0) {
-                    this.directionY = -this.directionY;
-                }
-                this.x += this.directionX;
-                this.y += this.directionY;
+                if (this.x > canvas.width || this.x < 0) { this.directionX = -this.directionX; }
+                if (this.y > canvas.height || this.y < 0) { this.directionY = -this.directionY; }
+                this.x += this.directionX; this.y += this.directionY;
                 this.draw();
             }
         }
 
-        // Create particle array
         function init() {
             setCanvasSize();
             particlesArray = [];
@@ -275,32 +305,28 @@
                 let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
                 let directionX = (Math.random() * 0.4) - 0.2;
                 let directionY = (Math.random() * 0.4) - 0.2;
-                let color = 'rgba(100, 100, 255, 0.5)';
+                let color = 'rgba(0, 255, 65, 0.5)'; // Matrix green particles
                 particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
             }
         }
 
-        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
             ctx.clearRect(0, 0, innerWidth, innerHeight);
-
             for (let i = 0; i < particlesArray.length; i++) {
                 particlesArray[i].update();
             }
             connect();
         }
 
-        // Function to draw connections
         function connect() {
             let opacityValue = 1;
             for (let a = 0; a < particlesArray.length; a++) {
                 for (let b = a; b < particlesArray.length; b++) {
-                    let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) +
-                                 ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y));
+                    let distance = ((particlesArray[a].x - particlesArray[b].x) ** 2) + ((particlesArray[a].y - particlesArray[b].y) ** 2);
                     if (distance < (canvas.width / 7) * (canvas.height / 7)) {
                         opacityValue = 1 - (distance / 20000);
-                        ctx.strokeStyle = `rgba(140, 140, 255, ${opacityValue})`;
+                        ctx.strokeStyle = `rgba(0, 255, 65, ${opacityValue})`; // Matrix green connections
                         ctx.lineWidth = 1;
                         ctx.beginPath();
                         ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
@@ -311,12 +337,7 @@
             }
         }
         
-        // Resize event listener
-        window.addEventListener('resize', () => {
-            init();
-        });
-
-        // Start animation
+        window.addEventListener('resize', init);
         init();
         animate();
 
