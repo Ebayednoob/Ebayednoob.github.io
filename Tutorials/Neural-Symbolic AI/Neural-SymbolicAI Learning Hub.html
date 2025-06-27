@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neural-Symbolic AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000000; /* Black background for Matrix theme */
+            color: #00ff41; /* Green text */
+        }
+        
+        /* Canvas for the background animation */
+        #neural-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1; /* Place it behind all other content */
+        }
+        
+        /* Style for the iframe container to make it responsive */
+        #tutorial-view-container {
+            position: relative;
+            width: 100%;
+            height: 0;
+            padding-bottom: 75%; /* 4:3 aspect ratio */
+        }
+        
+        #tutorial-iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Glassmorphism effect for cards - Matrix style */
+        .card-style {
+            background: rgba(0, 20, 0, 0.5); /* Semi-transparent dark green */
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 65, 0.2);
+        }
+
+        /* Custom notification bar for alerts */
+        #notification-bar {
+            position: fixed;
+            bottom: -100px; /* Start off-screen */
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            background-color: #e53e3e; /* Red for errors, keep for visibility */
+            color: white;
+            z-index: 1000;
+            transition: bottom 0.5s ease-in-out;
+            font-weight: 500;
+        }
+
+        /* Custom green focus ring */
+        .focus-ring-green {
+            --tw-ring-color: #00ff41;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- The interactive background canvas -->
+    <canvas id="neural-background"></canvas>
+    
+    <!-- Notification Bar for custom messages -->
+    <div id="notification-bar"></div>
+
+    <div id="page-container" class="container mx-auto p-4 md:p-8 relative z-10">
+        
+        <!-- Header Section -->
+        <header class="text-center mb-8 relative">
+            <h1 class="text-4xl md:text-5xl font-bold text-green-400">Neural-Symbolic AI</h1>
+            <p class="mt-2 text-lg text-green-500">Exploring the fusion of neural networks and symbolic reasoning.</p>
+            
+            <!-- Auth Status Display -->
+            <div id="auth-container" class="absolute top-0 right-0 text-right">
+                <p id="user-status" class="text-sm text-green-500 mb-1">Connecting...</p>
+                <button id="auth-button" class="px-3 py-1 bg-green-800 text-green-200 rounded-md text-sm hover:bg-green-700 transition-colors">Sign In</button>
+            </div>
+        </header>
+
+        <!-- Main Content: Grid for Search/Tutorials and Tutorial Viewer -->
+        <div id="main-content">
+            <!-- Search and Filter Input -->
+            <div class="mb-8">
+                <input type="text" id="search-input" placeholder="Search tutorials..." class="w-full px-4 py-3 bg-black/50 border border-green-700 rounded-lg text-green-300 placeholder-green-700 shadow-sm focus:outline-none focus:ring-2 focus-ring-green transition-shadow">
+            </div>
+
+            <!-- Tutorials Grid -->
+            <div id="tutorials-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Tutorial cards will be injected here by JavaScript -->
+            </div>
+            <p id="no-results" class="text-center text-green-500 hidden mt-8">No tutorials found matching your search.</p>
+        </div>
+
+        <!-- Tutorial Viewer Section (Initially Hidden) -->
+        <div id="tutorial-viewer" class="hidden mt-8">
+            <button id="back-button" class="mb-4 px-4 py-2 bg-green-800 text-green-200 rounded-lg hover:bg-green-700 transition-colors shadow-lg">
+                &larr; Back to Tutorials
+            </button>
+            <div id="tutorial-view-container" class="bg-black rounded-lg shadow-2xl overflow-hidden border border-green-800">
+                <iframe id="tutorial-iframe" src="" frameborder="0" class="w-full h-full"></iframe>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        // --- FIREBASE IMPORTS ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
+            authDomain: "gitlabs-3e081.firebaseapp.com",
+            projectId: "gitlabs-3e081",
+            storageBucket: "gitlabs-3e081.appspot.com",
+            messagingSenderId: "46943115268",
+            appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
+            measurementId: "G-M3MLTNVRH0"
+        };
+
+        // --- FIREBASE INITIALIZATION ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // --- NOTIFICATION FUNCTION ---
+        const notificationBar = document.getElementById('notification-bar');
+
+        function showNotification(message) {
+            notificationBar.textContent = message;
+            notificationBar.style.bottom = '20px'; // Slide in
+            setTimeout(() => {
+                notificationBar.style.bottom = '-100px'; // Slide out
+            }, 3000); // Hide after 3 seconds
+        }
+
+        // --- TUTORIAL DATA ---
+        const tutorials = [
+            {
+                title: 'Logic Tensor Networks',
+                category: 'Neurosymbolic Architectures',
+                description: 'An introduction to Logic Tensor Networks, a framework that integrates first-order logic with deep learning.',
+                path: 'path/to/your/ltn-tutorial.html'
+            },
+            {
+                title: 'Symbolic Reasoning in Deep Learning',
+                category: 'Core Concepts',
+                description: 'A survey of methods for incorporating symbolic reasoning capabilities into neural network models.',
+                path: 'path/to/your/symbolic-reasoning-dl.html'
+            },
+            {
+                title: 'Neural-Symbolic Program Synthesis',
+                category: 'Applications',
+                description: 'Learn how neuro-symbolic models can be used to automatically generate computer programs from examples.',
+                path: 'path/to/your/program-synthesis.html'
+            },
+            {
+                title: 'Differentiable Fuzzy Logic',
+                category: 'Advanced Topics',
+                description: 'Explore how fuzzy logic can be made differentiable, allowing it to be integrated with gradient-based optimization.',
+                path: 'path/to/your/differentiable-fuzzy-logic.html'
+            }
+        ];
+
+        // --- DOM ELEMENT REFERENCES ---
+        const tutorialsGrid = document.getElementById('tutorials-grid');
+        const searchInput = document.getElementById('search-input');
+        const noResultsMessage = document.getElementById('no-results');
+        const mainContent = document.getElementById('main-content');
+        const tutorialViewer = document.getElementById('tutorial-viewer');
+        const tutorialIframe = document.getElementById('tutorial-iframe');
+        const backButton = document.getElementById('back-button');
+        const userStatus = document.getElementById('user-status');
+        const authButton = document.getElementById('auth-button');
+
+        // --- FIREBASE AUTHENTICATION LOGIC ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                userStatus.innerHTML = `Signed In<br><span class="text-xs text-green-600" title="${user.uid}">UID: ${user.uid.substring(0, 12)}...</span>`;
+                authButton.textContent = 'Sign Out';
+            } else {
+                userStatus.textContent = 'Signed Out';
+                authButton.textContent = 'Sign In';
+            }
+        });
+
+        authButton.addEventListener('click', () => {
+            if (auth.currentUser) {
+                signOut(auth);
+            } else {
+                signInAnonymously(auth).catch(error => {
+                    console.error("Anonymous sign-in failed:", error);
+                    showNotification(`Error: ${error.message}`);
+                });
+            }
+        });
+
+        // --- TUTORIAL MANAGEMENT FUNCTIONS ---
+        function renderTutorials(tutorialsToRender) {
+            tutorialsGrid.innerHTML = '';
+            noResultsMessage.classList.toggle('hidden', tutorialsToRender.length > 0);
+
+            tutorialsToRender.forEach(tutorial => {
+                const card = document.createElement('div');
+                card.className = 'card-style p-6 rounded-lg shadow-lg hover:shadow-green-500/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between';
+                card.innerHTML = `
+                    <div>
+                        <span class="inline-block bg-green-900/50 text-green-300 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded-full">${tutorial.category}</span>
+                        <h3 class="text-xl font-bold mt-3 mb-2 text-green-300">${tutorial.title}</h3>
+                        <p class="text-green-500">${tutorial.description}</p>
+                    </div>
+                    <button class="mt-4 text-left font-semibold text-green-400 hover:text-green-300 transition-colors">View Tutorial &rarr;</button>
+                `;
+                card.addEventListener('click', () => loadTutorial(tutorial.path));
+                tutorialsGrid.appendChild(card);
+            });
+        }
+
+        function filterTutorials() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const filteredTutorials = tutorials.filter(t => 
+                t.title.toLowerCase().includes(searchTerm) ||
+                t.description.toLowerCase().includes(searchTerm) ||
+                t.category.toLowerCase().includes(searchTerm)
+            );
+            renderTutorials(filteredTutorials);
+        }
+        
+        function loadTutorial(path) {
+            if (path.startsWith('path/to/your/')) {
+                showNotification('This is an example tutorial. Update the path to a real file.');
+                return;
+            }
+            mainContent.classList.add('hidden');
+            tutorialViewer.classList.remove('hidden');
+            tutorialIframe.src = path;
+            window.scrollTo(0, 0);
+        }
+
+        function showMainContent() {
+            tutorialViewer.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            tutorialIframe.src = '';
+        }
+
+        // --- EVENT LISTENERS ---
+        searchInput.addEventListener('input', filterTutorials);
+        backButton.addEventListener('click', showMainContent);
+
+        // --- INITIAL RENDER ---
+        renderTutorials(tutorials);
+
+
+        // --- NEURAL NETWORK BACKGROUND ANIMATION (MATRIX THEME) ---
+        const canvas = document.getElementById('neural-background');
+        const ctx = canvas.getContext('2d');
+        let particlesArray;
+
+        const mouse = { x: null, y: null };
+        window.addEventListener('mousemove', event => {
+            mouse.x = event.x;
+            mouse.y = event.y;
+        });
+
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        class Particle {
+            constructor(x, y, directionX, directionY, size, color) {
+                this.x = x; this.y = y; this.directionX = directionX; this.directionY = directionY; this.size = size; this.color = color;
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill();
+            }
+            update() {
+                if (this.x > canvas.width || this.x < 0) { this.directionX = -this.directionX; }
+                if (this.y > canvas.height || this.y < 0) { this.directionY = -this.directionY; }
+                this.x += this.directionX;
+                this.y += this.directionY;
+                this.draw();
+            }
+        }
+
+        function init() {
+            setCanvasSize();
+            particlesArray = [];
+            let numberOfParticles = (canvas.height * canvas.width) / 9000;
+            for (let i = 0; i < numberOfParticles; i++) {
+                let size = (Math.random() * 2) + 1;
+                let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
+                let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
+                let directionX = (Math.random() * 0.4) - 0.2;
+                let directionY = (Math.random() * 0.4) - 0.2;
+                let color = 'rgba(0, 255, 65, 0.5)'; // Matrix green particles
+                particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            ctx.clearRect(0, 0, innerWidth, innerHeight);
+            for (let i = 0; i < particlesArray.length; i++) {
+                particlesArray[i].update();
+            }
+            connect();
+        }
+
+        function connect() {
+            let opacityValue = 1;
+            for (let a = 0; a < particlesArray.length; a++) {
+                for (let b = a; b < particlesArray.length; b++) {
+                    let distance = ((particlesArray[a].x - particlesArray[b].x) ** 2) + ((particlesArray[a].y - particlesArray[b].y) ** 2);
+                    if (distance < (canvas.width / 7) * (canvas.height / 7)) {
+                        opacityValue = 1 - (distance / 20000);
+                        ctx.strokeStyle = `rgba(0, 255, 65, ${opacityValue})`; // Matrix green connections
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        window.addEventListener('resize', init);
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
