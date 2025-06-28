@@ -3,488 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Physics and Mathematics</title>
+    <title>Nested Toroid Generator</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #000000;
-            color: #00ff41;
         }
-        
-        #neural-background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-        }
-        
-        #tutorial-view-container {
+        .three-container {
+            height: 500px;
+            background-color: #020f02; /* Very dark green */
+            border-radius: 0.75rem;
+            border: 1px solid #052e16;
             position: relative;
-            width: 100%;
-            height: 0;
-            padding-bottom: 75%; /* 4:3 Aspect Ratio */
+            overflow: hidden;
+            cursor: move;
         }
-        
-        #tutorial-iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        input[type="range"] {
+            -webkit-appearance: none; appearance: none;
+            width: 100%; height: 8px;
+            background: #064e3b; /* Dark green */
+            border-radius: 5px; 
+            outline: none;
         }
-
-        .card-style {
-            background: rgba(0, 20, 0, 0.5);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 255, 65, 0.2);
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 20px; height: 20px;
+            background: #10b981; /* Bright green */
+            cursor: pointer; 
+            border-radius: 50%;
         }
-
-        #notification-bar {
-            position: fixed;
-            bottom: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 1rem 2rem;
-            border-radius: 0.5rem;
-            background-color: #0d4b26;
-            color: #adffc1;
-            z-index: 1000;
-            transition: bottom 0.5s ease-in-out;
-            font-weight: 500;
-            border: 1px solid #00ff41;
-        }
-
-        .focus-ring-green, .form-select:focus, .form-input:focus {
-            --tw-ring-color: #00ff41;
-            border-color: #00ff41;
-            box-shadow: 0 0 0 2px rgba(0, 255, 65, 0.5);
-        }
-        
-        /* Custom form styles */
-        .form-select, .form-input {
-             background-color: #021a08;
-             border: 1px solid #00ff41;
-             color: #adffc1;
-        }
-        .form-select {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2300ff41' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 0.5rem center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 2.5rem;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-        }
-
-        /* Custom checkbox style */
-        .form-checkbox {
-            appearance: none;
-            -webkit-appearance: none;
-            height: 1.25rem;
-            width: 1.25rem;
-            background-color: #021a08;
-            border: 1px solid #00ff41;
-            border-radius: 4px;
-            display: inline-block;
-            position: relative;
-            cursor: pointer;
-        }
-        .form-checkbox:checked {
-            background-color: #00ff41;
-        }
-        .form-checkbox:checked::after {
-            content: '✔';
-            font-size: 0.8rem;
-            color: #000000;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        .form-checkbox:disabled {
-            border-color: #0a3d1e;
-            background-color: #041f0c;
-            cursor: not-allowed;
+        input[type="range"]::-moz-range-thumb {
+            width: 20px; height: 20px;
+            background: #10b981; /* Bright green */
+            cursor: pointer; 
+            border-radius: 50%;
         }
     </style>
 </head>
-<body>
+<body class="bg-black text-green-500 p-4 sm:p-6 md:p-8" style="font-family: 'Inter', sans-serif;">
 
-    <canvas id="neural-background"></canvas>
-    <div id="notification-bar"></div>
+    <div class="container mx-auto max-w-4xl">
 
-    <div id="page-container" class="container mx-auto p-4 md:p-8 relative z-10">
-        
-        <header class="text-center mb-8 relative">
-            <div class="absolute top-0 left-0 p-2 md:p-4 flex items-center space-x-4">
-                <a href="https://ebayednoob.github.io" target="_blank" rel="noopener noreferrer" title="Visit Ebayednoob's Page">
-                    <img src="Resources/Pictures/Logo Files/Ebayednoob-logo.png" 
-                         onerror="this.src='https://placehold.co/48x48/000000/00FF41?text=E';"
-                         alt="Ebayednoob Logo" 
-                         class="h-12 w-12 rounded-full object-cover hover:opacity-80 transition-opacity border-2 border-green-700">
-                </a>
-                <div id="auth-container" class="text-left">
-                    <p id="user-status" class="text-sm text-green-500 mb-1">Connecting...</p>
-                    <button id="auth-button" class="px-3 py-1 bg-green-800 text-green-200 rounded-md text-sm hover:bg-green-700 transition-colors">Sign In</button>
-                </div>
-            </div>
-
-            <h1 class="text-4xl md:text-5xl font-bold text-green-400 pt-16 md:pt-0">Physics and Mathematics</h1>
-            <p class="mt-2 text-lg text-green-500">Your central hub for tutorials in the fundamental sciences.</p>
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-green-200 mb-6">Nested Toroid Generator</h1>
+            <p class="text-xl text-green-300 font-semibold mt-2">Dual Field Simulation</p>
         </header>
 
-        <div id="main-content">
-             <div class="mb-8 p-4 rounded-lg card-style">
-                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                    <!-- Search Input -->
-                    <div>
-                        <label for="search-input" class="block text-sm font-medium text-green-300 mb-1">Search</label>
-                        <input type="text" id="search-input" placeholder="Search tutorials..." class="w-full px-3 py-2 form-input rounded-md focus:outline-none focus-ring-green">
-                    </div>
-                    <!-- Category Filter -->
-                    <div>
-                        <label for="category-filter" class="block text-sm font-medium text-green-300 mb-1">Category</label>
-                        <select id="category-filter" class="w-full px-3 py-2 form-select rounded-md focus:outline-none focus-ring-green"></select>
-                    </div>
-                    <!-- Date Sort -->
-                    <div>
-                        <label for="date-sort" class="block text-sm font-medium text-green-300 mb-1">Sort by</label>
-                        <select id="date-sort" class="w-full px-3 py-2 form-select rounded-md focus:outline-none focus-ring-green">
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
-                        </select>
-                    </div>
-                    <!-- Incomplete Filter -->
-                    <div class="flex items-center justify-start pt-5">
-                         <div class="flex items-center space-x-2">
-                            <input type="checkbox" id="show-incomplete-checkbox" class="form-checkbox">
-                            <label for="show-incomplete-checkbox" class="text-green-300 font-medium">Show incomplete only</label>
-                        </div>
-                    </div>
-                 </div>
-            </div>
-
-            <div id="tutorials-section">
-                <div id="tutorials-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Tutorial cards will be injected here -->
+        <main class="bg-gray-900/50 border border-green-800 p-6 md:p-8 rounded-2xl shadow-lg">
+            <section id="simulation">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4 border-b border-green-800 pb-2">Interactive Simulation</h2>
+                <p class="mb-4 text-lg leading-relaxed">This simulation visualizes two independent toroidal field pairs generated by a single bifilar coil. Use the controls to adjust each field's properties. <br><b>Camera Controls:</b> Left-drag to rotate, Right-drag to pan, Scroll to zoom.</p>
+                <div id="simulation-container" class="three-container"></div>
+                <div id="controls-panel" class="mt-4 p-4 bg-gray-900 rounded-lg space-y-4">
+                    <!-- Control sections will be injected here by script -->
                 </div>
-                <p id="no-results" class="text-center text-green-500 hidden mt-8">No tutorials found matching your search.</p>
-            </div>
-        </div>
+            </section>
+            
+            <section id="theory" class="mt-8">
+                <h2 class="text-2xl font-semibold text-green-300 mb-4 border-b border-green-800 pb-2">Predictive Algorithms and Data Diffusion</h2>
+                <p class="text-lg leading-relaxed">
+                    The visualization demonstrates a theoretical model for data interaction. By conceptualizing data streams as nested toroidal fields, we can explore concepts like data diffusion and drift. The primary toroid (Red/Blue) can represent a core dataset or a primary influencing factor, while the secondary toroid (Green/Yellow) can represent an intersecting data stream or external variable.
+                </p>
+                <p class="text-lg leading-relaxed mt-4">
+                    By precisely controlling the amplitude, pulse, and orientation of each toroidal flow, it becomes possible to model and create predictive paths. For instance, adjusting the "Pulse Frequency" can simulate the rate of data flow, while "Amplitude" and "Size" can represent the data's influence or volume. The interaction points and resulting particle trajectories could then be used to develop predictive algorithms that forecast how these data streams might merge, diverge, or influence one another over time.
+                </p>
+            </section>
 
-        <div id="tutorial-viewer" class="hidden mt-8">
-            <button id="back-button" class="mb-4 px-4 py-2 bg-green-800 text-green-200 rounded-lg hover:bg-green-700 transition-colors shadow-lg">
-                &larr; Back to Main Hub
-            </button>
-            <div id="tutorial-view-container" class="bg-black rounded-lg shadow-2xl overflow-hidden border border-green-800">
-                <iframe id="tutorial-iframe" src="" frameborder="0" class="w-full h-full"></iframe>
-            </div>
-        </div>
-
+        </main>
+        
+        <footer class="text-center mt-10 text-sm text-green-600">
+            <p>Project documentation. Last updated: <span id="date"></span>.</p>
+        </footer>
     </div>
 
-    <script type="module">
-        // --- FIREBASE IMPORTS ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // --- FIREBASE CONFIGURATION ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
-            authDomain: "gitlabs-3e081.firebaseapp.com",
-            projectId: "gitlabs-3e081",
-            storageBucket: "gitlabs-3e081.firebasestorage.app",
-            messagingSenderId: "46943115268",
-            appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
-            measurementId: "G-M3MLTNVRH0"
-        };
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            // --- Utility Functions ---
+            const toRadians = (degrees) => degrees * (Math.PI / 180);
 
-        // --- FIREBASE & APP INITIALIZATION ---
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        // --- GLOBAL STATE ---
-        let currentUserId = null;
-        let userTutorialStatus = {};
-        let firestoreListener = null;
-
-        // --- TUTORIAL DATA ---
-        const tutorials = [
-            { id: 'calculus-intro', title: 'Introduction to Calculus', category: 'Mathematics', description: 'Explore the core concepts of limits, derivatives, and integrals.', path: 'path/to/your/calculus-intro.html', datePosted: '2025-06-10' },
-            { id: 'newtonian-mechanics', title: 'Newtonian Mechanics', category: 'Physics', description: 'A deep dive into Newton\'s laws of motion, force, and energy.', path: 'path/to/your/newtonian-mechanics.html', datePosted: '2025-06-12' },
-            { id: 'linear-algebra', title: 'Linear Algebra Fundamentals', category: 'Mathematics', description: 'Understand vectors, matrices, and linear transformations.', path: 'path/to/your/linear-algebra.html', datePosted: '2025-06-15' },
-            { id: 'electromagnetism', title: 'Introduction to Electromagnetism', category: 'Physics', description: 'Learn about electric and magnetic fields, and Maxwell\'s equations.', path: 'path/to/your/electromagnetism.html', datePosted: '2025-06-20' },
-            { id: 'scalar-wave-phy', title: 'Scalar Wave Tutorial', category: 'Physics', description: 'An interactive guide to understanding the principles and applications of scalar waves.', path: 'Tutorials/Scalar Wave/Interactive Tutorial - Scalar Wave.html', datePosted: '2025-05-30' },
-            { id: 'toroid-sim-phy', title: 'Toroid Simulator', category: 'Physics', description: 'Simulate the electromagnetic fields of a single coil toroid in this interactive tool.', path: 'Tutorials/Scalar Wave/Single Coil Simulation.html', datePosted: '2025-06-05' },
-            { id: 'nested-toroid-vis', title: 'Nested Toroid Visualizer', category: 'Physics', description: 'Visualize the fields of nested toroids with this interactive tool.', path: 'Tutorials/Physics and Mathematics/Nested Toroid Generator/Nested Toroid Visualizer.html', datePosted: '2025-06-28' }
-        ];
-
-
-        // --- DOM ELEMENT REFERENCES ---
-        const tutorialViewer = document.getElementById('tutorial-viewer');
-        const backButton = document.getElementById('back-button');
-        const tutorialIframe = document.getElementById('tutorial-iframe');
-        const tutorialsGrid = document.getElementById('tutorials-grid');
-        const searchInput = document.getElementById('search-input');
-        const noResultsMessage = document.getElementById('no-results');
-        const userStatus = document.getElementById('user-status');
-        const authButton = document.getElementById('auth-button');
-        const showIncompleteCheckbox = document.getElementById('show-incomplete-checkbox');
-        const notificationBar = document.getElementById('notification-bar');
-        const categoryFilter = document.getElementById('category-filter');
-        const dateSort = document.getElementById('date-sort');
-
-        // --- NOTIFICATION FUNCTION ---
-        function showNotification(message, isError = false) {
-            notificationBar.textContent = message;
-            notificationBar.style.backgroundColor = isError ? '#9B2C2C' : '#0d4b26';
-            notificationBar.style.color = isError ? '#FED7D7' : '#adffc1';
-            notificationBar.style.bottom = '20px';
-            setTimeout(() => {
-                notificationBar.style.bottom = '-100px';
-            }, 3000);
-        }
-
-        // --- FIREBASE AUTHENTICATION & DATA HANDLING ---
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                currentUserId = user.uid;
-                userStatus.innerHTML = `Signed In<br><span class="text-xs text-green-600" title="${user.uid}">UID: ${user.uid.substring(0, 12)}...</span>`;
-                authButton.textContent = 'Sign Out';
-                listenToTutorialStatus(user.uid);
-            } else {
-                currentUserId = null;
-                userStatus.textContent = 'Signed Out';
-                authButton.textContent = 'Sign In';
-                userTutorialStatus = {};
-                if (firestoreListener) firestoreListener(); // Detach listener on sign out
-                updateDisplayedTutorials();
-            }
-        });
-
-        function listenToTutorialStatus(userId) {
-            if (firestoreListener) firestoreListener();
-            const docRef = doc(db, "artifacts", appId, "users", userId, "tutorial_statuses", "progress");
-            firestoreListener = onSnapshot(docRef, (docSnap) => {
-                userTutorialStatus = docSnap.exists() ? docSnap.data().completion || {} : {};
-                updateDisplayedTutorials();
-            });
-        }
-
-        async function updateTutorialCompletion(tutorialId, isComplete) {
-            if (!currentUserId) return showNotification("Please sign in to save your progress.", true);
-            const docRef = doc(db, "artifacts", appId, "users", currentUserId, "tutorial_statuses", "progress");
-            try {
-                await setDoc(docRef, { completion: { [tutorialId]: isComplete } }, { merge: true });
-                showNotification("Progress saved!");
-            } catch (error) {
-                console.error("Error updating tutorial status: ", error);
-                showNotification("Failed to save progress.", true);
-            }
-        }
-        
-        authButton.addEventListener('click', () => {
-            auth.currentUser ? signOut(auth) : signInAnonymously(auth).catch(e => showNotification(`Error: ${e.message}`, true));
-        });
-
-        // --- UI & TUTORIAL MANAGEMENT ---
-        function populateCategoryFilter() {
-            const categories = [...new Set(tutorials.map(t => t.category))];
-            categoryFilter.innerHTML = '<option value="all">All Categories</option>';
-            categories.sort().forEach(category => {
-                const option = document.createElement('option');
-                option.value = category;
-                option.textContent = category;
-                categoryFilter.appendChild(option);
-            });
-        }
-        
-        function updateDisplayedTutorials() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const showIncomplete = showIncompleteCheckbox.checked;
-            const selectedCategory = categoryFilter.value;
-            const sortBy = dateSort.value;
-
-            let filteredTutorials = tutorials;
-
-            // 1. Filter by Category
-            if (selectedCategory !== 'all') {
-                filteredTutorials = filteredTutorials.filter(t => t.category === selectedCategory);
-            }
-
-            // 2. Filter by Search Term
-            if (searchTerm) {
-                filteredTutorials = filteredTutorials.filter(t => 
-                    t.title.toLowerCase().includes(searchTerm) ||
-                    t.description.toLowerCase().includes(searchTerm)
-                );
-            }
-
-            // 3. Filter by Completion Status
-            if (showIncomplete) {
-                filteredTutorials = filteredTutorials.filter(t => !userTutorialStatus[t.id]);
-            }
-            
-            // 4. Sort by Date
-            filteredTutorials.sort((a, b) => {
-                const dateA = new Date(a.datePosted);
-                const dateB = new Date(b.datePosted);
-                return sortBy === 'newest' ? dateB - dateA : dateA - dateB;
-            });
-
-            renderTutorials(filteredTutorials);
-        }
-
-        function renderTutorials(tutorialsToRender) {
-            tutorialsGrid.innerHTML = '';
-            noResultsMessage.classList.toggle('hidden', tutorialsToRender.length > 0);
-
-            tutorialsToRender.forEach(tutorial => {
-                const isComplete = userTutorialStatus[tutorial.id] || false;
-                const card = document.createElement('div');
-                card.className = 'card-style p-6 rounded-lg shadow-lg hover:shadow-green-500/20 hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between';
-                
-                card.innerHTML = `
-                    <div class="cursor-pointer flex-grow" data-load-path="${tutorial.path}">
-                        <div class="flex justify-between items-start mb-2">
-                             <span class="inline-block bg-green-900/50 text-green-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">${tutorial.category}</span>
-                             <span class="text-xs text-green-600">${tutorial.datePosted}</span>
-                        </div>
-                        <h3 class="text-xl font-bold mt-2 mb-2 text-green-300">${tutorial.title}</h3>
-                        <p class="text-green-500">${tutorial.description}</p>
-                    </div>
-                    <div class="mt-4 pt-4 border-t border-green-800/50 flex justify-between items-center">
-                         <div class="font-semibold text-green-400">View Tutorial &rarr;</div>
-                         <div class="flex items-center space-x-2">
-                            <label for="complete-check-${tutorial.id}" class="text-sm text-green-400 select-none cursor-pointer">Complete</label>
-                            <input type="checkbox" id="complete-check-${tutorial.id}" data-tutorial-id="${tutorial.id}" class="form-checkbox tutorial-complete-checkbox"
-                                ${isComplete ? 'checked' : ''} ${!currentUserId ? 'disabled' : ''}>
-                         </div>
-                    </div>
-                `;
-                tutorialsGrid.appendChild(card);
-            });
-        }
-
-        // --- GLOBAL EVENT LISTENERS ---
-        document.addEventListener('click', (e) => {
-            if (e.target.closest('[data-load-path]')) {
-                loadContent(e.target.closest('[data-load-path]').dataset.loadPath);
-            }
-            if (e.target.matches('.tutorial-complete-checkbox')) {
-                updateTutorialCompletion(e.target.dataset.tutorialId, e.target.checked);
-            }
-        });
-
-        backButton.addEventListener('click', () => {
-            document.getElementById('main-content').classList.remove('hidden');
-            tutorialViewer.classList.add('hidden');
-            tutorialIframe.src = 'about:blank';
-        });
-        
-        [searchInput, categoryFilter, dateSort, showIncompleteCheckbox].forEach(el => {
-            el.addEventListener('input', updateDisplayedTutorials);
-        });
-
-        function loadContent(path) {
-            if (!path || path.startsWith('path/to/your/')) {
-                return showNotification('This is an example link. Please update it.', true);
-            }
-            document.getElementById('main-content').classList.add('hidden');
-            tutorialViewer.classList.remove('hidden');
-            tutorialIframe.src = path;
-            window.scrollTo(0, 0);
-        }
-
-        // --- INITIALIZATION ---
-        function initializePage() {
-            populateCategoryFilter();
-            if (!auth.currentUser) {
-                signInAnonymously(auth).catch(e => console.error("Initial sign-in failed:", e));
-            }
-            updateDisplayedTutorials();
-        }
-
-        initializePage();
-
-        // --- NEURAL NETWORK BACKGROUND ANIMATION ---
-        const canvas = document.getElementById('neural-background');
-        const ctx = canvas.getContext('2d');
-        let particlesArray, animationFrameId;
-
-        function setCanvasSize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-
-        class Particle {
-            constructor(x, y, dX, dY, size, color) { this.x = x; this.y = y; this.directionX = dX; this.directionY = dY; this.size = size; this.color = color; }
-            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = this.color; ctx.fill(); }
-            update() {
-                if (this.x < 0 || this.x > canvas.width) this.directionX *= -1;
-                if (this.y < 0 || this.y > canvas.height) this.directionY *= -1;
-                this.x += this.directionX; this.y += this.directionY;
-                this.draw();
-            }
-        }
-
-        function initAnimation() {
-            setCanvasSize();
-            particlesArray = [];
-            let num = Math.floor((canvas.height * canvas.width) / 9000);
-            for (let i = 0; i < num; i++) {
-                let size = (Math.random() * 2) + 1;
-                let x = (Math.random() * (innerWidth - size * 2)) + size * 2;
-                let y = (Math.random() * (innerHeight - size * 2)) + size * 2;
-                let dX = (Math.random() * 0.4) - 0.2;
-                let dY = (Math.random() * 0.4) - 0.2;
-                particlesArray.push(new Particle(x, y, dX, dY, size, 'rgba(0, 255, 65, 0.5)'));
-            }
-        }
-
-        function animate() {
-            animationFrameId = requestAnimationFrame(animate);
-            ctx.clearRect(0, 0, innerWidth, innerHeight);
-            for (let p of particlesArray) p.update();
-            connect();
-        }
-
-        function connect() {
-            for (let a = 0; a < particlesArray.length; a++) {
-                for (let b = a; b < particlesArray.length; b++) {
-                    let dist = ((particlesArray[a].x - particlesArray[b].x) ** 2) + ((particlesArray[a].y - particlesArray[b].y) ** 2);
-                    if (dist < (canvas.width / 7) * (canvas.height / 7)) {
-                        let opacity = 1 - (dist / 20000);
-                        ctx.strokeStyle = `rgba(0, 255, 65, ${opacity})`;
-                        ctx.lineWidth = 1;
-                        ctx.beginPath();
-                        ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
-                        ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
-                        ctx.stroke();
-                    }
+            function addCameraControls(camera, domElement) {
+                const target = new THREE.Vector3(0, 0, 0);
+                let isRotating = false, isPanning = false;
+                let previousMousePosition = { x: 0, y: 0 };
+                const panSpeed = 0.02, zoomSpeed = 0.2;
+                function onPointerDown(e) {
+                    if (e.button === 0) isRotating = true;
+                    if (e.button === 2) isPanning = true;
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
                 }
+                function onPointerUp() { isRotating = false; isPanning = false; }
+                function onPointerMove(e) {
+                    const deltaMove = { x: e.clientX - previousMousePosition.x, y: e.clientY - previousMousePosition.y };
+                    if (isRotating) {
+                        const deltaRotationQuaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(toRadians(deltaMove.y * 0.5), toRadians(deltaMove.x * 0.5), 0, 'YXZ'));
+                        const offset = new THREE.Vector3().subVectors(camera.position, target);
+                        offset.applyQuaternion(deltaRotationQuaternion);
+                        camera.position.copy(target).add(offset);
+                        camera.lookAt(target);
+                    } else if (isPanning) {
+                        const panOffset = new THREE.Vector3();
+                        const v = new THREE.Vector3().subVectors(camera.position, target).normalize();
+                        const u = new THREE.Vector3().crossVectors(camera.up, v).normalize();
+                        panOffset.add(u.multiplyScalar(-deltaMove.x * panSpeed));
+                        panOffset.add(camera.up.clone().multiplyScalar(deltaMove.y * panSpeed));
+                        camera.position.add(panOffset);
+                        target.add(panOffset);
+                    }
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+                function onWheel(e) {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? 1 : -1;
+                    const direction = new THREE.Vector3().subVectors(target, camera.position).normalize();
+                    camera.position.add(direction.multiplyScalar(delta * zoomSpeed));
+                }
+                domElement.addEventListener('contextmenu', e => e.preventDefault());
+                domElement.addEventListener('pointerdown', onPointerDown);
+                domElement.addEventListener('pointerup', onPointerUp);
+                domElement.addEventListener('pointermove', onPointerMove);
+                domElement.addEventListener('wheel', onWheel, { passive: false });
             }
-        }
-        
-        window.addEventListener('resize', () => {
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
-            initAnimation();
-            animate();
+
+            // --- Main Simulation Setup ---
+            function initVisualization() {
+                const container = document.getElementById('simulation-container');
+                if (!container) return;
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+                camera.position.set(0, 8, 20);
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+                
+                scene.add(new THREE.AmbientLight(0xccffcc, 0.6));
+                const dirLight = new THREE.DirectionalLight(0xccffcc, 0.8);
+                dirLight.position.set(5, 10, 7.5);
+                scene.add(dirLight);
+
+                const masterCoilSystem = new THREE.Group();
+                scene.add(masterCoilSystem);
+                addCameraControls(camera, container);
+
+                // --- State Management and UI Generation ---
+                const fieldSystems = [];
+
+                function createFieldSystem(id, name, colors, initialState, masterGroup) {
+                    const systemState = { ...initialState };
+
+                    const createParticleField = (color, isStrong) => {
+                        const maxParticleCount = isStrong ? 3000 : 1500;
+                        const geo = new THREE.BufferGeometry();
+                        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(maxParticleCount * 3), 3));
+                        geo.setAttribute('meta', new THREE.BufferAttribute(new Float32Array(maxParticleCount * 2), 2));
+                        for (let i = 0; i < maxParticleCount; i++) {
+                            geo.attributes.meta.array[i * 2] = Math.random() * Math.PI * 2;
+                            geo.attributes.meta.array[i * 2 + 1] = (0.5 + Math.random() * 0.5) * (Math.random() > 0.5 ? 1 : -1);
+                        }
+                        const mat = new THREE.PointsMaterial({ size: 0.08, color: color, transparent: true, opacity: 0.9 });
+                        const field = new THREE.Points(geo, mat);
+                        field.userData.isStrong = isStrong;
+                        field.geometry.setDrawRange(0, Math.floor(maxParticleCount * systemState.density));
+                        masterGroup.add(field);
+                        return field;
+                    };
+                    
+                    const strongField = createParticleField(colors.strong, true);
+                    const weakField = createParticleField(colors.weak, false);
+                    
+                    const filterPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+
+                    const controlsHtml = `
+                        <details class="border-b border-green-800 pb-4" open>
+                            <summary class="font-semibold text-lg cursor-pointer" style="color:${colors.strong};">${name}</summary>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4 text-green-400">
+                                <div><label for="${id}-pulse">Pulse Freq: <span id="${id}-pulse-readout" class="font-mono text-green-300"></span></label><input type="range" id="${id}-pulse" min="0.1" max="5" step="0.1" value="${systemState.pulse}"></div>
+                                <div><label for="${id}-amplitude">Amplitude: <span id="${id}-amplitude-readout" class="font-mono text-green-300"></span></label><input type="range" id="${id}-amplitude" min="2" max="8" step="0.1" value="${systemState.amplitude}"></div>
+                                <div><label for="${id}-size">Size: <span id="${id}-size-readout" class="font-mono text-green-300"></span></label><input type="range" id="${id}-size" min="0.1" max="3" step="0.1" value="${systemState.size}"></div>
+                                <div><label for="${id}-offset">Offset: <span id="${id}-offset-readout" class="font-mono text-green-300"></span></label><input type="range" id="${id}-offset" min="-5" max="5" step="0.1" value="${systemState.offset}"></div>
+                                <div><label for="${id}-ellipse">Elliptical Ratio: <span id="${id}-ellipse-readout" class="font-mono text-green-300"></span></label><input type="range" id="${id}-ellipse" min="0.2" max="2.0" step="0.05" value="${systemState.ellipse}"></div>
+                                <div><label for="${id}-density">Particle Density: <span id="${id}-density-readout" class="font-mono text-green-300"></span></label><input type="range" id="${id}-density" min="0.1" max="1.0" step="0.05" value="${systemState.density}"></div>
+                            </div>
+                            <h4 class="font-semibold text-green-300 mt-4 mb-2">Filter Plane Orientation</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-2">
+                                <div><label for="${id}-plane-rot-x">X-Axis</label><input type="range" id="${id}-plane-rot-x" min="-180" max="180" value="0"></div>
+                                <div><label for="${id}-plane-rot-y">Y-Axis</label><input type="range" id="${id}-plane-rot-y" min="-180" max="180" value="0"></div>
+                                <div><label for="${id}-plane-rot-z">Z-Axis</label><input type="range" id="${id}-plane-rot-z" min="-180" max="180" value="0"></div>
+                            </div>
+                        </details>
+                    `;
+                    document.getElementById('controls-panel').insertAdjacentHTML('beforeend', controlsHtml);
+                    
+                    const uiElements = {};
+                    ['pulse', 'amplitude', 'size', 'offset', 'ellipse', 'density', 'plane-rot-x', 'plane-rot-y', 'plane-rot-z'].forEach(key => {
+                        uiElements[key] = { slider: document.getElementById(`${id}-${key}`), readout: document.getElementById(`${id}-${key.split('-')[0]}-readout`) };
+                    });
+
+                    function updateUI() {
+                         Object.keys(systemState).forEach(key => {
+                            if(uiElements[key] && uiElements[key].readout) {
+                                let value = systemState[key];
+                                uiElements[key].readout.textContent = (key === 'ellipse' || key === 'density' ? value.toFixed(2) : value.toFixed(1));
+                            }
+                         });
+                    }
+
+                    Object.keys(uiElements).forEach(key => {
+                        if (uiElements[key].slider) {
+                            uiElements[key].slider.addEventListener('input', e => {
+                                const value = parseFloat(e.target.value);
+                                const prop = key.split('-')[0];
+                                if (key.startsWith('plane')) {
+                                   const axis = key.slice(-1);
+                                   systemState.planeRotation[axis] = value;
+                                } else {
+                                   systemState[prop] = value;
+                                }
+                                if (prop === 'density') {
+                                    strongField.geometry.setDrawRange(0, Math.floor(3000 * value));
+                                    weakField.geometry.setDrawRange(0, Math.floor(1500 * value));
+                                }
+                                updateUI();
+                            });
+                        }
+                    });
+
+                    updateUI();
+                    
+                    return { systemState, strongField, weakField, filterPlane };
+                }
+                
+                const coilModel = (() => {
+                    const group = new THREE.Group();
+                    const turns = 12, maxRadius = 2.0, wireSeparation = 0.08;
+                    const mat1 = new THREE.LineBasicMaterial({ color: '#6EE7B7' });
+                    const mat2 = new THREE.LineBasicMaterial({ color: '#34D399' });
+                    const p1 = [], p2 = [];
+                    for (let i = 0; i <= turns * 360; i++) {
+                        const angle = toRadians(i), radius = (i / (turns * 360)) * maxRadius;
+                        p1.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+                        const angle2 = angle + toRadians(wireSeparation / radius * 360 || 0);
+                        p2.push(new THREE.Vector3(Math.cos(angle2) * radius, 0, Math.sin(angle2) * radius));
+                    }
+                    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(p1), mat1));
+                    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(p2), mat2));
+                    return group;
+                })();
+                masterCoilSystem.add(coilModel); // FIX: This now correctly adds to masterCoilSystem.
+
+                fieldSystems.push(createFieldSystem('primary', 'Primary Field', {strong: '#6EE7B7', weak: '#34D399'}, {
+                    pulse: 1.0, amplitude: 4.0, size: 0.8, offset: 0.0, ellipse: 1.0, density: 1.0,
+                    planeRotation: {x: 0, y: 0, z: 0}
+                }, masterCoilSystem));
+                
+                fieldSystems.push(createFieldSystem('secondary', 'Secondary Field', {strong: '#A7F3D0', weak: '#FBBF24'}, {
+                    pulse: 1.2, amplitude: 2.5, size: 0.5, offset: 0.0, ellipse: 1.0, density: 1.0,
+                    planeRotation: {x: 0, y: 0, z: 0}
+                }, masterCoilSystem));
+
+                const clock = new THREE.Clock();
+                const point = new THREE.Vector3();
+                const planeQuaternion = new THREE.Quaternion();
+                const euler = new THREE.Euler();
+
+                function updateField(particles, state, isStrong, filterPlane) {
+                    const positions = particles.geometry.attributes.position.array;
+                    const meta = particles.geometry.attributes.meta.array;
+                    const time = clock.getElapsedTime();
+                    
+                    const amplitude = state.amplitude * (isStrong ? 1 : 1/3);
+                    const size = state.size * (isStrong ? 1 : 1/3);
+                    const { offset, pulse, ellipse } = state;
+                    
+                    for (let i = 0; i < meta.length / 2; i++) {
+                        const i2 = i * 2, i3 = i * 3;
+                        const v = meta[i2], u_speed = meta[i2 + 1];
+                        const u = time * pulse * 0.3 * u_speed;
+                        
+                        const R = amplitude + size * Math.cos(v);
+                        const px = R * Math.cos(u) * ellipse;
+                        const py = size * Math.sin(v) + offset;
+                        const pz = R * Math.sin(u);
+
+                        point.set(px, py, pz);
+                        
+                        const distanceToPlane = filterPlane.distanceToPoint(point);
+                        const isVisible = !( (isStrong && distanceToPlane > 0) || (!isStrong && distanceToPlane < 0) );
+
+                        if (isVisible) {
+                           positions[i3] = px; positions[i3 + 1] = py; positions[i3 + 2] = pz;
+                        } else {
+                           positions[i3] = 99999;
+                           positions[i3 + 1] = 99999;
+                           positions[i3 + 2] = 99999;
+                        }
+                    }
+                    particles.geometry.attributes.position.needsUpdate = true;
+                }
+
+                function animate() {
+                    requestAnimationFrame(animate);
+
+                    fieldSystems.forEach(system => {
+                        const { systemState, strongField, weakField, filterPlane } = system;
+                        
+                        euler.set(toRadians(systemState.planeRotation.x), toRadians(systemState.planeRotation.y), toRadians(systemState.planeRotation.z), 'XYZ');
+                        planeQuaternion.setFromEuler(euler);
+                        filterPlane.normal.set(1, 0, 0).applyQuaternion(planeQuaternion);
+                        
+                        updateField(strongField, systemState, true, filterPlane);
+                        updateField(weakField, systemState, false, filterPlane);
+                    });
+
+                    renderer.render(scene, camera);
+                }
+                
+                animate();
+            }
+
+            initVisualization();
+            document.getElementById('date').textContent = new Date().toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric' 
+            });
         });
-        
-        window.onload = function() {
-            initAnimation();
-            animate();
-        };
     </script>
 </body>
 </html>
