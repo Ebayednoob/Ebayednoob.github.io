@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Tutorial: NVIDIA RAPIDS Accelerator for Apache Spark</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .prose h1 { @apply text-3xl font-bold mb-4 text-gray-800; }
+        .prose h2 { @apply text-2xl font-semibold mb-3 text-gray-700; }
+        .prose h3 { @apply text-xl font-medium mb-2 text-gray-600; }
+        .prose p { @apply mb-4 leading-relaxed; }
+        .prose code { @apply bg-gray-200 text-gray-800 rounded px-1 py-0.5 font-mono; }
+        .prose pre { @apply bg-gray-800 text-white rounded-lg p-4 overflow-x-auto; }
+        .prose blockquote { @apply border-l-4 border-blue-500 pl-4 italic text-gray-600; }
+        .card { @apply bg-white p-6 rounded-xl shadow-md; }
+        /* Custom toggle switch styles */
+        .toggle-checkbox:checked { @apply bg-blue-600; }
+        .toggle-checkbox:checked + .toggle-label { @apply bg-blue-600; }
+        .toggle-checkbox:checked + .toggle-label .toggle-dot { @apply translate-x-full; }
+        .table-responsive { @apply block w-full overflow-x-auto; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+
+    <div class="container mx-auto p-4 md:p-8 prose max-w-5xl">
+
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-900">NVIDIA RAPIDS Accelerator for Apache Spark</h1>
+            <p class="text-xl text-gray-600 mt-2">An Interactive Guide to GPU-Accelerated Big Data</p>
+        </header>
+
+        <main>
+            <section id="introduction" class="card mb-8">
+                <h2>What is the RAPIDS Accelerator?</h2>
+                <p>The <a href="https://nvidia.github.io/spark-rapids/" target="_blank" class="text-blue-600 hover:underline">RAPIDS Accelerator for Apache Spark</a> is a plugin that leverages NVIDIA GPUs to accelerate your Spark data processing and machine learning workloads without requiring any code changes to your existing Spark applications. By running operations on GPUs instead of CPUs, you can achieve significant performance improvements, often leading to faster data analysis and reduced infrastructure costs.</p>
+                <blockquote>
+                    At its core, the accelerator translates Spark's physical plan into operations that can be executed on the massively parallel architecture of GPUs.
+                </blockquote>
+            </section>
+
+            <section id="how-it-works" class="card mb-8">
+                <h2>How It Works: From CPU to GPU</h2>
+                <p>The RAPIDS plugin works by identifying parts of a Spark job that can be accelerated and automatically offloading them to the GPU. This includes many common data processing operations and SQL queries.</p>
+                <div id="workflow-visualization" class="w-full h-64 md:h-96 my-4 bg-gray-100 rounded-lg shadow-inner"></div>
+                <p class="text-center text-sm text-gray-500">Visualization: Spark job execution with and without the RAPIDS Accelerator.</p>
+            </section>
+
+            <section id="benefits" class="card mb-8">
+                <h2>Key Benefits</h2>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-green-100 p-4 rounded-lg">
+                        <h3 class="font-semibold text-green-800">🚀 Performance Boost</h3>
+                        <p class="text-green-700">Experience dramatic speedups for your ETL, data science, and machine learning pipelines, reducing run times from hours to minutes.</p>
+                    </div>
+                    <div class="bg-blue-100 p-4 rounded-lg">
+                        <h3 class="font-semibold text-blue-800">💰 Cost Savings</h3>
+                        <p class="text-blue-700">Faster job completion and higher throughput mean you can often reduce the size of your Spark cluster, leading to lower operational costs.</p>
+                    </div>
+                    <div class="bg-purple-100 p-4 rounded-lg">
+                        <h3 class="font-semibold text-purple-800">✨ Zero Code Change</h3>
+                        <p class="text-purple-700">Enable GPU acceleration with simple configuration changes. No need to rewrite your existing PySpark, Scala, Java, or R code.</p>
+                    </div>
+                    <div class="bg-yellow-100 p-4 rounded-lg">
+                        <h3 class="font-semibold text-yellow-800">📈 MLlib Acceleration</h3>
+                        <p class="text-yellow-700">The accelerator integrates with Spark's MLlib, speeding up the training of machine learning models like XGBoost, K-Means, and more.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="getting-started" class="card mb-8">
+                <h2>Interactive Configuration Builder</h2>
+                <p>Enabling the RAPIDS Accelerator is a configuration task. Use the interactive controls below to build your `spark-submit` command and see how different settings affect it. Hover over the setting names for an explanation.</p>
+                
+                <div class="space-y-6 mt-6 bg-gray-50 p-6 rounded-lg">
+                    <!-- Enable Plugin -->
+                    <div class="flex items-center justify-between">
+                        <label for="enablePlugin" class="font-medium text-gray-700" title="This is the main switch to enable the RAPIDS SQL plugin.">Enable RAPIDS Plugin</label>
+                        <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="enablePlugin" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
+                            <label for="enablePlugin" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"></label>
+                        </div>
+                    </div>
+
+                    <!-- Concurrent GPU Tasks -->
+                    <div class="space-y-2">
+                         <label for="concurrentTasks" class="font-medium text-gray-700" title="Number of tasks that can run concurrently on one GPU. Depends on GPU memory and workload.">Concurrent GPU Tasks: <span id="concurrentTasksValue" class="font-bold text-blue-600">2</span></label>
+                        <input type="range" id="concurrentTasks" min="1" max="8" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                    <!-- Executor GPU Amount -->
+                    <div class="space-y-2">
+                        <label for="executorGpu" class="font-medium text-gray-700" title="Number of GPUs assigned to each executor. Typically set to 1.">GPUs per Executor: <span id="executorGpuValue" class="font-bold text-blue-600">1</span></label>
+                        <input type="range" id="executorGpu" min="1" max="4" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    
+                    <!-- Task GPU Amount -->
+                    <div class="space-y-2">
+                        <label for="taskGpu" class="font-medium text-gray-700" title="Fraction of a GPU each task requires. (1 / Concurrent Tasks)">Task GPU Share: <span id="taskGpuValue" class="font-bold text-blue-600">0.5</span></label>
+                        <input type="range" id="taskGpu" min="0.1" max="1" step="0.1" value="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                     <!-- JAR Path -->
+                    <div>
+                        <label for="jarPath" class="block font-medium text-gray-700 mb-1" title="The path to the RAPIDS Accelerator JAR file.">RAPIDS JAR Path</label>
+                        <input type="text" id="jarPath" value="/path/to/rapids-4-spark_2.12-22.08.0.jar" class="w-full p-2 border border-gray-300 rounded-md">
+                    </div>
+                </div>
+
+                <h3 class="mt-8">Generated `spark-submit` Command</h3>
+                <p>The command below updates automatically as you change the settings.</p>
+                <pre><code id="generatedCommand" class="language-bash">
+                </code></pre>
+            </section>
+            
+             <section id="interactive-viz" class="card mb-8">
+                <h2>Interactive Demo: CPU vs. GPU Performance</h2>
+                <p>This is a simplified simulation to visualize the conceptual speed difference. Click the button to run a simulated data processing task on both a CPU and a GPU. The parallelism of the GPU simulation will be based on the "Concurrent GPU Tasks" setting above.</p>
+                <div class="text-center my-4">
+                    <button id="run-simulation" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition duration-300">Run Simulation</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div>
+                        <h3 class="text-center mb-2">CPU Processing (Sequential)</h3>
+                        <div id="cpu-viz" class="w-full h-64 bg-gray-100 rounded-lg p-2 flex flex-wrap gap-1 content-start"></div>
+                        <p id="cpu-timer" class="text-center mt-2 font-semibold"></p>
+                    </div>
+                    <div>
+                        <h3 class="text-center mb-2">GPU Processing (Parallel)</h3>
+                        <div id="gpu-viz" class="w-full h-64 bg-gray-100 rounded-lg p-2 flex flex-wrap gap-1 content-start"></div>
+                         <p id="gpu-timer" class="text-center mt-2 font-semibold"></p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="advanced-config" class="card mb-8">
+                <h2>Advanced Configuration Reference</h2>
+                <p>The following is the list of options that the RAPIDS Accelerator for Spark supports. You can set them on startup using <code>--conf [key]=[value]</code> or at runtime using <code>spark.conf.set("[key]", [value])</code>. Check the "Applicable at" column to see when a config can be set.</p>
+                 <div class="mt-4">
+                    <input type="text" id="configSearch" placeholder="Search configurations..." class="w-full p-2 border border-gray-300 rounded-md mb-4">
+                </div>
+                <div class="table-responsive">
+                    <table class="w-full text-sm text-left text-gray-500" id="configTable">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">Name</th>
+                                <th scope="col" class="px-6 py-3">Description</th>
+                                <th scope="col" class="px-6 py-3">Default Value</th>
+                                <th scope="col" class="px-6 py-3">Applicable at</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows will be injected by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="text-center mt-12 text-sm text-gray-500">
+            <p>This has been an interactive guide to the NVIDIA RAPIDS Accelerator for Apache Spark. Happy accelerating!</p>
+        </footer>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // D3.js visualization for workflow
+            function createWorkflowVisualization() {
+                const svgContainer = d3.select("#workflow-visualization");
+                if (svgContainer.node()) {
+                    svgContainer.html("");
+                    const width = svgContainer.node().getBoundingClientRect().width;
+                    const height = svgContainer.node().getBoundingClientRect().height;
+                    const svg = svgContainer.append("svg").attr("width", width).attr("height", height);
+
+                    const data = {
+                        nodes: [
+                            { id: 1, name: "Spark Driver", fx: 50, fy: height / 2 },
+                            { id: 2, name: "CPU Executor", fx: width / 2, fy: height / 4 },
+                            { id: 3, name: "GPU Executor", fx: width / 2, fy: 3 * height / 4 },
+                            { id: 4, name: "Data Source", fx: width - 50, fy: height / 2 }
+                        ],
+                        links: [
+                            { source: 1, target: 2, label: "CPU Plan" },
+                            { source: 1, target: 3, label: "GPU Plan (RAPIDS)" },
+                            { source: 2, target: 4, label: "Process" },
+                            { source: 3, target: 4, label: "Accelerated Process" }
+                        ]
+                    };
+                    
+                    svg.append("defs").append("marker").attr("id", "arrow").attr("viewBox", "0 -5 10 10").attr("refX", 18).attr("refY", 0).attr("markerWidth", 6).attr("markerHeight", 6).attr("orient", "auto").append("path").attr("d", "M0,-5L10,0L0,5").attr("fill", "#999");
+                    const link = svg.selectAll(".link").data(data.links).enter().append("line").attr("stroke", "#999").attr("stroke-width", 2).attr("marker-end", "url(#arrow)");
+                    const linkText = svg.selectAll(".link-text").data(data.links).enter().append("text").text(d => d.label).attr("dy", -5).attr("text-anchor", "middle").style("fill", "#555").style("font-size", "12px");
+                    const node = svg.selectAll(".node").data(data.nodes).enter().append("g");
+                    node.append("circle").attr("r", 15).attr("fill", d => (d.name.includes("GPU")) ? "#76b900" : "#0071c5");
+                    node.append("text").text(d => d.name).attr("dy", 28).attr("text-anchor", "middle").style("font-size", "14px");
+                    
+                    const simulation = d3.forceSimulation(data.nodes).force("link", d3.forceLink(data.links).id(d => d.id).distance(width / 3)).force("charge", d3.forceManyBody().strength(-300)).on("tick", () => {
+                        link.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+                        linkText.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+                        node.attr("transform", d => `translate(${d.x},${d.y})`);
+                    });
+                }
+            }
+            createWorkflowVisualization();
+            window.addEventListener('resize', createWorkflowVisualization);
+
+            // Interactive configuration builder
+            const enablePlugin = document.getElementById('enablePlugin');
+            const concurrentTasks = document.getElementById('concurrentTasks');
+            const concurrentTasksValue = document.getElementById('concurrentTasksValue');
+            const executorGpu = document.getElementById('executorGpu');
+            const executorGpuValue = document.getElementById('executorGpuValue');
+            const taskGpu = document.getElementById('taskGpu');
+            const taskGpuValue = document.getElementById('taskGpuValue');
+            const jarPath = document.getElementById('jarPath');
+            const output = document.getElementById('generatedCommand');
+
+            function generateCommand() {
+                const isPluginEnabled = enablePlugin.checked;
+                const tasks = concurrentTasks.value;
+                const executorVal = executorGpu.value;
+                const taskVal = taskGpu.value;
+                const jar = jarPath.value;
+
+                let command = `spark-submit \\
+  --master yarn \\`;
+
+                if (isPluginEnabled) {
+                    command += `
+  --conf spark.plugins=com.nvidia.spark.SQLPlugin \\
+  --conf spark.rapids.sql.concurrentGpuTasks=${tasks} \\
+  --conf spark.executor.resource.gpu.amount=${executorVal} \\
+  --conf spark.task.resource.gpu.amount=${taskVal} \\`;
+                }
+                if (jar) {
+                    command += `
+  --jars ${jar} \\`;
+                }
+                command += `
+  my_spark_app.py`;
+                output.textContent = command;
+            }
+
+            [concurrentTasks, executorGpu, taskGpu, jarPath].forEach(el => {
+                el.addEventListener('input', () => {
+                    if (concurrentTasksValue) concurrentTasksValue.textContent = concurrentTasks.value;
+                    if (executorGpuValue) executorGpuValue.textContent = executorGpu.value;
+                    if (taskGpuValue) taskGpuValue.textContent = taskGpu.value;
+                    generateCommand();
+                });
+            });
+            enablePlugin.addEventListener('change', generateCommand);
+            concurrentTasks.addEventListener('input', () => {
+                const recommendedTaskGpu = (1 / concurrentTasks.value).toFixed(2);
+                taskGpu.value = recommendedTaskGpu;
+                taskGpuValue.textContent = recommendedTaskGpu;
+            });
+            generateCommand();
+
+            // Advanced Config Table
+            const configData = [
+                { name: 'spark.rapids.cloudSchemes', description: 'Comma separated list of additional URI schemes that are to be considered cloud based filesystems. Schemes already included: abfs, abfss, dbfs, gs, s3, s3a, s3n, wasbs, cosn.', defaultValue: 'None', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.filecache.enabled', description: 'Controls whether the caching of input files is enabled. When enabled, input data is cached to the same local directories configured for the Spark application. The cache will use up to half the available space by default.', defaultValue: 'false', applicableAt: 'Startup' },
+                { name: 'spark.rapids.memory.gpu.maxAllocFraction', description: 'The fraction of total GPU memory that limits the maximum size of the RMM pool. The value must be greater than or equal to the setting for spark.rapids.memory.gpu.allocFraction.', defaultValue: '1.0', applicableAt: 'Startup' },
+                { name: 'spark.rapids.memory.gpu.minAllocFraction', description: 'The fraction of total GPU memory that limits the minimum size of the RMM pool. The value must be less than or equal to the setting for spark.rapids.memory.gpu.allocFraction.', defaultValue: '0.25', applicableAt: 'Startup' },
+                { name: 'spark.rapids.memory.host.spillStorageSize', description: 'Amount of off-heap host memory to use for buffering spilled GPU data before spilling to local disk. Use -1 to set the amount to the combined size of pinned and pageable memory pools.', defaultValue: '-1', applicableAt: 'Startup' },
+                { name: 'spark.rapids.memory.pinnedPool.size', description: 'The size of the pinned memory pool in bytes unless otherwise specified. Use 0 to disable the pool.', defaultValue: '0', applicableAt: 'Startup' },
+                { name: 'spark.rapids.sql.batchSizeBytes', description: 'Set the target number of bytes for a GPU batch. Splits sizes for input data is covered by separate configs.', defaultValue: '1073741824', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.concurrentGpuTasks', description: 'Set the number of tasks that can execute concurrently per GPU. Tasks may temporarily block when the number of concurrent tasks in the executor exceeds this amount.', defaultValue: '2', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.enabled', description: 'Enable (true) or disable (false) sql operations on the GPU', defaultValue: 'true', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.explain', description: 'Explain why some parts of a query were not placed on a GPU or not. Possible values are ALL, NONE, NOT_ON_GPU.', defaultValue: 'NOT_ON_GPU', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.metrics.level', description: 'GPU plans can produce a lot more metrics than CPU plans do. Supported values include DEBUG, MODERATE, ESSENTIAL.', defaultValue: 'MODERATE', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.multiThreadedRead.numThreads', description: 'The maximum number of threads on each executor to use for reading small files in parallel. This can not be changed at runtime after the executor has started.', defaultValue: '20', applicableAt: 'Startup' },
+                { name: 'spark.rapids.sql.reader.batchSizeBytes', description: 'Soft limit on the maximum number of bytes the reader reads per batch.', defaultValue: '2147483647', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.reader.batchSizeRows', description: 'Soft limit on the maximum number of rows the reader will read per batch.', defaultValue: '2147483647', applicableAt: 'Runtime' },
+                { name: 'spark.rapids.sql.udfCompiler.enabled', description: 'When set to true, Scala UDFs will be considered for compilation as Catalyst expressions', defaultValue: 'false', applicableAt: 'Runtime' },
+            ];
+            
+            const tableBody = document.querySelector("#configTable tbody");
+            const searchInput = document.getElementById("configSearch");
+
+            function renderTable(data) {
+                tableBody.innerHTML = '';
+                data.forEach(item => {
+                    const applicableAtClass = item.applicableAt === 'Runtime' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+                    const row = `
+                        <tr class="bg-white border-b hover:bg-gray-50">
+                            <td class="px-6 py-4 font-mono text-xs"><code>${item.name}</code></td>
+                            <td class="px-6 py-4">${item.description}</td>
+                            <td class="px-6 py-4"><code>${item.defaultValue}</code></td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs font-medium rounded-full ${applicableAtClass}">${item.applicableAt}</span>
+                            </td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+            }
+
+            searchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const filteredData = configData.filter(item => 
+                    item.name.toLowerCase().includes(searchTerm) ||
+                    item.description.toLowerCase().includes(searchTerm)
+                );
+                renderTable(filteredData);
+            });
+
+            renderTable(configData);
+
+
+            // Interactive CPU vs GPU simulation
+            const runButton = document.getElementById('run-simulation');
+            const cpuViz = document.getElementById('cpu-viz');
+            const gpuViz = document.getElementById('gpu-viz');
+            const cpuTimerEl = document.getElementById('cpu-timer');
+            const gpuTimerEl = document.getElementById('gpu-timer');
+            const totalTasks = 100;
+
+            function resetViz() {
+                if(!cpuViz || !gpuViz) return;
+                cpuViz.innerHTML = '';
+                gpuViz.innerHTML = '';
+                cpuTimerEl.textContent = '';
+                gpuTimerEl.textContent = '';
+                for(let i=0; i<totalTasks; i++) {
+                    const cpuTask = document.createElement('div');
+                    cpuTask.className = 'w-4 h-4 bg-gray-300 rounded-sm task';
+                    cpuTask.id = `cpu-task-${i}`;
+                    cpuViz.appendChild(cpuTask);
+                    const gpuTask = document.createElement('div');
+                    gpuTask.className = 'w-4 h-4 bg-gray-300 rounded-sm task';
+                    gpuTask.id = `gpu-task-${i}`;
+                    gpuViz.appendChild(gpuTask);
+                }
+            }
+
+            if (runButton) {
+                runButton.addEventListener('click', () => {
+                    resetViz();
+                    runButton.disabled = true;
+                    runButton.textContent = 'Simulating...';
+                    let cpuDone = false;
+                    let gpuDone = false;
+
+                    let cpuStartTime = performance.now();
+                    let cpuTaskIndex = 0;
+                    const cpuInterval = setInterval(() => {
+                        if (cpuTaskIndex >= totalTasks) {
+                            clearInterval(cpuInterval);
+                            let cpuEndTime = performance.now();
+                            cpuTimerEl.textContent = `CPU Time: ${((cpuEndTime - cpuStartTime)/1000).toFixed(2)}s`;
+                            cpuDone = true;
+                            if (gpuDone) checkCompletion();
+                            return;
+                        }
+                        const taskEl = document.getElementById(`cpu-task-${cpuTaskIndex}`);
+                        if(taskEl) taskEl.style.backgroundColor = '#0071c5';
+                        cpuTaskIndex++;
+                    }, 50); 
+
+                    let gpuStartTime = performance.now();
+                    let gpuTaskIndex = 0;
+                    const gpuInterval = setInterval(() => {
+                         if (gpuTaskIndex >= totalTasks) {
+                            clearInterval(gpuInterval);
+                            let gpuEndTime = performance.now();
+                            gpuTimerEl.textContent = `GPU Time: ${((gpuEndTime - gpuStartTime)/1000).toFixed(2)}s`;
+                            gpuDone = true;
+                            if (cpuDone) checkCompletion();
+                            return;
+                        }
+                        const parallelFactor = parseInt(concurrentTasks.value, 10) || 1;
+                        for(let i=0; i<parallelFactor && gpuTaskIndex < totalTasks; i++) {
+                           const taskEl = document.getElementById(`gpu-task-${gpuTaskIndex}`);
+                           if(taskEl) taskEl.style.backgroundColor = '#76b900';
+                           gpuTaskIndex++;
+                        }
+                    }, 50);
+                });
+            }
+            
+            function checkCompletion() {
+                if (runButton) {
+                    runButton.disabled = false;
+                    runButton.textContent = 'Run Simulation Again';
+                }
+            }
+            resetViz();
+        });
+    </script>
+
+</body>
+</html>
