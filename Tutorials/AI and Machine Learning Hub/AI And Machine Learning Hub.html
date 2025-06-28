@@ -26,7 +26,7 @@
             position: relative;
             width: 100%;
             height: 0;
-            padding-bottom: 75%;
+            padding-bottom: 75%; /* 4:3 Aspect Ratio */
         }
         
         #tutorial-iframe {
@@ -51,11 +51,12 @@
             transform: translateX(-50%);
             padding: 1rem 2rem;
             border-radius: 0.5rem;
-            background-color: #e53e3e;
-            color: white;
+            background-color: #0d4b26; /* Darker green */
+            color: #adffc1; /* Lighter green text */
             z-index: 1000;
             transition: bottom 0.5s ease-in-out;
             font-weight: 500;
+            border: 1px solid #00ff41;
         }
 
         .focus-ring-green {
@@ -64,8 +65,8 @@
 
         /* Styles for active/inactive tabs */
         .tab-button.active {
-             background-color: #00ff41;
-             color: #000000;
+            background-color: #00ff41;
+            color: #000000;
         }
         .tab-button {
             background-color: rgba(0, 50, 0, 0.7);
@@ -172,18 +173,20 @@
     <script type="module">
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         
         // --- FIREBASE CONFIGURATION ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
-            authDomain: "gitlabs-3e081.firebaseapp.com",
-            projectId: "gitlabs-3e081",
-            storageBucket: "gitlabs-3e081.appspot.com",
-            messagingSenderId: "46943115268",
-            appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
-            measurementId: "G-M3MLTNVRH0"
-        };
+        // This will be automatically populated by the environment.
+        const firebaseConfig = typeof __firebase_config !== 'undefined'
+            ? JSON.parse(__firebase_config)
+            : {
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_AUTH_DOMAIN",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_STORAGE_BUCKET",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID"
+            };
 
         // --- FIREBASE INITIALIZATION ---
         const app = initializeApp(firebaseConfig);
@@ -192,8 +195,9 @@
         // --- NOTIFICATION FUNCTION ---
         const notificationBar = document.getElementById('notification-bar');
 
-        function showNotification(message) {
+        function showNotification(message, isError = false) {
             notificationBar.textContent = message;
+            notificationBar.style.backgroundColor = isError ? '#e53e3e' : '#0d4b26';
             notificationBar.style.bottom = '20px';
             setTimeout(() => {
                 notificationBar.style.bottom = '-100px';
@@ -238,6 +242,12 @@
                 description: 'Simulate the electromagnetic fields of a single coil toroid in this interactive tool.',
                 path: 'Tutorials/Scalar Wave/Single Coil Simulation.html'
             },
+            {
+                title: 'Nvidia RAPIDS Spark overview',
+                category: 'Data Science',
+                description: 'An overview of using NVIDIA RAPIDS with Apache Spark for accelerated data processing.',
+                path: 'Tutorials/AI and Machine Learning Hub/NVIDIA RAPIDS for Spark/Page 1-NVIDIA RAPIDS for Spark.html'
+            }
         ];
 
         // --- DOM ELEMENT REFERENCES ---
@@ -268,17 +278,34 @@
                 authButton.textContent = 'Sign In';
             }
         });
-
-        authButton.addEventListener('click', () => {
-            if (auth.currentUser) {
-                signOut(auth);
+        
+        authButton.addEventListener('click', async () => {
+             if (auth.currentUser) {
+                await signOut(auth);
+                showNotification("Signed out.");
             } else {
-                signInAnonymously(auth).catch(error => {
-                    console.error("Anonymous sign-in failed:", error);
-                    showNotification(`Error: ${error.message}`);
-                });
+                // When signed out, clicking sign in will attempt the standard sign in logic again.
+                await performSignIn();
             }
         });
+
+        // Function to perform sign in based on available token from the environment
+        async function performSignIn() {
+            try {
+                // The environment provides __initial_auth_token
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                    showNotification("Authentication successful.");
+                } else {
+                    await signInAnonymously(auth);
+                    showNotification("Signed in anonymously.");
+                }
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                showNotification(`Error: ${error.message}`, true);
+            }
+        }
+
 
         // --- UI/NAVIGATION LOGIC ---
         function showMainHub() {
@@ -289,7 +316,7 @@
 
         function loadContent(path) {
             if (!path || path.startsWith('path/to/your/')) {
-                showNotification('This is an example link. Please update the path to a real file.');
+                showNotification('This is an example link. Please update the path to a real file.', true);
                 return;
             }
             mainContent.classList.add('hidden');
@@ -365,8 +392,13 @@
         backButton.addEventListener('click', showMainHub);
         searchInput.addEventListener('input', filterTutorials);
         
-        // --- INITIAL RENDER ---
-        renderTutorials(tutorials);
+        // --- INITIALIZATION ---
+        function initializePage() {
+            renderTutorials(tutorials);
+            performSignIn(); // Attempt to sign in on page load.
+        }
+
+        initializePage();
 
 
         // --- NEURAL NETWORK BACKGROUND ANIMATION ---
@@ -384,7 +416,7 @@
                 this.x = x; this.y = y; this.directionX = dX; this.directionY = dY; this.size = size; this.color = color;
             }
             draw() {
-                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x, y, this.size, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill();
             }
             update() {
                 if (this.x > canvas.width || this.x < 0) { this.directionX = -this.directionX; }
@@ -394,7 +426,7 @@
             }
         }
 
-        function init() {
+        function initAnimation() {
             setCanvasSize();
             particlesArray = [];
             let num = (canvas.height * canvas.width) / 9000;
@@ -434,9 +466,13 @@
             }
         }
         
-        window.addEventListener('resize', init);
-        init();
-        animate();
+        window.addEventListener('resize', initAnimation);
+        
+        // Wait for the DOM to be fully loaded before initializing
+        window.onload = function() {
+            initAnimation();
+            animate();
+        };
 
     </script>
 </body>
