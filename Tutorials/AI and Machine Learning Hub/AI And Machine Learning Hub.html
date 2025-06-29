@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI and Machine Learning</title>
+    <title>Neural Symbolic Learning Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -135,8 +135,8 @@
                 </div>
             </div>
 
-            <h1 class="text-4xl md:text-5xl font-bold text-green-400 pt-16 md:pt-0">AI and Machine Learning</h1>
-            <p class="mt-2 text-lg text-green-500">Your central hub for tutorials in AI and Machine Learning.</p>
+            <h1 class="text-4xl md:text-5xl font-bold text-green-400 pt-16 md:pt-0">Neural Symbolic Learning Hub</h1>
+            <p class="mt-2 text-lg text-green-500">Your central hub for tutorials on combining neural networks with symbolic reasoning.</p>
         </header>
 
         <div id="main-content">
@@ -192,7 +192,7 @@
     <script type="module">
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- FIREBASE CONFIGURATION ---
@@ -219,9 +219,14 @@
 
         // --- TUTORIAL DATA ---
         const tutorials = [
-            { id: 'Scalar-waves-in-ai', title: 'Scalar Waves in AI and Machine Learning', category: 'Signal Processing', description: 'Learn the fundamentals of implementing pseudo-scalar resonance in AI systems', path: 'https://Ebayednoob.github.io/Tutorials/AI and Machine Learning Hub/Scalar Waves/Scalar Waves in AI.html', datePosted: '2025-06-28' },
-            { id: 'rapids-spark', title: 'Nvidia RAPIDS Spark overview', category: 'Data Science', description: 'An overview of using NVIDIA RAPIDS with Apache Spark for accelerated data processing.', path: 'https://ebayednoob.github.io/Tutorials/AI%20and%20Machine%20Learning%20Hub/NVIDIA%20RAPIDS%20for%20Spark/Page%201-NVIDIA%20RAPIDS%20for%20Spark.html', datePosted: '2025-06-28' },
-            { id: 'biology-llm', title: 'The Biology of a Large Language', category: 'Biological AI', description: 'Explore how principles of biology can inform the structure and function of large language models.', path: 'https://ebayednoob.github.io/Tutorials/AI and Machine Learning Hub/Introduction to Biological Learning/The Biology of a Large Language Model.html', datePosted: '2025-06-28' }
+            { 
+                id: 'multi-sequence-quaternion-evolution', 
+                title: 'Multi-Sequence Quaternion Evolution Learning', 
+                category: 'Symbolic Evolution', 
+                description: 'An advanced tutorial on leveraging quaternion spaces for multi-sequence symbolic evolution.', 
+                path: 'Tutorials/Neural-Symbolic AI/Symbolic Evolution/Multi-Sequence Quaternion Evolution.html', 
+                datePosted: '2025-06-28' 
+            }
         ];
 
         // --- DOM ELEMENT REFERENCES ---
@@ -287,8 +292,27 @@
             }
         }
         
-        authButton.addEventListener('click', () => {
-            auth.currentUser ? signOut(auth) : signInAnonymously(auth).catch(e => showNotification(`Error: ${e.message}`, true));
+        async function performSignIn() {
+            try {
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                showNotification(`Error: ${error.message}`, true);
+            }
+        }
+
+        authButton.addEventListener('click', async () => {
+             if (auth.currentUser) {
+                await signOut(auth);
+                showNotification("Signed out.");
+            } else {
+                await performSignIn();
+            }
         });
 
         // --- UI & TUTORIAL MANAGEMENT ---
@@ -403,10 +427,8 @@
         // --- INITIALIZATION ---
         function initializePage() {
             populateCategoryFilter();
-            if (!auth.currentUser) {
-                signInAnonymously(auth).catch(e => console.error("Initial sign-in failed:", e));
-            }
-            updateDisplayedTutorials();
+            updateDisplayedTutorials(); // Initial render with no user data
+            performSignIn(); // Trigger sign-in, which will then trigger onAuthStateChanged
         }
 
         initializePage();
