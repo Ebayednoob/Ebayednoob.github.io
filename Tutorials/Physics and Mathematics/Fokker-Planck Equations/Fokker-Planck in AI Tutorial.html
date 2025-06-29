@@ -325,70 +325,58 @@
 
         let currentFrame = 0;
         const totalFrames = 12;
-        const centralNode = { id: 'Current', fx: width / 2, fy: height / 2 };
+        const centralNode = { id: 'Current', fx: width / 2, fy: height / 2, x: width / 2, y: height / 2 };
         let outerNodes = [];
         
-        const simulation = d3.forceSimulation()
-            .force("charge", d3.forceManyBody().strength(-50))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .on("tick", ticked);
-
         let linkGroup = svg.append("g");
         let triangleGroup = svg.append("g");
         let nodeGroup = svg.append("g");
         
         function initialize() {
             currentFrame = 0;
-            outerNodes = Array.from({ length: totalFrames }, (_, i) => ({
-                id: `N${i}`,
-                weight: 0.1,
-                index: i
-            }));
-            const allNodes = [centralNode, ...outerNodes];
-            simulation.nodes(allNodes)
-                .force("link", d3.forceLink(outerNodes.map(node => ({source: centralNode.id, target: node.id}))).distance(150));
-            
+            outerNodes = [];
+            for (let i = 0; i < totalFrames; i++) {
+                const angle = (i / totalFrames) * 2 * Math.PI - Math.PI / 2;
+                outerNodes.push({
+                    id: `N${i}`,
+                    x: width / 2 + 150 * Math.cos(angle),
+                    y: height / 2 + 150 * Math.sin(angle),
+                    weight: 0.1,
+                    index: i
+                });
+            }
             updateVisualization();
-            updateLearnedStateChart();
             drawFrame(currentFrame);
-            simulation.alpha(1).restart();
+            updateLearnedStateChart();
         }
 
-        function ticked() {
-            nodeGroup.selectAll("g")
-                .attr("transform", d => `translate(${d.x},${d.y})`);
-            linkGroup.selectAll("line")
-                .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-            triangleGroup.selectAll("line")
-                .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-            triangleGroup.selectAll("text")
-                .attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
-        }
-        
         function updateVisualization() {
             const allNodes = [centralNode, ...outerNodes];
             const allLinks = outerNodes.map(node => ({source: centralNode, target: node, weight: node.weight}));
 
-            const node = nodeGroup.selectAll("g").data(allNodes, d => d.id);
-            node.exit().remove();
-            const nodeEnter = node.enter().append("g")
-                .attr("cursor", d => d.id === 'Current' ? "default" : "pointer")
-                .on('click', (event, d) => {
-                    if (d.id !== 'Current') {
-                        currentFrame = outerNodes.findIndex(n => n.id === d.id);
-                        drawFrame(currentFrame);
+            nodeGroup.selectAll("g").data(allNodes, d => d.id)
+                .join(
+                    enter => {
+                        const g = enter.append("g")
+                            .attr("transform", d => `translate(${d.x}, ${d.y})`)
+                            .attr("cursor", d => d.id === 'Current' ? "default" : "pointer")
+                            .on('click', (event, d) => {
+                                if (d.id !== 'Current') {
+                                    currentFrame = outerNodes.findIndex(n => n.id === d.id);
+                                    drawFrame(currentFrame);
+                                }
+                            });
+                        g.append("circle").attr("r", d => d.id === 'Current' ? 25 : 18).attr("stroke", "#6ee7b7").attr("stroke-width", 2);
+                        g.append("text").text(d => d.id).attr("fill", "#ecfdf5").attr("text-anchor", "middle").attr("dy", 5).style("font-size", "12px");
                     }
-                });
-            nodeEnter.append("circle").attr("r", d => d.id === 'Current' ? 25 : 18).attr("stroke", "#6ee7b7").attr("stroke-width", 2);
-            nodeEnter.append("text").text(d => d.id).attr("fill", "#ecfdf5").attr("text-anchor", "middle").attr("dy", 5).style("font-size", "12px");
+                );
             
-            node.merge(nodeEnter);
-
-            const link = linkGroup.selectAll("line").data(allLinks);
-            link.enter().append("line").attr("stroke", "#047857")
-                .merge(link).transition().duration(100)
+            linkGroup.selectAll("line").data(allLinks)
+                .join("line")
+                .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x).attr("y2", d => d.target.y)
+                .attr("stroke", "#047857")
+                .transition().duration(100)
                 .attr("stroke-width", d => Math.max(1, d.target.weight * 10));
         }
 
@@ -408,10 +396,13 @@
 
             triangleGroup.selectAll("line").data(frameLinks).enter().append("line")
                 .attr("class", "temp-elements")
+                .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x).attr("y2", d => d.target.y)
                 .attr("stroke", "#a7f3d0").attr("stroke-width", 2).attr("stroke-dasharray", "4 2");
             
             triangleGroup.selectAll("text").data(frameLinks).enter().append("text")
                 .attr("class", "temp-elements")
+                .attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2)
                 .text(d => d.weight.toFixed(2)).attr("fill", "#f0fdf4").attr("text-anchor", "middle").attr("dy", -5);
 
             nodeGroup.selectAll("circle")
@@ -421,8 +412,6 @@
                     if(d.id === 'Current') return "#4ade80";
                     return "#10b981";
                 });
-
-            ticked(); 
         }
 
         function updateLearnedStateChart() {
@@ -469,7 +458,6 @@
         initialize();
     }
     
-    // --- Initialize ALL Simulations on DOMContentLoaded ---
     document.addEventListener('DOMContentLoaded', () => {
         setupSimpleAnimation('drift-canvas', '#6ee7b7');
         setupSimpleAnimation('diffusion-canvas', '#a7f3d0');
