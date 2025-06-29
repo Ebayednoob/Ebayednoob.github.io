@@ -192,7 +192,7 @@
     <script type="module">
         // --- FIREBASE IMPORTS ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- FIREBASE CONFIGURATION ---
@@ -225,7 +225,6 @@
             { id: 'knowledge-graph-embedding', title: 'Knowledge Graph Reasoning', category: 'Applications', description: 'Using neural networks to reason over knowledge graphs.', path: 'path/to/your/kg-reasoning.html', datePosted: '2025-07-15' },
             { id: 'semantic-loss', title: 'Semantic Loss Functions', category: 'Techniques', description: 'Injecting logical constraints into the training process via custom loss functions.', path: 'path/to/your/semantic-loss.html', datePosted: '2025-07-20' }
         ];
-
 
         // --- DOM ELEMENT REFERENCES ---
         const tutorialViewer = document.getElementById('tutorial-viewer');
@@ -290,8 +289,27 @@
             }
         }
         
-        authButton.addEventListener('click', () => {
-            auth.currentUser ? signOut(auth) : signInAnonymously(auth).catch(e => showNotification(`Error: ${e.message}`, true));
+        async function performSignIn() {
+            try {
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    await signInWithCustomToken(auth, token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                showNotification(`Error: ${error.message}`, true);
+            }
+        }
+
+        authButton.addEventListener('click', async () => {
+             if (auth.currentUser) {
+                await signOut(auth);
+                showNotification("Signed out.");
+            } else {
+                await performSignIn();
+            }
         });
 
         // --- UI & TUTORIAL MANAGEMENT ---
@@ -406,10 +424,8 @@
         // --- INITIALIZATION ---
         function initializePage() {
             populateCategoryFilter();
-            if (!auth.currentUser) {
-                signInAnonymously(auth).catch(e => console.error("Initial sign-in failed:", e));
-            }
-            updateDisplayedTutorials();
+            updateDisplayedTutorials(); // Initial render with no user data
+            performSignIn(); // Trigger sign-in, which will then trigger onAuthStateChanged
         }
 
         initializePage();
@@ -426,7 +442,7 @@
 
         class Particle {
             constructor(x, y, dX, dY, size, color) { this.x = x; this.y = y; this.directionX = dX; this.directionY = dY; this.size = size; this.color = color; }
-            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill(); }
+            draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fillStyle = this.color; ctx.fill(); }
             update() {
                 if (this.x < 0 || this.x > canvas.width) this.directionX *= -1;
                 if (this.y < 0 || this.y > canvas.height) this.directionY *= -1;
