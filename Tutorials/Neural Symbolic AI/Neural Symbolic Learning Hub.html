@@ -224,7 +224,7 @@
                 title: 'Multi-Sequence Quaternion Evolution Learning', 
                 category: 'Symbolic Evolution', 
                 description: 'An advanced tutorial on leveraging quaternion spaces for multi-sequence symbolic evolution.', 
-                path: 'Tutorials/Neural-Symbolic AI/Symbolic Evolution/Multi-Sequence Quaternion Evolution.html', 
+                path: 'Tutorials/Neural Symbolic AI/Symbolic Evolution/Multi-Sequence Quaternion Evolution.html', 
                 datePosted: '2025-06-28' 
             }
         ];
@@ -266,7 +266,7 @@
                 userStatus.textContent = 'Signed Out';
                 authButton.textContent = 'Sign In';
                 userTutorialStatus = {};
-                if (firestoreListener) firestoreListener();
+                if (firestoreListener) firestoreListener(); // Detach listener on sign out
                 updateDisplayedTutorials();
             }
         });
@@ -277,9 +277,6 @@
             firestoreListener = onSnapshot(docRef, (docSnap) => {
                 userTutorialStatus = docSnap.exists() ? docSnap.data().completion || {} : {};
                 updateDisplayedTutorials();
-            }, (error) => {
-                console.error("Firestore snapshot error:", error);
-                showNotification("Could not load user progress.", true);
             });
         }
 
@@ -318,7 +315,6 @@
             }
         });
 
-
         // --- UI & TUTORIAL MANAGEMENT ---
         function populateCategoryFilter() {
             const categories = [...new Set(tutorials.map(t => t.category))];
@@ -339,10 +335,12 @@
 
             let filteredTutorials = tutorials;
 
+            // 1. Filter by Category
             if (selectedCategory !== 'all') {
                 filteredTutorials = filteredTutorials.filter(t => t.category === selectedCategory);
             }
 
+            // 2. Filter by Search Term
             if (searchTerm) {
                 filteredTutorials = filteredTutorials.filter(t => 
                     t.title.toLowerCase().includes(searchTerm) ||
@@ -350,10 +348,12 @@
                 );
             }
 
+            // 3. Filter by Completion Status
             if (showIncomplete) {
                 filteredTutorials = filteredTutorials.filter(t => !userTutorialStatus[t.id]);
             }
             
+            // 4. Sort by Date
             filteredTutorials.sort((a, b) => {
                 const dateA = new Date(a.datePosted);
                 const dateB = new Date(b.datePosted);
@@ -427,8 +427,8 @@
         // --- INITIALIZATION ---
         function initializePage() {
             populateCategoryFilter();
-            updateDisplayedTutorials();
-            performSignIn();
+            updateDisplayedTutorials(); // Initial render with no user data
+            performSignIn(); // Trigger sign-in, which will then trigger onAuthStateChanged
         }
 
         initializePage();
