@@ -219,11 +219,14 @@
 
         // --- TUTORIAL DATA ---
         const tutorials = [
-            { id: 'nesy-intro', title: 'Introduction to NeSy', category: 'Fundamentals', description: 'What is Neural-Symbolic learning and why is it important?', path: 'path/to/your/nesy-intro.html', datePosted: '2025-07-01' },
-            { id: 'logic-tensor-networks', title: 'Logic Tensor Networks', category: 'Frameworks', description: 'Learn how to use LTNs to integrate first-order logic with deep learning.', path: 'path/to/your/ltn-tutorial.html', datePosted: '2025-07-05' },
-            { id: 'deep-prolog', title: 'Deep Prolog', category: 'Frameworks', description: 'A guide to Deep Prolog, a system that combines logic programming with neural networks.', path: 'path/to/your/deep-prolog.html', datePosted: '2025-07-10' },
-            { id: 'knowledge-graph-embedding', title: 'Knowledge Graph Reasoning', category: 'Applications', description: 'Using neural networks to reason over knowledge graphs.', path: 'path/to/your/kg-reasoning.html', datePosted: '2025-07-15' },
-            { id: 'semantic-loss', title: 'Semantic Loss Functions', category: 'Techniques', description: 'Injecting logical constraints into the training process via custom loss functions.', path: 'path/to/your/semantic-loss.html', datePosted: '2025-07-20' }
+            { 
+                id: 'multi-sequence-quaternion-evolution', 
+                title: 'Multi-Sequence Quaternion Evolution Learning', 
+                category: 'Symbolic Evolution', 
+                description: 'An advanced tutorial on leveraging quaternion spaces for multi-sequence symbolic evolution.', 
+                path: 'Tutorials/Neural-Symbolic AI/Symbolic Evolution/Multi-Sequence Quaternion Evolution.html', 
+                datePosted: '2025-06-28' 
+            }
         ];
 
         // --- DOM ELEMENT REFERENCES ---
@@ -263,7 +266,7 @@
                 userStatus.textContent = 'Signed Out';
                 authButton.textContent = 'Sign In';
                 userTutorialStatus = {};
-                if (firestoreListener) firestoreListener(); // Detach listener on sign out
+                if (firestoreListener) firestoreListener();
                 updateDisplayedTutorials();
             }
         });
@@ -274,6 +277,9 @@
             firestoreListener = onSnapshot(docRef, (docSnap) => {
                 userTutorialStatus = docSnap.exists() ? docSnap.data().completion || {} : {};
                 updateDisplayedTutorials();
+            }, (error) => {
+                console.error("Firestore snapshot error:", error);
+                showNotification("Could not load user progress.", true);
             });
         }
 
@@ -312,6 +318,7 @@
             }
         });
 
+
         // --- UI & TUTORIAL MANAGEMENT ---
         function populateCategoryFilter() {
             const categories = [...new Set(tutorials.map(t => t.category))];
@@ -332,12 +339,10 @@
 
             let filteredTutorials = tutorials;
 
-            // 1. Filter by Category
             if (selectedCategory !== 'all') {
                 filteredTutorials = filteredTutorials.filter(t => t.category === selectedCategory);
             }
 
-            // 2. Filter by Search Term
             if (searchTerm) {
                 filteredTutorials = filteredTutorials.filter(t => 
                     t.title.toLowerCase().includes(searchTerm) ||
@@ -345,12 +350,10 @@
                 );
             }
 
-            // 3. Filter by Completion Status
             if (showIncomplete) {
                 filteredTutorials = filteredTutorials.filter(t => !userTutorialStatus[t.id]);
             }
             
-            // 4. Sort by Date
             filteredTutorials.sort((a, b) => {
                 const dateA = new Date(a.datePosted);
                 const dateB = new Date(b.datePosted);
@@ -424,8 +427,8 @@
         // --- INITIALIZATION ---
         function initializePage() {
             populateCategoryFilter();
-            updateDisplayedTutorials(); // Initial render with no user data
-            performSignIn(); // Trigger sign-in, which will then trigger onAuthStateChanged
+            updateDisplayedTutorials();
+            performSignIn();
         }
 
         initializePage();
