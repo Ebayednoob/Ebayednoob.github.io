@@ -6,16 +6,7 @@
     <title>Comprehensive Meditation System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        window.firebase = {
-            initializeApp, getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
-            getFirestore, doc, setDoc, getDoc
-        };
-    </script>
+    
     <style>
         :root {
             --bg-color: #0a0a0a;
@@ -46,6 +37,7 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             max-height: 80vh;
             overflow-y: auto;
+            z-index: 100;
         }
         .drag-handle {
             cursor: move;
@@ -54,39 +46,53 @@
         .ui-panel::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
         .ui-panel::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 10px; }
         .ui-panel::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+        .btn-active {
+            background-color: var(--primary-color) !important;
+            color: white !important;
+        }
+        /* Custom Modal for Notifications and Confirmations */
+        #notification-modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        #confirmation-modal {
+             transition: opacity 0.3s ease, transform 0.3s ease;
+        }
     </style>
 </head>
 <body class="select-none">
     <!-- Main Visualization Canvas -->
     <canvas id="visualization"></canvas>
     
-    <!-- User Auth Area -->
-    <div id="auth-container" class="fixed top-4 right-4 z-50">
-        <button id="sign-in-btn" class="px-4 py-2 bg-blue-600 rounded-lg text-white font-semibold hover:bg-blue-700 transition">Sign In</button>
-        <div id="user-profile" class="hidden items-center space-x-3">
-            <img id="user-photo" class="w-10 h-10 rounded-full" src="" alt="User photo">
-            <button id="sign-out-btn" class="px-4 py-2 bg-red-600 rounded-lg text-white font-semibold hover:bg-red-700 transition">Sign Out</button>
-        </div>
+    <!-- User Auth Area (Simplified) -->
+    <div id="auth-container" class="fixed top-4 right-4 z-50 text-xs text-gray-500">
+        User ID: <span id="user-id-display">Initializing...</span>
     </div>
-
 
     <!-- Persistent Top-Left Menu -->
     <div id="persistent-menu" class="fixed top-4 left-4 z-50 flex flex-col space-y-2">
-        <button id="theme-selector-btn" title="Select Theme" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.364 6.364 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <button id="main-menu-btn" title="Open Menu" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
-        <button id="tone-generator-btn" title="Audio Controls" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        </button>
-         <button id="emdr-btn" title="EMDR Tool" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-        <button id="acrn-btn" title="ACRN Tinnitus Tool" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M18 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M12 12.5a4.5 4.5 0 0 0-4.5 4.5v0"/><path d="M16.5 17a4.5 4.5 0 0 0-4.5-4.5"/></svg>
-        </button>
-        <button id="help-btn" title="Help" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-        </button>
+        <div id="menu-icons-container" class="hidden flex-col space-y-2">
+            <button id="theme-selector-btn" title="Select Theme" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.364 6.364 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </button>
+            <button id="tone-generator-btn" title="Audio Controls" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            </button>
+             <button id="emdr-btn" title="EMDR Tool" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button id="acrn-btn" title="ACRN Tinnitus Tool" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M18 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M12 12.5a4.5 4.5 0 0 0-4.5 4.5v0"/><path d="M16.5 17a4.5 4.5 0 0 0-4.5-4.5"/></svg>
+            </button>
+            <button id="share-btn" title="Share Settings" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </button>
+            <button id="help-btn" title="Help" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            </button>
+        </div>
     </div>
 
      <!-- Small Timer Display -->
@@ -94,7 +100,6 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         <span id="small-timer-text">00:00</span>
     </div>
-
 
     <!-- Timer Control Panel -->
     <div id="timer-panel" class="hidden ui-panel" style="bottom: 5rem; left: 1rem;">
@@ -134,8 +139,8 @@
                      <label for="interval-minutes" class="block text-sm font-medium mb-1">Play Gong Every (minutes)</label>
                      <input type="number" id="interval-minutes" value="5" min="1" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
                      <label class="flex items-center mt-2">
-                        <input type="checkbox" id="enable-interval-gong" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                        <span class="ml-2 text-sm">Enable Interval Gong</span>
+                         <input type="checkbox" id="enable-interval-gong" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                         <span class="ml-2 text-sm">Enable Interval Gong</span>
                      </label>
                 </div>
             </div>
@@ -168,6 +173,7 @@
                  </label>
                 <button id="start-stop-emdr-btn" class="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Start EMDR</button>
             </div>
+             <p class="text-xs text-gray-400 mt-4 italic">Disclaimer: For best results, EMDR therapy should be done on a large screen computer or in VR. Consult a trained therapist for clinical use.</p>
         </div>
     </div>
     
@@ -178,12 +184,12 @@
                 <h2 class="text-xl font-bold">ACRN Tinnitus Tool</h2>
                 <button id="close-acrn-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
             </div>
-             <div class="space-y-4">
+              <div class="space-y-4">
                 <div>
                     <label for="acrn-frequency" class="block text-sm font-medium mb-1">Tinnitus Frequency</label>
                      <div class="flex items-center space-x-2">
-                        <input type="range" id="acrn-frequency" min="1000" max="12000" value="4000" step="50" class="w-full">
-                         <span id="acrn-freq-display" class="text-sm w-16 text-right">4000 Hz</span>
+                         <input type="range" id="acrn-frequency" min="1000" max="12000" value="4000" step="50" class="w-full">
+                          <span id="acrn-freq-display" class="text-sm w-16 text-right">4000 Hz</span>
                      </div>
                     <button id="test-acrn-freq-btn" class="w-full mt-2 py-2 text-sm bg-gray-600 rounded-lg hover:bg-gray-700 transition">Play Test Tone</button>
                 </div>
@@ -192,13 +198,22 @@
                     <input type="range" id="acrn-volume" min="0" max="1" value="0.5" step="0.01" class="w-full">
                 </div>
                 <div class="mt-6 pt-4 border-t border-gray-700 space-y-2">
-                     <label class="flex items-center">
-                        <input type="checkbox" id="enable-acrn-algorithm" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                        <span class="ml-2 text-sm">Enable ACRN Algorithm</span>
-                     </label>
-                     <p class="text-xs text-gray-400">Plays four tones around your selected frequency to help with tinnitus.</p>
+                    <label class="block text-sm font-medium mb-1">Algorithm Type</label>
+                    <div class="flex space-x-2">
+                        <button id="acrn-simple-btn" class="flex-1 py-1 text-sm bg-gray-600 rounded-lg hover:bg-gray-500 transition btn-active">Simple</button>
+                        <button id="acrn-advanced-btn" class="flex-1 py-1 text-sm bg-gray-600 rounded-lg hover:bg-gray-500 transition">Advanced</button>
+                    </div>
+                </div>
+                <div id="acrn-advanced-controls" class="hidden space-y-4 pt-2">
+                     <div>
+                         <label for="acrn-pause-duration" class="block text-sm font-medium mb-1">Pause Duration (ms)</label>
+                         <input type="range" id="acrn-pause-duration" min="100" max="1000" value="200" step="10" class="w-full">
+                    </div>
+                    <div id="acrn-tone-volumes" class="space-y-2">
+                        </div>
                 </div>
                  <button id="start-stop-acrn-btn" class="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Start ACRN Therapy</button>
+                 <p class="text-xs text-gray-400 mt-4 italic">Disclaimer: ACRN should be used in addition to meditation or alternate focus to be effective. Adjust sliders to barely hear the tones.</p>
             </div>
         </div>
     </div>
@@ -224,6 +239,7 @@
                     <p>Each theme provides a unique visual and atmospheric experience for your meditation. Select one that matches your intention.</p>
                     <ul class="list-disc list-inside mt-2 space-y-1">
                         <li><strong>Breathing Guide:</strong> The pulsating circle in the center of the screen is a visual guide for your breath. You can adjust its rhythm in the Theme panel.</li>
+                        <li><strong>Tone Streamers:</strong> Enable this for a beautiful "trail" effect on moving audio visuals, enhancing immersion.</li>
                         <li><strong>Optimal Use:</strong> Match the theme to your mood. Use 'Cosmic Void' for spaciousness, 'Forest Whispers' for grounding, or 'Ocean Depths' for a feeling of flow. Synchronize your breath with the guide to calm your nervous system.</li>
                     </ul>
                 </div>
@@ -233,8 +249,9 @@
                     <ul class="list-disc list-inside mt-2 space-y-1">
                         <li><strong>Presets:</strong> Instantly load therapeutic Solfeggio frequencies. Each preset creates three harmonically related tones in the "Custom" tab.</li>
                         <li><strong>Custom Tones:</strong> Create your own tones. Use the X, Y, and Z sliders to position the sound in 3D space around you (requires headphones for best effect). A visual orb will appear, corresponding to the tone's position.</li>
+                         <li><strong>Spin:</strong> The "Spin" tab allows you to automatically move all active custom tones along a pre-defined 2D or 3D path, creating a dynamic, immersive soundscape.</li>
                          <li><strong>Files:</strong> Layer procedural sounds (like rain) with your own uploaded audio files for a rich, complex soundscape.</li>
-                        <li><strong>Optimal Use:</strong> Use the "Presets" to target a specific emotional or spiritual state. Use the "Custom" tab to experiment with 3D audio for deep immersion. Layer a custom tone with a "File" soundscape for a complete experience.</li>
+                        <li><strong>Optimal Use:</strong> Use the "Presets" to target a specific emotional or spiritual state. Use the "Custom" tab to experiment with 3D audio for deep immersion. Use "Spin" to create a sense of movement and flow. Layer a custom tone with a "File" soundscape for a complete experience.</li>
                     </ul>
                 </div>
                 <div id="guide-emdr-tab" class="hidden help-tab-content">
@@ -280,8 +297,6 @@
         </div>
     </div>
 
-
-    <!-- Theme Selector Panel -->
     <div id="theme-selector-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
         <div class="p-6 w-72">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -289,7 +304,7 @@
                  <button id="close-theme-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
             </div>
             <div id="theme-list" class="space-y-2"></div>
-            <div class="mt-6 pt-4 border-t border-gray-700">
+            <div class="mt-6 pt-4 border-t border-gray-700 space-y-4">
                  <h3 class="font-semibold mb-2">Breathing Guide Speed</h3>
                  <div class="flex items-center space-x-2">
                     <label for="breathing-speed" class="text-sm">3s</label>
@@ -297,11 +312,24 @@
                     <label for="breathing-speed" class="text-sm">6s</label>
                  </div>
                  <div class="text-center text-sm mt-1">Interval: <span id="breathing-speed-value">4.0</span>s</div>
+
+                 <div class="border-t border-gray-700 my-2"></div>
+
+                 <h3 class="font-semibold mb-2">Visuals</h3>
+                 <label class="flex items-center">
+                    <input type="checkbox" id="tone-streamers-enable" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="ml-2 text-sm">Enable Tone Streamers</span>
+                 </label>
+
+                 <div class="border-t border-gray-700 my-2"></div>
+
+                 <h3 class="font-semibold mb-2">Custom Landscape</h3>
+                 <button id="upload-landscape-btn" class="w-full py-2 text-sm bg-gray-600 rounded-lg hover:bg-gray-700 transition">Upload Image</button>
+                 <input type="file" id="landscape-upload" class="hidden" accept="image/*">
             </div>
         </div>
     </div>
     
-    <!-- Tone Generator Panel -->
     <div id="tone-generator-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
         <div class="p-6 w-96">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -313,11 +341,11 @@
                 <button data-tab="presets" class="tab-btn py-2 px-4 text-blue-400 border-b-2 border-blue-400">Presets</button>
                 <button data-tab="generated-tones" class="tab-btn py-2 px-4 text-gray-400">Custom</button>
                 <button data-tab="sound-files" class="tab-btn py-2 px-4 text-gray-400">Files</button>
+                <button data-tab="spin" class="tab-btn py-2 px-4 text-gray-400">Spin</button>
             </div>
 
             <div id="presets-tab" class="tab-content space-y-2">
-                <!-- Solfeggio presets will be populated here -->
-            </div>
+                </div>
 
             <div id="generated-tones-tab" class="hidden tab-content space-y-4">
                  <div id="tone-layers-container"></div>
@@ -343,6 +371,33 @@
                 </div>
             </div>
             
+            <div id="spin-tab" class="hidden tab-content space-y-4">
+                <h3 class="font-semibold">Auto-Spin Controls</h3>
+                <button id="spin-toggle-btn" class="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Enable Auto-Spin</button>
+                
+                <div id="spin-controls" class="hidden space-y-4">
+                    <div>
+                        <label for="spin-speed" class="block text-sm font-medium mb-1">Speed</label>
+                        <input type="range" id="spin-speed" min="0.1" max="5" value="1" step="0.1" class="w-full">
+                    </div>
+                    <div>
+                        <label for="spin-radius" class="block text-sm font-medium mb-1">Radius</label>
+                        <input type="range" id="spin-radius" min="1" max="10" value="5" step="0.1" class="w-full">
+                    </div>
+                    <div>
+                        <label for="spin-algorithm" class="block text-sm font-medium mb-1">Algorithm</label>
+                        <select id="spin-algorithm" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
+                            <option value="circular-2d">Circular (2D)</option>
+                            <option value="figureEight-2d">Figure-Eight (2D)</option>
+                            <option value="pendulum-2d">Pendulum (2D)</option>
+                            <option value="lissajous-3d">Lissajous Knot (3D)</option>
+                            <option value="torus-knot-3d">Torus Knot (3D)</option>
+                            <option value="spherical-spiral-3d">Spherical Spiral (3D)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-6 pt-4 border-t border-gray-700 space-y-4">
                 <h3 class="font-semibold">Master Controls</h3>
                 <div class="flex items-center space-x-2">
@@ -357,7 +412,6 @@
         </div>
     </div>
     
-    <!-- AI Assistant -->
     <div id="ai-chat-panel" class="hidden ui-panel" style="bottom: 1rem; right: 1rem;">
         <div class="p-4 w-96 max-w-[calc(100vw-2rem)]">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -378,14 +432,67 @@
         </button>
     </div>
 
+    <div id="share-panel" class="hidden ui-panel" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <div class="p-6 w-[32rem] max-w-[calc(100vw-2rem)]">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Share & Import Settings</h2>
+                <button id="close-share-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-semibold mb-2">Export Your Settings</h3>
+                    <p class="text-sm text-gray-400 mb-2">Click the button to generate a shareable code for your current setup.</p>
+                    <button id="export-btn" class="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Generate Export Code</button>
+                    <textarea id="export-code" readonly class="w-full h-24 mt-2 bg-gray-900/50 border border-gray-600 rounded-lg p-2 text-xs" placeholder="Your code will appear here..."></textarea>
+                    <button id="copy-code-btn" class="w-full mt-2 py-2 text-sm bg-gray-600 rounded-lg hover:bg-gray-700 transition">Copy to Clipboard</button>
+                </div>
+                <div class="border-t border-gray-700 my-4"></div>
+                <div>
+                    <h3 class="font-semibold mb-2">Import Settings</h3>
+                     <p class="text-sm text-gray-400 mb-2">Paste a code from another user below and click import to load their setup.</p>
+                    <textarea id="import-code" class="w-full h-24 bg-gray-700 border border-gray-600 rounded-lg p-2 text-xs" placeholder="Paste settings code here..."></textarea>
+                    <button id="import-btn" class="w-full mt-2 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition">Import Settings</button>
+                </div>
+                 <div class="border-t border-gray-700 my-4"></div>
+                <div>
+                    <h3 class="font-semibold mb-2">Reset</h3>
+                     <p class="text-sm text-gray-400 mb-2">This will reset all settings to their original defaults. This cannot be undone.</p>
+                    <button id="reset-all-btn" class="w-full py-2 bg-red-800 rounded-lg hover:bg-red-700 transition">Reset All to Default</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification-modal" class="fixed top-5 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg opacity-0 -translate-y-20 pointer-events-none">
+        <p id="notification-message"></p>
+    </div>
+
+    <div id="confirmation-modal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 opacity-0 pointer-events-none">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-4" id="confirmation-title">Are you sure?</h3>
+            <p class="text-gray-300 mb-6" id="confirmation-message">This action cannot be undone.</p>
+            <div class="flex justify-end space-x-4">
+                <button id="confirm-cancel-btn" class="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-500 transition">Cancel</button>
+                <button id="confirm-action-btn" class="px-4 py-2 bg-red-600 rounded-lg hover:bg-red-500 transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
     <script type="module">
+        // --- Firebase SDKs ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
         // --- DOM Elements ---
         const canvas = document.getElementById('visualization');
         const ctx = canvas.getContext('2d');
         
         // --- Firebase State ---
-        let auth, db, user, userId, userDocRef;
+        let app, auth, db, user, userId, settingsDocRef;
         let settingsSaveTimeout;
+        let isAuthReady = false;
 
         // --- App State ---
         let audioContext;
@@ -397,6 +504,8 @@
         let currentTheme = 'oceanDepths';
         let breathInterval = 4;
         let chatHistory = [];
+        let userLandscape = null;
+        let toneStreamersEnabled = false;
         
         // Timer State
         let timerIntervalId = null, timerRunning = false, timeRemaining = 0, totalDuration = 0, nextGongTime = 0;
@@ -405,7 +514,14 @@
         let emdrState = { isRunning: false, speed: 5, size: 30, color: '#3b82f6', x: 0, direction: 1, autoScale: false };
 
         // ACRN State
-        let acrnState = { isRunning: false, testTone: null, tinnitusFrequency: 4000, algorithmNodes: [], intervalId: null };
+        let acrnState = { 
+            isRunning: false, testTone: null, tinnitusFrequency: 4000, algorithmNodes: [], intervalId: null,
+            algorithmType: 'simple', pauseDuration: 200,
+            toneVolumes: [0.3, 0.3, 0.3, 0.3]
+        };
+        
+        // Spin State
+        let spinState = { isRunning: false, speed: 1, radius: 5, algorithm: 'circular-2d', angle: 0 };
         
         const themes = { oceanDepths:{name:'Ocean Depths'}, forestWhispers:{name:'Forest Whispers'}, sunsetSerenity:{name:'Sunset Serenity'}, cosmicVoid:{name:'Cosmic Void'}, zenGarden:{name:'Zen Garden'} };
         const solfeggioTones = { 174:'Relief & Security', 285:'Healing & Rejuvenation', 396:'Liberating Guilt & Fear', 417:'Facilitating Change', 528:'Transformation & Miracles', 639:'Connecting Relationships', 741:'Awakening Intuition', 852:'Returning to Spirit', 963:'Connecting with Oneness' };
@@ -420,15 +536,15 @@
             populateSampleTones();
             populateSolfeggioPresets();
             renderLoop();
-            addChatMessage('Welcome! Please sign in to save your settings.', 'ai');
+            addChatMessage('Welcome! Your settings will be saved automatically. To use the AI, please follow the deployment guide.', 'ai');
             updateAIChatContext();
             resetTimer();
             makePanelsDraggable();
             applySettings(null); // Apply default settings initially
         }
         
-        function setupFirebase() {
-             const firebaseConfig = {
+        async function setupFirebase() {
+            const firebaseConfig = {
                 apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
                 authDomain: "gitlabs-3e081.firebaseapp.com",
                 projectId: "gitlabs-3e081",
@@ -437,31 +553,36 @@
                 appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
                 measurementId: "G-M3MLTNVRH0"
             };
-            const app = window.firebase.initializeApp(firebaseConfig);
-            auth = window.firebase.getAuth(app);
-            db = window.firebase.getFirestore(app);
             
-            window.firebase.onAuthStateChanged(auth, async (currentUser) => {
-                user = currentUser;
-                if (user) {
-                    // User is signed in
-                    userId = user.uid;
-                    userDocRef = window.firebase.doc(db, "users", userId);
-                    document.getElementById('sign-in-btn').classList.add('hidden');
-                    const profileDiv = document.getElementById('user-profile');
-                    profileDiv.classList.remove('hidden');
-                    profileDiv.classList.add('flex');
-                    document.getElementById('user-photo').src = user.photoURL || 'https://placehold.co/40x40/7c3aed/ffffff?text=U';
-                    loadUserSettings();
-                } else {
-                    // User is signed out
-                    userId = null;
-                    userDocRef = null;
-                    document.getElementById('sign-in-btn').classList.remove('hidden');
-                    document.getElementById('user-profile').classList.add('hidden');
-                    applySettings(null); // Reset to defaults
-                }
-            });
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('error');
+
+                onAuthStateChanged(auth, async (currentUser) => {
+                    if (currentUser) {
+                        user = currentUser;
+                        userId = user.uid;
+                        document.getElementById('user-id-display').textContent = userId.substring(0, 8) + '...';
+                        
+                        settingsDocRef = doc(db, "users", userId);
+                        
+                        isAuthReady = true;
+                        await loadUserSettings();
+                    } else {
+                        try {
+                            await signInAnonymously(auth);
+                        } catch (error) {
+                            console.error("Firebase anonymous sign-in error:", error);
+                            isAuthReady = false;
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                document.getElementById('user-id-display').textContent = 'Error';
+            }
         }
 
         function setupAudioContext() {
@@ -470,7 +591,9 @@
                 masterGain = audioContext.createGain();
                 acrnGain = audioContext.createGain();
                 masterGain.gain.value = 0.5;
+                document.getElementById('master-volume').value = 0.5;
                 acrnGain.gain.value = 0.5;
+                document.getElementById('acrn-volume').value = 0.5;
                 acrnGain.connect(masterGain);
                 masterGain.connect(audioContext.destination);
             }
@@ -486,11 +609,8 @@
         function setupEventListeners() {
             window.addEventListener('resize', setupCanvas);
             
-            // Auth
-            document.getElementById('sign-in-btn').addEventListener('click', signIn);
-            document.getElementById('sign-out-btn').addEventListener('click', signOut);
-
             // Panel Toggles & Closes
+            document.getElementById('main-menu-btn').addEventListener('click', () => document.getElementById('menu-icons-container').classList.toggle('hidden'));
             document.getElementById('theme-selector-btn').addEventListener('click', () => togglePanel(document.getElementById('theme-selector-panel')));
             document.getElementById('tone-generator-btn').addEventListener('click', () => { setupAudioContext(); togglePanel(document.getElementById('tone-generator-panel')) });
             document.getElementById('ai-assistant-btn').addEventListener('click', () => { togglePanel(document.getElementById('ai-chat-panel')); document.getElementById('ai-assistant-btn-container').classList.add('hidden'); });
@@ -498,6 +618,7 @@
             document.getElementById('emdr-btn').addEventListener('click', () => togglePanel(document.getElementById('emdr-panel')));
             document.getElementById('acrn-btn').addEventListener('click', () => { setupAudioContext(); togglePanel(document.getElementById('acrn-panel')); });
             document.getElementById('help-btn').addEventListener('click', () => togglePanel(document.getElementById('help-panel')));
+            document.getElementById('share-btn').addEventListener('click', () => togglePanel(document.getElementById('share-panel')));
 
             document.getElementById('close-tone-panel-btn').addEventListener('click', () => document.getElementById('tone-generator-panel').classList.add('hidden'));
             document.getElementById('close-ai-panel-btn').addEventListener('click', () => { document.getElementById('ai-chat-panel').classList.add('hidden'); document.getElementById('ai-assistant-btn-container').classList.remove('hidden'); });
@@ -506,11 +627,18 @@
             document.getElementById('close-acrn-panel-btn').addEventListener('click', () => document.getElementById('acrn-panel').classList.add('hidden'));
             document.getElementById('close-theme-panel-btn').addEventListener('click', () => document.getElementById('theme-selector-panel').classList.add('hidden'));
             document.getElementById('close-help-panel-btn').addEventListener('click', () => document.getElementById('help-panel').classList.add('hidden'));
+            document.getElementById('close-share-panel-btn').addEventListener('click', () => document.getElementById('share-panel').classList.add('hidden'));
 
             // Theme Panel
             document.getElementById('breathing-speed').addEventListener('input', e => {
                 breathInterval = parseFloat(e.target.value);
                 document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+                requestSave();
+            });
+            document.getElementById('upload-landscape-btn').addEventListener('click', () => document.getElementById('landscape-upload').click());
+            document.getElementById('landscape-upload').addEventListener('change', handleLandscapeUpload);
+            document.getElementById('tone-streamers-enable').addEventListener('change', e => {
+                toneStreamersEnabled = e.target.checked;
                 requestSave();
             });
             
@@ -540,6 +668,9 @@
             });
             document.getElementById('test-acrn-freq-btn').addEventListener('click', toggleAcrnTestTone);
             document.getElementById('start-stop-acrn-btn').addEventListener('click', toggleAcrnTherapy);
+            document.getElementById('acrn-simple-btn').addEventListener('click', () => setAcrnAlgorithm('simple'));
+            document.getElementById('acrn-advanced-btn').addEventListener('click', () => setAcrnAlgorithm('advanced'));
+            document.getElementById('acrn-pause-duration').addEventListener('input', e => { acrnState.pauseDuration = parseFloat(e.target.value); requestSave(); });
 
             // Tone Generator
             document.querySelectorAll('#tone-generator-panel .tab-btn').forEach(b => b.addEventListener('click', switchTab));
@@ -548,6 +679,31 @@
             document.getElementById('master-mute-btn').addEventListener('click', toggleMasterMute);
             document.getElementById('stop-all-btn').addEventListener('click', stopAllAudio);
             
+            // Spin Controls
+            document.getElementById('spin-toggle-btn').addEventListener('click', (e) => {
+                const btn = e.target;
+                spinState.isRunning = !spinState.isRunning;
+                document.getElementById('spin-controls').classList.toggle('hidden', !spinState.isRunning);
+                if (spinState.isRunning) {
+                    btn.textContent = "Disable Auto-Spin";
+                    btn.classList.replace('bg-blue-600', 'bg-red-600');
+                    btn.classList.replace('hover:bg-blue-700', 'hover:bg-red-700');
+                } else {
+                    btn.textContent = "Enable Auto-Spin";
+                    btn.classList.replace('bg-red-600', 'bg-blue-600');
+                    btn.classList.replace('hover:bg-red-700', 'hover:bg-blue-700');
+                }
+                requestSave();
+            });
+            document.getElementById('spin-speed').addEventListener('input', e => { spinState.speed = parseFloat(e.target.value); requestSave(); });
+            document.getElementById('spin-radius').addEventListener('input', e => { spinState.radius = parseFloat(e.target.value); requestSave(); });
+            document.getElementById('spin-algorithm').addEventListener('change', e => { 
+                spinState.algorithm = e.target.value;
+                spinState.angle = 0; // Reset angle on algorithm change
+                requestSave(); 
+            });
+
+
             // Help Panel Tabs
             document.querySelectorAll('.help-tab-btn').forEach(b => b.addEventListener('click', switchTab));
 
@@ -559,32 +715,43 @@
             dropZone.addEventListener('drop', handleFileDrop);
             document.getElementById('file-upload').addEventListener('change', handleFileUpload);
             
+            // Share Panel
+            document.getElementById('export-btn').addEventListener('click', exportSettings);
+            document.getElementById('copy-code-btn').addEventListener('click', copyExportCode);
+            document.getElementById('import-btn').addEventListener('click', importSettings);
+            document.getElementById('reset-all-btn').addEventListener('click', () => {
+                showConfirmation(
+                    "Reset All Settings",
+                    "Are you sure you want to reset all settings to their defaults? This cannot be undone.",
+                    () => {
+                        applySettings(null);
+                        requestSave();
+                    }
+                );
+            });
+
             // AI Chat
             document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage);
             document.getElementById('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') sendChatMessage(); });
         }
         
         // --- Firebase Functions ---
-        function signIn() {
-            const provider = new window.firebase.GoogleAuthProvider();
-            window.firebase.signInWithPopup(auth, provider).catch(error => console.error("Sign in error", error));
-        }
-
-        function signOut() {
-            window.firebase.signOut(auth);
-        }
-        
         function requestSave() {
-            if (!user) return; // Don't save if not logged in
+            if (!isAuthReady || !settingsDocRef) {
+                return;
+            }
             clearTimeout(settingsSaveTimeout);
             settingsSaveTimeout = setTimeout(saveUserSettings, 1500); // Debounce saves
         }
 
         async function saveUserSettings() {
-            if (!userDocRef) return;
+            if (!isAuthReady || !settingsDocRef) {
+                return;
+            }
             const settings = {
                 theme: currentTheme,
                 breathInterval,
+                toneStreamersEnabled,
                 emdr: {
                     speed: emdrState.speed,
                     size: emdrState.size,
@@ -594,29 +761,44 @@
                 acrn: {
                     frequency: acrnState.tinnitusFrequency,
                     volume: document.getElementById('acrn-volume').value,
+                    algorithmType: acrnState.algorithmType,
+                    pauseDuration: acrnState.pauseDuration,
+                    toneVolumes: acrnState.toneVolumes,
+                },
+                spin: {
+                    isRunning: spinState.isRunning,
+                    speed: spinState.speed,
+                    radius: spinState.radius,
+                    algorithm: spinState.algorithm,
                 },
                 customTones: Object.values(generatedTones).map(t => ({
                     frequency: t.frequency, volume: t.volume, type: t.type,
-                    x: t.x, y: t.y, z: t.z
+                    x: t.x, y: t.y, z: t.z, color: t.color, isochronic: t.isochronic, isoFrequency: t.isoFrequency
                 })),
                 panelPositions: getPanelPositions()
             };
             try {
-                await window.firebase.setDoc(userDocRef, settings, { merge: true });
-                console.log("Settings saved.");
+                await setDoc(settingsDocRef, settings, { merge: true });
             } catch (error) {
-                console.error("Error saving settings: ", error);
+                console.error("Error saving settings to Firestore: ", error);
             }
         }
         
         async function loadUserSettings() {
-            if (!userDocRef) return;
-            const docSnap = await window.firebase.getDoc(userDocRef);
-            if (docSnap.exists()) {
-                console.log("Loading user settings...");
-                applySettings(docSnap.data());
-            } else {
-                console.log("No saved settings found, using defaults.");
+            if (!isAuthReady || !settingsDocRef) {
+                applySettings(null); // Use defaults if we can't load
+                return;
+            }
+            try {
+                const docSnap = await getDoc(settingsDocRef);
+                if (docSnap.exists()) {
+                    applySettings(docSnap.data());
+                } else {
+                    applySettings(null);
+                    requestSave(); // Save the default settings for the new user
+                }
+            } catch (error) {
+                console.error("Error loading settings from Firestore:", error);
                 applySettings(null);
             }
         }
@@ -630,8 +812,10 @@
             // Theme and Breathing
             setTheme(s.theme || 'oceanDepths');
             breathInterval = s.breathInterval || 4;
+            toneStreamersEnabled = s.toneStreamersEnabled || false;
             document.getElementById('breathing-speed').value = breathInterval;
             document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+            document.getElementById('tone-streamers-enable').checked = toneStreamersEnabled;
 
             // EMDR
             const emdr = s.emdr || {};
@@ -648,10 +832,38 @@
             const acrn = s.acrn || {};
             acrnState.tinnitusFrequency = acrn.frequency || 4000;
             const acrnVol = acrn.volume || 0.5;
+            acrnState.algorithmType = acrn.algorithmType || 'simple';
+            acrnState.pauseDuration = acrn.pauseDuration || 200;
+            acrnState.toneVolumes = acrn.toneVolumes || [0.3, 0.3, 0.3, 0.3];
             document.getElementById('acrn-frequency').value = acrnState.tinnitusFrequency;
             document.getElementById('acrn-freq-display').textContent = `${acrnState.tinnitusFrequency} Hz`;
             document.getElementById('acrn-volume').value = acrnVol;
             if(acrnGain) acrnGain.gain.value = acrnVol;
+            setAcrnAlgorithm(acrnState.algorithmType, false);
+            document.getElementById('acrn-pause-duration').value = acrnState.pauseDuration;
+            
+            // Spin
+            const spin = s.spin || {};
+            spinState.isRunning = spin.isRunning || false;
+            spinState.speed = spin.speed || 1;
+            spinState.radius = spin.radius || 5;
+            spinState.algorithm = spin.algorithm || 'circular-2d';
+            
+            const spinBtn = document.getElementById('spin-toggle-btn');
+            document.getElementById('spin-controls').classList.toggle('hidden', !spinState.isRunning);
+            if (spinState.isRunning) {
+                spinBtn.textContent = "Disable Auto-Spin";
+                spinBtn.classList.replace('bg-blue-600', 'bg-red-600');
+                spinBtn.classList.replace('hover:bg-blue-700', 'hover:bg-red-700');
+            } else {
+                spinBtn.textContent = "Enable Auto-Spin";
+                spinBtn.classList.replace('bg-red-600', 'bg-blue-600');
+                spinBtn.classList.replace('hover:bg-red-700', 'hover:bg-blue-700');
+            }
+            
+            document.getElementById('spin-speed').value = spinState.speed;
+            document.getElementById('spin-radius').value = spinState.radius;
+            document.getElementById('spin-algorithm').value = spinState.algorithm;
 
             // Custom Tones
             const customTones = s.customTones || [];
@@ -686,7 +898,7 @@
                 btn.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400');
                 btn.classList.add('text-gray-400');
             });
-            parent.querySelector(`#${tabId}-tab`).classList.remove('hidden');
+            parent.querySelector(`#${tabId}-tab, #${tabId}`).classList.remove('hidden');
             e.target.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
             e.target.classList.remove('text-gray-400');
         }
@@ -698,6 +910,20 @@
             const handle = panel.querySelector('.drag-handle');
             if (!handle) return;
             let offsetX, offsetY, isDragging = false;
+            
+            function onMouseMove(e) {
+                if (!isDragging) return;
+                panel.style.left = `${e.clientX - offsetX}px`;
+                panel.style.top = `${e.clientY - offsetY}px`;
+            }
+
+            function onMouseUp() {
+                isDragging = false;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                requestSave(); // Save panel position after dragging
+            }
+            
             handle.addEventListener('mousedown', (e) => {
                 isDragging = true;
                 offsetX = e.clientX - panel.offsetLeft;
@@ -705,17 +931,6 @@
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
             });
-            function onMouseMove(e) {
-                if (!isDragging) return;
-                panel.style.left = `${e.clientX - offsetX}px`;
-                panel.style.top = `${e.clientY - offsetY}px`;
-            }
-            function onMouseUp() {
-                isDragging = false;
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-                requestSave(); // Save panel position after dragging
-            }
         }
 
 
@@ -823,35 +1038,82 @@
                 btn.classList.add('bg-yellow-600'); btn.classList.remove('bg-gray-600');
             }
         }
+        
+        function setAcrnAlgorithm(type, shouldSave = true) {
+            acrnState.algorithmType = type;
+            document.getElementById('acrn-simple-btn').classList.toggle('btn-active', type === 'simple');
+            document.getElementById('acrn-advanced-btn').classList.toggle('btn-active', type === 'advanced');
+            document.getElementById('acrn-advanced-controls').classList.toggle('hidden', type !== 'advanced');
+            
+            if (type === 'advanced' && !document.getElementById('acrn-tone-volumes').children.length) {
+                buildAcrnVolumeControls();
+            }
+            
+            if (shouldSave) requestSave();
+        }
+
+        function buildAcrnVolumeControls() {
+            const container = document.getElementById('acrn-tone-volumes');
+            container.innerHTML = `<label class="block text-sm font-medium mb-1">Individual Tone Volumes</label>`;
+            const labels = ['Low', 'Mid-Low', 'Mid-High', 'High'];
+            for(let i=0; i<4; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex items-center space-x-2';
+                wrapper.innerHTML = `<label class="text-xs w-20">${labels[i]}</label><input type="range" min="0" max="1" step="0.01" value="${acrnState.toneVolumes[i]}" class="w-full">`;
+                wrapper.querySelector('input').oninput = (e) => {
+                    acrnState.toneVolumes[i] = parseFloat(e.target.value);
+                    requestSave();
+                };
+                container.appendChild(wrapper);
+            }
+        }
+
         function toggleAcrnTherapy() {
             acrnState.isRunning = !acrnState.isRunning;
             const btn = document.getElementById('start-stop-acrn-btn');
             btn.textContent = acrnState.isRunning ? 'Stop ACRN Therapy' : 'Start ACRN Therapy';
             btn.classList.toggle('bg-blue-600', !acrnState.isRunning);
             btn.classList.toggle('bg-red-600', acrnState.isRunning);
+
             if (acrnState.isRunning) {
-                if (document.getElementById('enable-acrn-algorithm').checked) {
-                    const f = acrnState.tinnitusFrequency, freqs = [f * 0.5, f * 1.5, f * 0.75, f * 1.25];
-                    acrnState.algorithmNodes = freqs.map(freq => {
-                        const osc = audioContext.createOscillator(); osc.frequency.value = freq;
-                        const gain = audioContext.createGain(); gain.gain.value = 0;
-                        osc.connect(gain).connect(acrnGain); osc.start();
-                        return { osc, gain };
-                    });
-                    acrnState.intervalId = setInterval(() => {
-                        const node = acrnState.algorithmNodes[Math.floor(Math.random() * 4)];
-                        const now = audioContext.currentTime;
-                        node.gain.gain.setValueAtTime(0.3, now); node.gain.gain.setValueAtTime(0, now + 0.05);
-                    }, 200);
-                } else {
-                    acrnState.testTone = audioContext.createOscillator();
-                    acrnState.testTone.frequency.value = acrnState.tinnitusFrequency;
-                    acrnState.testTone.connect(acrnGain); acrnState.testTone.start();
-                }
+                const f = acrnState.tinnitusFrequency;
+                const freqs = [f * 0.5, f * 1.5, f * 0.75, f * 1.25]; // Example frequencies
+                acrnState.algorithmNodes = freqs.map((freq, i) => {
+                    const osc = audioContext.createOscillator(); osc.frequency.value = freq;
+                    const gain = audioContext.createGain(); gain.gain.value = 0;
+                    osc.connect(gain).connect(acrnGain); osc.start();
+                    return { osc, gain, baseVolume: acrnState.toneVolumes[i] };
+                });
+                
+                const runSequence = () => {
+                    if (!acrnState.isRunning) return;
+                    
+                    const now = audioContext.currentTime;
+                    let nodeIndex = Math.floor(Math.random() * 4);
+                    let node = acrnState.algorithmNodes[nodeIndex];
+                    node.gain.gain.setValueAtTime(node.baseVolume, now);
+                    node.gain.gain.setValueAtTime(0, now + 0.05);
+
+                    // Advanced: sometimes play a second tone
+                    if (acrnState.algorithmType === 'advanced' && Math.random() < 0.25) {
+                        let node2Index = (nodeIndex + Math.floor(Math.random() * 3) + 1) % 4;
+                        let node2 = acrnState.algorithmNodes[node2Index];
+                        node2.gain.gain.setValueAtTime(node2.baseVolume, now);
+                        node2.gain.gain.setValueAtTime(0, now + 0.05);
+                    }
+                    
+                    const pause = acrnState.algorithmType === 'advanced' 
+                        ? acrnState.pauseDuration * (0.75 + Math.random() * 0.5) // Variable pause
+                        : 200; // Fixed pause for simple
+                    
+                    acrnState.intervalId = setTimeout(runSequence, pause);
+                };
+                runSequence();
+
             } else {
-                if (acrnState.testTone) { acrnState.testTone.stop(); acrnState.testTone = null; }
-                if (acrnState.intervalId) clearInterval(acrnState.intervalId);
-                acrnState.algorithmNodes.forEach(n => n.osc.stop()); acrnState.algorithmNodes = [];
+                if (acrnState.intervalId) clearTimeout(acrnState.intervalId);
+                acrnState.algorithmNodes.forEach(n => n.osc.stop());
+                acrnState.algorithmNodes = [];
             }
         }
 
@@ -868,26 +1130,41 @@
         }
         function applySolfeggioPreset(baseFreq) {
             Object.values(generatedTones).forEach(tone => removeTone(tone.id));
-            createToneControl({ frequency: baseFreq });
-            createToneControl({ frequency: baseFreq * 1.5 });
-            createToneControl({ frequency: baseFreq / 2 });
+            createToneControl({ frequency: baseFreq, y: 1 });
+            createToneControl({ frequency: baseFreq * 1.5, x: 5 });
+            createToneControl({ frequency: baseFreq / 2, x: -5 });
             document.querySelector('#tone-generator-panel .tab-btn[data-tab="generated-tones"]')?.click();
         }
         function createToneControl(options = {}) {
-            const { frequency=440, x=0, y=0, z=0, type='sine', volume=0.5 } = options;
+            const { frequency=440, x=0, y=0, z=0, type='sine', volume=0.5, color='#ffffff', isochronic=false, isoFrequency=10 } = options;
             const id = `tone-${Date.now()}-${Math.random()}`;
             const container = document.getElementById('tone-layers-container');
             const controlWrapper = document.createElement('div');
-            controlWrapper.id = `wrapper-${id}`; controlWrapper.className = 'p-4 bg-gray-900/50 rounded-lg space-y-3';
-            const playRemoveRow = document.createElement('div'); playRemoveRow.className = 'flex justify-between items-center';
+            controlWrapper.id = `wrapper-${id}`; controlWrapper.className = 'bg-gray-900/50 rounded-lg';
+            
+            const header = document.createElement('div');
+            header.className = 'p-4 flex justify-between items-center cursor-pointer';
+            const title = document.createElement('span');
+            title.textContent = "Custom Tone";
+            title.className = 'font-semibold';
+            const headerControls = document.createElement('div');
+            headerControls.className = 'flex items-center space-x-2';
             const playBtn = document.createElement('button');
             playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
             playBtn.className = 'p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition';
-            playBtn.onclick = () => toggleTone(id, playBtn);
+            playBtn.onclick = (e) => { e.stopPropagation(); toggleTone(id, playBtn); };
             const removeBtn = document.createElement('button'); removeBtn.innerHTML = '&times;';
             removeBtn.className = 'text-2xl text-gray-400 hover:text-white';
-            removeBtn.onclick = () => removeTone(id);
-            playRemoveRow.append(playBtn, removeBtn);
+            removeBtn.onclick = (e) => { e.stopPropagation(); removeTone(id); };
+            const chevronIcon = document.createElement('span');
+            chevronIcon.innerHTML = `<svg class="w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>`;
+            chevronIcon.className = 'transition-transform';
+            headerControls.append(playBtn, removeBtn, chevronIcon);
+            header.append(title, headerControls);
+
+            const content = document.createElement('div');
+            content.className = 'p-4 border-t border-gray-700 space-y-3 hidden';
+            
             const waveformSelector = document.createElement('select'); waveformSelector.className = 'w-full bg-gray-700 border border-gray-600 rounded-lg px-2 py-1';
             ['sine', 'square', 'sawtooth', 'triangle'].forEach(t => {
                 const option = document.createElement('option');
@@ -896,25 +1173,77 @@
                 waveformSelector.appendChild(option);
             });
             waveformSelector.onchange = e => updateToneParam(id, 'type', e.target.value);
+            
             const freqSlider = createSlider(id, 'frequency', 'Freq', frequency, 50, 1200, 1);
             const volSlider = createSlider(id, 'volume', 'Vol', volume, 0, 1, 0.01);
             const xSlider = createSlider(id, 'x', 'X', x, -10, 10, 0.1);
             const ySlider = createSlider(id, 'y', 'Y', y, -10, 10, 0.1);
             const zSlider = createSlider(id, 'z', 'Z', z, -10, 10, 0.1);
-            controlWrapper.append(playRemoveRow, waveformSelector, freqSlider, volSlider, xSlider, ySlider, zSlider);
+
+            const advancedRow = document.createElement('div');
+            advancedRow.className = 'flex items-center justify-between';
+            const colorPicker = document.createElement('input');
+            colorPicker.type = 'color';
+            colorPicker.value = color;
+            colorPicker.className = 'w-10 h-8 p-1 bg-gray-700 border-none rounded-md cursor-pointer';
+            colorPicker.oninput = e => updateToneParam(id, 'color', e.target.value);
+            
+            const isochronicLabel = document.createElement('label');
+            isochronicLabel.className = 'flex items-center space-x-2 text-sm';
+            const isochronicCheckbox = document.createElement('input');
+            isochronicCheckbox.type = 'checkbox';
+            isochronicCheckbox.checked = isochronic;
+            isochronicLabel.append(isochronicCheckbox, document.createTextNode('Isochronic'));
+            
+            advancedRow.append(colorPicker, isochronicLabel);
+            
+            const isoControls = document.createElement('div');
+            isoControls.className = isochronic ? 'space-y-2' : 'hidden';
+            const isoFreqSlider = createSlider(id, 'isoFrequency', 'Iso Freq', isoFrequency, 0.1, 40, 0.1);
+            isoControls.append(isoFreqSlider);
+
+            isochronicCheckbox.onchange = e => {
+                const isChecked = e.target.checked;
+                updateToneParam(id, 'isochronic', isChecked);
+                isoControls.classList.toggle('hidden', !isChecked);
+                // When toggling, we need to restart the tone to apply the new audio graph structure
+                const tone = generatedTones[id];
+                if (tone && tone.isPlaying) {
+                    toggleTone(id, playBtn); // Stop it
+                    toggleTone(id, playBtn); // Start it again with new settings
+                }
+            };
+
+            header.addEventListener('click', (e) => {
+                if (e.target.closest('button')) return; 
+                content.classList.toggle('hidden');
+                chevronIcon.classList.toggle('rotate-180');
+            });
+            
+            content.append(waveformSelector, freqSlider, volSlider, xSlider, ySlider, zSlider, advancedRow, isoControls);
+            controlWrapper.append(header, content);
             container.prepend(controlWrapper);
-            generatedTones[id] = { id, oscillator: null, gainNode: null, pannerNode: null, isPlaying: false, type, frequency, volume, x, y, z };
+            generatedTones[id] = { id, oscillator: null, gainNode: null, pannerNode: null, lfo: null, lfoGain: null, isPlaying: false, type, frequency, volume, x, y, z, color, isochronic, isoFrequency, initialAngle: Math.random() * 2 * Math.PI };
         }
         function createSlider(id, param, label, value, min, max, step) {
             const wrapper = document.createElement('div'); wrapper.className = 'flex items-center space-x-2';
-            const valueDisplay = param === 'frequency' ? `<span class="text-sm w-16 text-right">${value} Hz</span>` : '';
-            wrapper.innerHTML = `<label class="text-sm w-8">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" class="w-full">${valueDisplay}`;
-            const slider = wrapper.querySelector('input');
+            const valueDisplay = param === 'frequency' ? `<input type="number" value="${value}" class="w-20 bg-gray-700 text-right pr-1 rounded-md">` : '';
+            wrapper.innerHTML = `<label class="text-sm w-8">${label}</label><input type="range" data-param="${param}" min="${min}" max="${max}" step="${step}" value="${value}" class="w-full">${valueDisplay}`;
+            const slider = wrapper.querySelector('input[type="range"]');
+            const numberInput = wrapper.querySelector('input[type="number"]');
+
             slider.oninput = e => {
                 const val = parseFloat(e.target.value);
                 updateToneParam(id, param, val);
-                if (param === 'frequency') slider.nextElementSibling.textContent = `${val.toFixed(0)} Hz`;
+                if (numberInput) numberInput.value = val.toFixed(0);
             };
+            if(numberInput) {
+                numberInput.onchange = e => {
+                    const val = parseFloat(e.target.value);
+                    updateToneParam(id, param, val);
+                    slider.value = val;
+                };
+            }
             return wrapper;
         }
         function toggleTone(id, btn) {
@@ -927,19 +1256,46 @@
                 tone.pannerNode = audioContext.createPanner();
                 tone.pannerNode.panningModel = 'HRTF';
                 tone.pannerNode.positionX.value = tone.x; tone.pannerNode.positionY.value = tone.y; tone.pannerNode.positionZ.value = tone.z;
-                tone.oscillator.type = tone.type; tone.oscillator.frequency.value = tone.frequency;
-                tone.gainNode.gain.value = tone.volume;
-                tone.oscillator.connect(tone.gainNode).connect(tone.pannerNode).connect(masterGain);
+                tone.oscillator.type = tone.type;
+                tone.oscillator.frequency.value = tone.frequency;
+                
+                // Connect oscillator to the main gain node
+                tone.oscillator.connect(tone.gainNode);
+
+                if (tone.isochronic) {
+                    // For isochronic tones, the main gain is 0, and an LFO pulses the volume.
+                    tone.gainNode.gain.value = 0;
+                    
+                    tone.lfo = audioContext.createOscillator();
+                    tone.lfo.type = 'square';
+                    tone.lfo.frequency.value = tone.isoFrequency;
+                    
+                    tone.lfoGain = audioContext.createGain();
+                    tone.lfoGain.gain.value = tone.volume; // The main volume slider sets the pulse amplitude
+
+                    tone.lfo.connect(tone.lfoGain);
+                    tone.lfoGain.connect(tone.gainNode.gain); // LFO modulates the gain
+                    tone.lfo.start();
+                } else {
+                    // For normal tones, just set the gain to the volume level.
+                    tone.gainNode.gain.value = tone.volume;
+                }
+
+                tone.gainNode.connect(tone.pannerNode).connect(masterGain);
                 tone.oscillator.start();
                 toneVisuals[id] = { ...tone, opacity: 0, targetOpacity: 1 };
                 btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h4v12H6zm8 0h4v12h-4z"/></svg>`;
                 btn.classList.replace('bg-blue-600', 'bg-yellow-600');
             } else {
                 if (tone.oscillator) {
-                    tone.oscillator.stop(); tone.oscillator.disconnect();
-                    tone.gainNode.disconnect(); tone.pannerNode.disconnect();
+                    tone.oscillator.stop();
+                    tone.oscillator.disconnect();
+                    if (tone.lfo) {
+                        tone.lfo.stop();
+                        tone.lfo.disconnect();
+                    }
                 }
-                tone.oscillator = null; tone.gainNode = null; tone.pannerNode = null;
+                tone.oscillator = null; tone.gainNode = null; tone.pannerNode = null; tone.lfo = null; tone.lfoGain = null;
                 if (toneVisuals[id]) toneVisuals[id].targetOpacity = 0;
                 btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
                 btn.classList.replace('bg-yellow-600', 'bg-blue-600');
@@ -947,13 +1303,27 @@
         }
         function updateToneParam(id, param, value) {
             const tone = generatedTones[id]; if (!tone) return;
+            
+            // Ensure value is finite before setting
+            if (!isFinite(value)) {
+                console.warn(`Attempted to set non-finite value for ${param}: ${value}. Aborting.`);
+                return;
+            }
+
             tone[param] = value;
             if (toneVisuals[id]) toneVisuals[id][param] = value;
             if (tone.isPlaying && audioContext) {
                 const panner = tone.pannerNode;
-                if (param==='frequency') tone.oscillator.frequency.setTargetAtTime(value, audioContext.currentTime, .01);
-                else if (param==='volume') tone.gainNode.gain.setTargetAtTime(value, audioContext.currentTime, .01);
-                else if (param==='type') tone.oscillator.type = value;
+                if (param==='frequency' && tone.oscillator) tone.oscillator.frequency.setTargetAtTime(value, audioContext.currentTime, .01);
+                else if (param==='volume' && tone.gainNode) {
+                    if (tone.isochronic && tone.lfoGain) {
+                        tone.lfoGain.gain.setTargetAtTime(value, audioContext.currentTime, .01);
+                    } else {
+                        tone.gainNode.gain.setTargetAtTime(value, audioContext.currentTime, .01);
+                    }
+                }
+                else if (param==='type' && tone.oscillator) tone.oscillator.type = value;
+                else if (param==='isoFrequency' && tone.lfo) tone.lfo.frequency.setTargetAtTime(value, audioContext.currentTime, .01);
                 else if (param==='x'&&panner) panner.positionX.setTargetAtTime(value, audioContext.currentTime, .01);
                 else if (param==='y'&&panner) panner.positionY.setTargetAtTime(value, audioContext.currentTime, .01);
                 else if (param==='z'&&panner) panner.positionZ.setTargetAtTime(value, audioContext.currentTime, .01);
@@ -1058,7 +1428,13 @@
             }
         }
         function stopAllAudio() {
-            Object.keys(generatedTones).forEach(id => { const t = generatedTones[id]; if (t.isPlaying) toggleTone(id, document.querySelector(`#tone-layers-container #wrapper-${id} button`)); });
+            Object.keys(generatedTones).forEach(id => { 
+                const t = generatedTones[id]; 
+                if (t && t.isPlaying) {
+                    const wrapper = document.getElementById(`wrapper-${id}`);
+                    if(wrapper) toggleTone(id, wrapper.querySelector('button'));
+                }
+            });
             Object.keys(soundFiles).forEach(id => { const f = soundFiles[id]; if (f.isPlaying) toggleSoundFile(id, document.querySelector(`#layered-tracks-container #wrapper-${id} button`)); });
             if (emdrState.isRunning) toggleEmdr();
             if (acrnState.isRunning) toggleAcrnTherapy();
@@ -1068,11 +1444,37 @@
         // --- Visualizations ---
         let particles = [], mandalas = []; let breathPhase = 0; let breathRadius = 50;
         function renderLoop(timestamp) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Handle tone streamers effect
+            if (toneStreamersEnabled) {
+                ctx.fillStyle = 'rgba(10, 10, 10, 0.1)'; // Fades to the background color
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+            
+            if(userLandscape) {
+                ctx.globalAlpha = toneStreamersEnabled ? 0.9 : 1.0; // Avoid washing out landscape too fast
+                ctx.drawImage(userLandscape, 0, 0, canvas.width, canvas.height);
+                ctx.globalAlpha = 1.0;
+            }
+
             (visualThemes[currentTheme] || visualThemes.cosmicVoid)(timestamp);
             drawToneVisuals(timestamp);
             if (emdrState.isRunning) drawEmdrVisual();
+            
+            if (spinState.isRunning) updateSpin(timestamp);
+
             requestAnimationFrame(renderLoop);
+        }
+        function handleLandscapeUpload(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const img = new Image();
+                img.onload = () => {
+                    userLandscape = img;
+                };
+                img.src = URL.createObjectURL(file);
+            }
         }
         const visualThemes = { 
             oceanDepths:t=>{updateBreathingGuide();ctx.strokeStyle='rgba(59,130,246,.8)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(canvas.width/2,canvas.height/2,breathRadius,0,2*Math.PI);ctx.stroke();if(particles.length<50)particles.push(createParticle('rgba(59,130,246,'));particles.forEach((p,i)=>{p.y-=p.speed;p.x+=Math.sin(p.y/50)*p.drift;if(p.y<-p.size)particles.splice(i,1);ctx.fillStyle=`${p.color}${p.opacity})`;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,2*Math.PI);ctx.fill()})}, 
@@ -1105,9 +1507,14 @@
             Object.values(toneVisuals).forEach((vis, index) => {
                 vis.opacity += (vis.targetOpacity - vis.opacity) * 0.1;
                 if (vis.targetOpacity === 0 && vis.opacity < 0.01) { delete toneVisuals[vis.id]; return; }
-                const x = canvas.width/2+(vis.x/10)*(canvas.width/3), y=canvas.height/2-(vis.y/10)*(canvas.height/3), zScale=Math.max(.1,1-vis.z/15), size=(15+Math.sin(timestamp/500+index)*2)*zScale;
-                ctx.beginPath(); ctx.arc(x, y, size, 0, 2*Math.PI); ctx.fillStyle=`rgba(255,255,255,${vis.opacity*.1*zScale})`; ctx.fill();
-                ctx.beginPath(); ctx.arc(x, y, size*.3, 0, 2*Math.PI); ctx.fillStyle=`rgba(255,255,255,${vis.opacity*.2*zScale})`; ctx.fill();
+                const x = canvas.width/2+(vis.x/10)*(canvas.width/3), y=canvas.height/2-(vis.y/10)*(canvas.height/3), zScale=Math.max(.1,1-vis.z/15);
+                let size = (15+Math.sin(timestamp/500+index)*2)*zScale;
+                if(vis.isochronic && vis.isPlaying) {
+                    const lfoPhase = (timestamp * vis.isoFrequency / 1000) % 1;
+                    size *= (1 + Math.sin(lfoPhase * 2 * Math.PI)) / 2;
+                }
+                ctx.beginPath(); ctx.arc(x, y, size, 0, 2*Math.PI); ctx.fillStyle=vis.color+Math.round(vis.opacity*0.2*zScale*255).toString(16).padStart(2,'0'); ctx.fill();
+                ctx.beginPath(); ctx.arc(x, y, size*.3, 0, 2*Math.PI); ctx.fillStyle=vis.color+Math.round(vis.opacity*0.4*zScale*255).toString(16).padStart(2,'0'); ctx.fill();
             });
         }
         function drawEmdrVisual() {
@@ -1136,15 +1543,230 @@
              else if (phase < 2) breathRadius = maxRadius;
              else if (phase < 3) breathRadius = maxRadius - (maxRadius - minRadius) * (phase - 2);
              else breathRadius = minRadius;
-        }
+         }
         function createParticle(color) { return { x:Math.random()*canvas.width, y:canvas.height+Math.random()*100, size:Math.random()*5+1, speed:Math.random()*.5+.2, drift:Math.random()*.5-.25, opacity:Math.random()*.5+.2, color }; }
         function createStar() { return { x: Math.random() * canvas.width-canvas.width/2, y: Math.random()*canvas.height-canvas.height/2, z: Math.random()*1000, opacity: Math.random() }; }
         function createMandalas(count) { mandalas = Array.from({length: count}, (_, i) => ({ radius:50+i*50, rotation:Math.random()*2*Math.PI, speed:(Math.random()-.5)*.0001, petals:Math.floor(Math.random()*6)+3, petalSize:10+Math.random()*20, lineWidth:Math.random()*1.5+.5, opacity:Math.random()*.5+.3 })); }
         function resetVisuals() { particles = []; mandalas = []; breathPhase = 0; }
+        
+        function updateSpin() {
+            if (!spinState.isRunning || Object.keys(generatedTones).length === 0) return;
+
+            spinState.angle += spinState.speed * 0.01; 
+
+            Object.values(generatedTones).forEach((tone) => {
+                if (!tone.isPlaying) return;
+                
+                let newX, newY, newZ;
+                const angle = spinState.angle + tone.initialAngle;
+                const R = spinState.radius;
+
+                switch (spinState.algorithm) {
+                    case 'figureEight-2d':
+                        newX = R * Math.sin(angle * 2);
+                        newY = tone.y; // Keep Y constant
+                        newZ = R * Math.cos(angle);
+                        break;
+                    case 'pendulum-2d':
+                        newX = R * Math.sin(angle);
+                        newY = tone.y; // Keep Y constant
+                        newZ = 0;
+                        break;
+                    case 'lissajous-3d': {
+                        const wx = 1, wy = 2, wz = 3;
+                        newX = R * Math.sin(wx * angle);
+                        newY = R * Math.sin(wy * angle);
+                        newZ = R * Math.sin(wz * angle);
+                        break;
+                    }
+                    case 'torus-knot-3d': {
+                        const p = 2, q = 3;
+                        const r = R / 3;
+                        newX = (R + r * Math.cos(p * angle)) * Math.cos(q * angle);
+                        newY = r * Math.sin(p * angle);
+                        newZ = (R + r * Math.cos(p * angle)) * Math.sin(q * angle);
+                        break;
+                    }
+                    case 'spherical-spiral-3d': {
+                        // Using a stable parameterization for a Loxodrome (spherical spiral)
+                        const t = (angle / (Math.PI * 2)) % 1.0; // t cycles from 0 to 1
+                        const phi = angle * 1.618; // Azimuthal angle (using golden ratio for nice sweep)
+                        const theta = Math.acos(1 - 2 * t); // Polar angle, sweeps from 0 to PI and back
+                        
+                        newX = R * Math.sin(theta) * Math.cos(phi);
+                        newY = R * Math.sin(theta) * Math.sin(phi);
+                        newZ = R * Math.cos(theta);
+                        break;
+                    }
+                    case 'circular-2d':
+                    default:
+                        newX = R * Math.cos(angle);
+                        newY = tone.y; // Keep Y constant
+                        newZ = R * Math.sin(angle);
+                        break;
+                }
+                
+                updateToneParam(tone.id, 'x', newX);
+                updateToneParam(tone.id, 'y', newY);
+                updateToneParam(tone.id, 'z', newZ);
+                
+                const wrapper = document.getElementById(`wrapper-${tone.id}`);
+                if(wrapper) {
+                    wrapper.querySelector('input[type="range"][data-param="x"]').value = newX;
+                    wrapper.querySelector('input[type="range"][data-param="y"]').value = newY;
+                    wrapper.querySelector('input[type="range"][data-param="z"]').value = newZ;
+                }
+            });
+        }
+
 
         // --- AI Assistant ---
-        const chatBox=document.getElementById("chat-box"),chatInput=document.getElementById("chat-input"),quickRepliesContainer=document.getElementById("quick-replies");function addChatMessage(e,t="ai"){const a=document.createElement("div");a.className=`p-3 rounded-lg max-w-[80%] ${"user"===t?"bg-blue-600 ml-auto":"bg-gray-700 mr-auto"}`,a.textContent=e,chatBox.appendChild(a),chatBox.scrollTop=chatBox.scrollHeight,"user"===t?chatHistory.push({role:"user",parts:[{text:e}]}):chatHistory.push({role:"model",parts:[{text:e}]})}function sendChatMessage(){const e=chatInput.value.trim();e&&(addChatMessage(e,"user"),getAIResponse(e),chatInput.value="")}async function getAIResponse(e){const t=document.createElement("div");t.className="p-3 rounded-lg max-w-[80%] bg-gray-700 mr-auto animate-pulse",t.textContent="● ● ●",chatBox.appendChild(t),chatBox.scrollTop=chatBox.scrollHeight;const a=`You are a friendly and empathetic meditation assistant. Your goal is to provide concise, helpful guidance for users seeking to manage stress, improve focus, or deepen their meditation. The user is currently in the "${themes[currentTheme].name}" theme. Keep responses short and directly related to meditation and mindfulness.`,n={contents:[...chatHistory,{role:"user",parts:[{text:e}]}],systemInstruction:{role:"system",parts:[{text:a}]}},o="";try{const e=await fetch(`/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)});if(!e.ok)throw new Error(`API Error: ${e.statusText}`);const a=await e.json();chatBox.removeChild(t),a.candidates&&a.candidates.length>0&&a.candidates[0].content.parts[0].text?addChatMessage(a.candidates[0].content.parts[0].text,"ai"):addChatMessage("I'm sorry, I couldn't generate a response. Please try again.","ai")}catch(e){console.error("Gemini API call failed:",e),chatBox.removeChild(t),addChatMessage("Sorry, I'm having trouble connecting. This may be due to network issues or API restrictions. For a deployed version, a backend proxy or Cloud Function is needed.","ai")}}function updateAIChatContext(){const e={general:["Help me relax","Guide my breathing","I feel stressed"],oceanDepths:["Tell me about ocean meditation","Deep water breathing"],forestWhispers:["Guide a forest visualization","Grounding exercise"],sunsetSerenity:["Focus on gratitude","Evening wind-down"],cosmicVoid:["Expand my awareness","Feeling of spaciousness"],zenGarden:["Help me find stillness","Thoughts on simplicity"]};quickRepliesContainer.innerHTML="";const t=e[currentTheme]||e.general;t.forEach(e=>{const t=document.createElement("button");t.textContent=e,t.className="px-3 py-1 bg-gray-600 rounded-full text-sm hover:bg-gray-500 transition",t.onclick=()=>{chatInput.value=e,sendChatMessage()},quickRepliesContainer.appendChild(t)})}
+        const AI_PROXY_URL = "https://your-project-name.vercel.app/api/chat";
+
+        const chatBox=document.getElementById("chat-box"),chatInput=document.getElementById("chat-input"),quickRepliesContainer=document.getElementById("quick-replies");
+        function addChatMessage(text, sender = "ai") {
+            const messageEl = document.createElement("div");
+            messageEl.className = `p-3 rounded-lg max-w-[80%] ${sender === "user" ? "bg-blue-600 ml-auto" : "bg-gray-700 mr-auto"}`;
+            messageEl.textContent = text;
+            chatBox.appendChild(messageEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            if (sender === "user") {
+                chatHistory.push({ role: "user", parts: [{ text }] });
+            } else {
+                chatHistory.push({ role: "model", parts: [{ text }] });
+            }
+        }
+        function sendChatMessage() {
+            const prompt = chatInput.value.trim();
+            if (prompt) {
+                addChatMessage(prompt, "user");
+                getAIResponse(prompt);
+                chatInput.value = "";
+            }
+        }
+        async function getAIResponse(prompt) {
+            const loadingEl = document.createElement("div");
+            loadingEl.className = "p-3 rounded-lg max-w-[80%] bg-gray-700 mr-auto animate-pulse";
+            loadingEl.textContent = "● ● ●";
+            chatBox.appendChild(loadingEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            if (AI_PROXY_URL.includes("your-project-name")) {
+                chatBox.removeChild(loadingEl);
+                addChatMessage("AI not configured. Please deploy the serverless function and update the AI_PROXY_URL in the script.", "ai");
+                return;
+            }
+
+            const systemInstruction = `You are a friendly and empathetic meditation assistant. Your goal is to provide concise, helpful guidance. The user is currently in the "${themes[currentTheme].name}" theme.`;
+            const payload = {
+                contents: [...chatHistory, { role: "user", parts: [{ text: prompt }] }],
+                systemInstruction: { role: "system", parts: [{ text: systemInstruction }] }
+            };
+
+            try {
+                const response = await fetch(AI_PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText} - ${await response.text()}`);
+                }
+                
+                const result = await response.json();
+                chatBox.removeChild(loadingEl);
+
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts[0].text) {
+                    const aiText = result.candidates[0].content.parts[0].text;
+                    addChatMessage(aiText, "ai");
+                } else {
+                    addChatMessage("I'm sorry, I couldn't generate a response. Please try again.", "ai");
+                }
+            } catch (error) {
+                console.error("AI Proxy call failed:", error);
+                chatBox.removeChild(loadingEl);
+                addChatMessage("Sorry, I'm having trouble connecting to the AI assistant.", "ai");
+            }
+        }
+        function updateAIChatContext(){const quickReplyOptions={general:["Help me relax","Guide my breathing","I feel stressed"],oceanDepths:["Tell me about ocean meditation","Deep water breathing"],forestWhispers:["Guide a forest visualization","Grounding exercise"],sunsetSerenity:["Focus on gratitude","Evening wind-down"],cosmicVoid:["Expand my awareness","Feeling of spaciousness"],zenGarden:["Help me find stillness","Thoughts on simplicity"]};quickRepliesContainer.innerHTML="";const replies=quickReplyOptions[currentTheme]||quickReplyOptions.general;replies.forEach(reply=>{const btn=document.createElement("button");btn.textContent=reply,btn.className="px-3 py-1 bg-gray-600 rounded-full text-sm hover:bg-gray-500 transition",btn.onclick=()=>{chatInput.value=reply,sendChatMessage()},quickRepliesContainer.appendChild(btn)})}
         
+        // --- Share/Import & Notification Functions ---
+        function exportSettings() {
+            const settings = {
+                theme: currentTheme, breathInterval, toneStreamersEnabled, emdr: emdrState, acrn: acrnState, spin: spinState,
+                customTones: Object.values(generatedTones).map(t => ({
+                    frequency: t.frequency, volume: t.volume, type: t.type, x: t.x, y: t.y, z: t.z, color: t.color, isochronic: t.isochronic, isoFrequency: t.isoFrequency
+                })),
+                panelPositions: getPanelPositions()
+            };
+            const settingsString = JSON.stringify(settings);
+            const encodedSettings = btoa(settingsString); // Base64 encode
+            document.getElementById('export-code').value = encodedSettings;
+        }
+
+        function copyExportCode() {
+            const exportArea = document.getElementById('export-code');
+            exportArea.select();
+            exportArea.setSelectionRange(0, 99999); // For mobile devices
+            document.execCommand('copy');
+            showNotification('Settings code copied to clipboard!');
+        }
+
+        function importSettings() {
+            const importCode = document.getElementById('import-code').value.trim();
+            if (!importCode) return;
+            try {
+                const decodedString = atob(importCode); // Base64 decode
+                const settings = JSON.parse(decodedString);
+                applySettings(settings);
+                showNotification('Settings imported successfully!');
+                document.getElementById('share-panel').classList.add('hidden');
+            } catch (e) {
+                console.error("Import failed:", e);
+                showNotification("Invalid settings code. Please check and try again.", "error");
+            }
+        }
+        
+        function showNotification(message, type = 'success') {
+            const modal = document.getElementById('notification-modal');
+            const messageEl = document.getElementById('notification-message');
+            
+            messageEl.textContent = message;
+            modal.classList.remove('bg-green-500', 'bg-red-500');
+            modal.classList.add(type === 'success' ? 'bg-green-500' : 'bg-red-500');
+            
+            modal.classList.remove('opacity-0', '-translate-y-20');
+            
+            setTimeout(() => {
+                modal.classList.add('opacity-0', '-translate-y-20');
+            }, 3000);
+        }
+        
+        function showConfirmation(title, message, onConfirm) {
+            const modal = document.getElementById('confirmation-modal');
+            document.getElementById('confirmation-title').textContent = title;
+            document.getElementById('confirmation-message').textContent = message;
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            const actionBtn = document.getElementById('confirm-action-btn');
+            
+            const close = () => {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                actionBtn.replaceWith(actionBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+            };
+            
+            document.getElementById('confirm-cancel-btn').onclick = close;
+            document.getElementById('confirm-action-btn').onclick = () => {
+                onConfirm();
+                close();
+            };
+        }
+
+        // --- Start the App ---
         init();
     </script>
 </body>
