@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Meditation System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #e2e8f0;
+            --primary-color: #3b82f6;
+            --secondary-color: #8b5cf6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+        #visualization {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        .ui-panel {
+            position: fixed; /* Necessary for dragging */
+            background-color: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .drag-handle {
+            cursor: move;
+        }
+        .ui-panel::-webkit-scrollbar { width: 8px; }
+        .ui-panel::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+        .ui-panel::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 10px; }
+        .ui-panel::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+    </style>
+</head>
+<body class="select-none">
+    <!-- Main Visualization Canvas -->
+    <canvas id="visualization"></canvas>
+
+    <!-- Persistent Top-Left Menu -->
+    <div id="persistent-menu" class="fixed top-4 left-4 z-50 flex flex-col space-y-2">
+        <button id="theme-selector-btn" title="Select Theme" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.364 6.364 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+        <button id="tone-generator-btn" title="Audio Controls" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </button>
+         <button id="emdr-btn" title="EMDR Tool" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button id="acrn-btn" title="ACRN Tinnitus Tool" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M18 18.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M12 2v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M12 12.5a4.5 4.5 0 0 0-4.5 4.5v0"/><path d="M16.5 17a4.5 4.5 0 0 0-4.5-4.5"/></svg>
+        </button>
+        <button id="help-btn" title="Help" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </button>
+    </div>
+
+     <!-- Small Timer Display -->
+    <div id="small-timer-display" class="fixed bottom-4 left-4 z-50 p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg cursor-pointer flex items-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span id="small-timer-text">00:00</span>
+    </div>
+
+
+    <!-- Timer Control Panel -->
+    <div id="timer-panel" class="hidden ui-panel" style="bottom: 5rem; left: 1rem;">
+        <div class="p-6 w-80">
+            <div class="flex justify-between items-center drag-handle">
+                <h2 class="text-xl font-bold">Timer & Alerts</h2>
+                <button id="close-timer-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            
+            <div class="text-center my-4">
+                <h1 id="timer-display-large" class="text-6xl font-bold">00:00</h1>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="timer-duration" class="block text-sm font-medium mb-1">Set Duration (minutes)</label>
+                    <input type="number" id="timer-duration" value="10" min="1" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
+                </div>
+
+                <div class="flex space-x-2">
+                    <button id="start-stop-btn" class="flex-1 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Start</button>
+                    <button id="reset-btn" class="flex-1 py-2 bg-gray-600 rounded-lg hover:bg-gray-700 transition">Reset</button>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-gray-700 space-y-4">
+                <h3 class="font-semibold">Alerts</h3>
+                <div>
+                    <label for="alarm-sound" class="block text-sm font-medium mb-1">End of Session Alarm</label>
+                    <select id="alarm-sound" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
+                        <option value="none">None</option>
+                        <option value="subtle">Subtle Chime</option>
+                        <option value="gong">Meditation Gong</option>
+                    </select>
+                </div>
+                <div>
+                     <label for="interval-minutes" class="block text-sm font-medium mb-1">Play Gong Every (minutes)</label>
+                     <input type="number" id="interval-minutes" value="5" min="1" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
+                     <label class="flex items-center mt-2">
+                        <input type="checkbox" id="enable-interval-gong" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="ml-2 text-sm">Enable Interval Gong</span>
+                     </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMDR Control Panel -->
+    <div id="emdr-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+        <div class="p-6 w-80">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">EMDR Tool</h2>
+                <button id="close-emdr-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="emdr-speed" class="block text-sm font-medium mb-1">Speed</label>
+                    <input type="range" id="emdr-speed" min="1" max="20" value="5" class="w-full">
+                </div>
+                <div>
+                    <label for="emdr-size" class="block text-sm font-medium mb-1">Max Size</label>
+                    <input type="range" id="emdr-size" min="10" max="100" value="30" class="w-full">
+                </div>
+                 <div>
+                    <label for="emdr-color" class="block text-sm font-medium mb-1">Color</label>
+                    <input type="color" id="emdr-color" value="#3b82f6" class="w-full h-10 p-1 bg-gray-700 border border-gray-600 rounded-lg">
+                </div>
+                 <label class="flex items-center mt-2">
+                    <input type="checkbox" id="emdr-autoscale" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    <span class="ml-2 text-sm">Enable Auto-Scaling</span>
+                 </label>
+                <button id="start-stop-emdr-btn" class="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Start EMDR</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ACRN Control Panel -->
+     <div id="acrn-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+         <div class="p-6 w-80">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">ACRN Tinnitus Tool</h2>
+                <button id="close-acrn-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+             <div class="space-y-4">
+                <div>
+                    <label for="acrn-frequency" class="block text-sm font-medium mb-1">Tinnitus Frequency</label>
+                     <div class="flex items-center space-x-2">
+                        <input type="range" id="acrn-frequency" min="1000" max="12000" value="4000" step="50" class="w-full">
+                         <span id="acrn-freq-display" class="text-sm w-16 text-right">4000 Hz</span>
+                     </div>
+                    <button id="test-acrn-freq-btn" class="w-full mt-2 py-2 text-sm bg-gray-600 rounded-lg hover:bg-gray-700 transition">Play Test Tone</button>
+                </div>
+                 <div>
+                    <label for="acrn-volume" class="block text-sm font-medium mb-1">ACRN Volume</label>
+                    <input type="range" id="acrn-volume" min="0" max="1" value="0.5" step="0.01" class="w-full">
+                </div>
+                <div class="mt-6 pt-4 border-t border-gray-700 space-y-2">
+                     <label class="flex items-center">
+                        <input type="checkbox" id="enable-acrn-algorithm" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="ml-2 text-sm">Enable ACRN Algorithm</span>
+                     </label>
+                     <p class="text-xs text-gray-400">Plays four tones around your selected frequency to help with tinnitus.</p>
+                </div>
+                 <button id="start-stop-acrn-btn" class="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Start ACRN Therapy</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Panel -->
+    <div id="help-panel" class="hidden ui-panel" style="top: 5rem; left: 50%; transform: translateX(-50%);">
+        <div class="p-6 w-[32rem] max-w-[calc(100vw-2rem)]">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Feature Guide</h2>
+                <button id="close-help-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="flex border-b border-gray-700 mb-4 text-sm flex-wrap">
+                <button data-tab="guide-themes" class="help-tab-btn py-2 px-3 text-blue-400 border-b-2 border-blue-400">Themes</button>
+                <button data-tab="guide-audio" class="help-tab-btn py-2 px-3 text-gray-400">Audio</button>
+                <button data-tab="guide-emdr" class="help-tab-btn py-2 px-3 text-gray-400">EMDR</button>
+                <button data-tab="guide-acrn" class="help-tab-btn py-2 px-3 text-gray-400">ACRN</button>
+                <button data-tab="guide-timer" class="help-tab-btn py-2 px-3 text-gray-400">Timer</button>
+                <button data-tab="guide-ai" class="help-tab-btn py-2 px-3 text-gray-400">AI</button>
+            </div>
+            <div class="space-y-4 text-gray-300 text-sm leading-relaxed">
+                <div id="guide-themes-tab" class="help-tab-content">
+                    <h3 class="font-bold text-white mb-2">Visual Themes & Breathing Guide</h3>
+                    <p>Each theme provides a unique visual and atmospheric experience for your meditation. Select one that matches your intention.</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><strong>Breathing Guide:</strong> The pulsating circle in the center of the screen is a visual guide for your breath. You can adjust its rhythm in the Theme panel.</li>
+                        <li><strong>Optimal Use:</strong> Match the theme to your mood. Use 'Cosmic Void' for spaciousness, 'Forest Whispers' for grounding, or 'Ocean Depths' for a feeling of flow. Synchronize your breath with the guide to calm your nervous system.</li>
+                    </ul>
+                </div>
+                <div id="guide-audio-tab" class="hidden help-tab-content">
+                    <h3 class="font-bold text-white mb-2">Audio Controls</h3>
+                    <p>The audio panel is a powerful tool for soundscaping. You can layer generated tones, presets, and your own files.</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><strong>Presets:</strong> Instantly load therapeutic Solfeggio frequencies. Each preset creates three harmonically related tones in the "Custom" tab.</li>
+                        <li><strong>Custom Tones:</strong> Create your own tones. Use the X, Y, and Z sliders to position the sound in 3D space around you (requires headphones for best effect). A visual orb will appear, corresponding to the tone's position.</li>
+                         <li><strong>Files:</strong> Layer procedural sounds (like rain) with your own uploaded audio files for a rich, complex soundscape.</li>
+                        <li><strong>Optimal Use:</strong> Use the "Presets" to target a specific emotional or spiritual state. Use the "Custom" tab to experiment with 3D audio for deep immersion. Layer a custom tone with a "File" soundscape for a complete experience.</li>
+                    </ul>
+                </div>
+                <div id="guide-emdr-tab" class="hidden help-tab-content">
+                    <h3 class="font-bold text-white mb-2">EMDR Tool</h3>
+                    <p>The Eye Movement Desensitization and Reprocessing (EMDR) tool is designed to assist in processing traumatic memories and reducing emotional distress.</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><strong>How it works:</strong> A moving orb guides your eyes from side to side, engaging both hemispheres of the brain.</li>
+                        <li><strong>Controls:</strong> Adjust the speed, size, and color to your comfort. "Auto-Scaling" makes the orb grow larger at the edges for a more pronounced effect.</li>
+                        <li><strong>Optimal Use:</strong> While holding a distressing memory or feeling in mind, follow the orb with your eyes without moving your head. Let any thoughts or feelings come and go without judgment. Use in a quiet, safe environment. It's recommended to consult with a trained EMDR therapist.</li>
+                    </ul>
+                </div>
+                 <div id="guide-acrn-tab" class="hidden help-tab-content">
+                    <h3 class="font-bold text-white mb-2">ACRN Tinnitus Tool</h3>
+                    <p>Acoustic Coordinated Reset Neuromodulation (ACRN) is a therapy designed to reduce the symptoms of tinnitus by disrupting pathological brain synchrony.</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><strong>Find Your Frequency:</strong> Play the "Test Tone" and adjust the slider until the tone's pitch matches your tinnitus.</li>
+                        <li><strong>Enable Algorithm:</strong> Once your frequency is matched, stop the test tone and enable the ACRN algorithm. This will play four tones, two above and two below your target frequency.</li>
+                         <li><strong>Volume:</strong> Adjust the ACRN volume to a level that is audible but not intrusive.</li>
+                        <li><strong>Optimal Use:</strong> Listen to the ACRN tones for a sustained period each day. The goal is not to mask the tinnitus with volume, but to allow the specific frequencies to retrain the brain's auditory processing over time. Consistency is key.</li>
+                    </ul>
+                </div>
+                <div id="guide-timer-tab" class="hidden help-tab-content">
+                    <h3 class="font-bold text-white mb-2">Timer & Alerts</h3>
+                    <p>Structure your meditation sessions with a customizable timer and gentle audio cues.</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><strong>Duration:</strong> Set your total meditation time in minutes.</li>
+                        <li><strong>End Alarm:</strong> Choose a sound to signify the end of your session.</li>
+                        <li><strong>Interval Gongs:</strong> Receive a gentle gong sound at regular intervals to bring your awareness back to the present moment.</li>
+                        <li><strong>Optimal Use:</strong> For mindfulness practice, use the interval gongs to gently pull your focus back from wandering thoughts. For deep relaxation, set a duration with a subtle chime at the end to gently bring you back.</li>
+                    </ul>
+                </div>
+                <div id="guide-ai-tab" class="hidden help-tab-content">
+                    <h3 class="font-bold text-white mb-2">AI Assistant</h3>
+                    <p>Your personal meditation guide, powered by Gemini. It can provide context-aware suggestions and encouragement.</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><strong>Contextual Guidance:</strong> The AI knows which theme you have selected and can offer relevant advice.</li>
+                        <li><strong>Quick Replies:</strong> Use the suggested prompts for common requests like breathing exercises or stress reduction techniques.</li>
+                        <li><strong>Chat:</strong> Ask anything related to your practice. For example, "How can I focus better?" or "Guide me through a body scan."</li>
+                        <li><strong>Optimal Use:</strong> Use the AI at the beginning of a session to set an intention or ask for guidance. If you feel stuck or distracted during a session, open the panel and ask for help.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Theme Selector Panel -->
+    <div id="theme-selector-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+        <div class="p-6 w-72">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Select Theme</h2>
+                 <button id="close-theme-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div id="theme-list" class="space-y-2"></div>
+            <div class="mt-6 pt-4 border-t border-gray-700">
+                 <h3 class="font-semibold mb-2">Breathing Guide Speed</h3>
+                 <div class="flex items-center space-x-2">
+                    <label for="breathing-speed" class="text-sm">3s</label>
+                    <input type="range" id="breathing-speed" min="3" max="6" step="0.1" value="4" class="w-full">
+                    <label for="breathing-speed" class="text-sm">6s</label>
+                 </div>
+                 <div class="text-center text-sm mt-1">Interval: <span id="breathing-speed-value">4.0</span>s</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tone Generator Panel -->
+    <div id="tone-generator-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+        <div class="p-6 w-96">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                 <h2 class="text-xl font-bold">Audio Controls</h2>
+                 <button id="close-tone-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            
+            <div class="flex border-b border-gray-700 mb-4">
+                <button data-tab="presets" class="tab-btn py-2 px-4 text-blue-400 border-b-2 border-blue-400">Presets</button>
+                <button data-tab="generated-tones" class="tab-btn py-2 px-4 text-gray-400">Custom</button>
+                <button data-tab="sound-files" class="tab-btn py-2 px-4 text-gray-400">Files</button>
+            </div>
+
+            <div id="presets-tab" class="tab-content space-y-2">
+                <!-- Solfeggio presets will be populated here -->
+            </div>
+
+            <div id="generated-tones-tab" class="hidden tab-content space-y-4">
+                 <div id="tone-layers-container"></div>
+                 <button id="add-tone-btn" class="w-full mt-4 py-2 bg-blue-600/50 rounded-lg hover:bg-blue-600/80 transition">+ Add Tone Layer</button>
+            </div>
+
+            <div id="sound-files-tab" class="hidden tab-content space-y-4">
+                <div>
+                    <h3 class="font-semibold mb-2">Layered Tracks</h3>
+                    <div id="layered-tracks-container" class="space-y-2 p-2 bg-gray-900/50 rounded-lg min-h-[50px]"></div>
+                </div>
+                <div>
+                     <h3 class="font-semibold mb-2">Sample Tones</h3>
+                     <div id="sample-tones-container" class="space-y-2"></div>
+                </div>
+                 <div>
+                     <h3 class="font-semibold mb-2">Upload Your Own</h3>
+                    <div id="drop-zone" class="border-2 border-dashed border-gray-500 rounded-lg p-6 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-800/50 transition">
+                        <p>Drag & drop or click to upload</p>
+                        <input type="file" id="file-upload" class="hidden" multiple accept="audio/*">
+                    </div>
+                    <div id="file-list" class="space-y-2 mt-2"></div>
+                </div>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-gray-700 space-y-4">
+                <h3 class="font-semibold">Master Controls</h3>
+                <div class="flex items-center space-x-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                    <input type="range" id="master-volume" min="0" max="1" step="0.01" value="0.5" class="w-full">
+                </div>
+                <div class="flex space-x-2">
+                    <button id="master-mute-btn" class="flex-1 py-2 bg-yellow-600 rounded-lg hover:bg-yellow-700 transition">Mute</button>
+                    <button id="stop-all-btn" class="flex-1 py-2 bg-red-600 rounded-lg hover:bg-red-700 transition">Stop All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Assistant -->
+    <div id="ai-chat-panel" class="hidden ui-panel" style="bottom: 1rem; right: 1rem;">
+        <div class="p-4 w-96 max-w-[calc(100vw-2rem)]">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                 <h2 class="text-lg font-bold">AI Meditation Assistant</h2>
+                 <button id="close-ai-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div id="chat-box" class="h-64 overflow-y-auto mb-4 p-2 bg-gray-900/50 rounded-lg space-y-4"></div>
+            <div id="quick-replies" class="flex flex-wrap gap-2 mb-4"></div>
+            <div class="flex space-x-2">
+                <input type="text" id="chat-input" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ask for guidance...">
+                <button id="send-chat-btn" class="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">Send</button>
+            </div>
+        </div>
+    </div>
+     <div id="ai-assistant-btn-container" class="fixed bottom-4 right-4 z-50">
+        <button id="ai-assistant-btn" title="AI Assistant" class="p-4 bg-purple-600 rounded-full text-white hover:bg-purple-700 transition-transform hover:scale-110 duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 0-2.3 19.46a10 10 0 0 0 4.6 0A10 10 0 0 0 12 2Z"/><path d="M12 12a5 5 0 0 0-5 5"/><path d="M12 8a.5.5 0 0 1 .5.5v0a.5.5 0 0 1-.5.5h0a.5.5 0 0 1-.5-.5v0a.5.5 0 0 1 .5-.5Z"/></svg>
+        </button>
+    </div>
+
+    <script type="module">
+        // --- DOM Elements ---
+        const canvas = document.getElementById('visualization');
+        const ctx = canvas.getContext('2d');
+        
+        // --- State ---
+        let audioContext;
+        let masterGain;
+        let acrnGain;
+        const generatedTones = {};
+        const soundFiles = {};
+        const toneVisuals = {};
+        let currentTheme = 'oceanDepths';
+        let breathInterval = 4;
+        let chatHistory = [];
+        
+        // Timer State
+        let timerIntervalId = null, timerRunning = false, timeRemaining = 0, totalDuration = 0, nextGongTime = 0;
+        
+        // EMDR State
+        let emdrState = { isRunning: false, speed: 5, size: 30, color: '#3b82f6', x: 0, direction: 1, autoScale: false };
+
+        // ACRN State
+        let acrnState = { isRunning: false, testTone: null, tinnitusFrequency: 4000, algorithmNodes: [], intervalId: null };
+        
+        const themes = { oceanDepths:{name:'Ocean Depths'}, forestWhispers:{name:'Forest Whispers'}, sunsetSerenity:{name:'Sunset Serenity'}, cosmicVoid:{name:'Cosmic Void'}, zenGarden:{name:'Zen Garden'} };
+        const solfeggioTones = { 174:'Relief & Security', 285:'Healing & Rejuvenation', 396:'Liberating Guilt & Fear', 417:'Facilitating Change', 528:'Transformation & Miracles', 639:'Connecting Relationships', 741:'Awakening Intuition', 852:'Returning to Spirit', 963:'Connecting with Oneness' };
+        const sampleTones = { 'rain':'Gentle Rain', 'fire':'Crackling Fire', 'stream':'Babbling Brook', 'wind':'Howling Wind', 'chimes':'Wind Chimes' };
+
+        function init() {
+            setupCanvas();
+            setupEventListeners();
+            populateThemeSelector();
+            populateSampleTones();
+            populateSolfeggioPresets();
+            setTheme(currentTheme);
+            renderLoop();
+            addChatMessage('Welcome! How can I help you today?', 'ai');
+            updateAIChatContext();
+            resetTimer();
+            makePanelsDraggable();
+        }
+
+        function setupAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioContext.createGain();
+                acrnGain = audioContext.createGain();
+                masterGain.gain.value = 0.5;
+                acrnGain.gain.value = 0.5;
+                acrnGain.connect(masterGain);
+                masterGain.connect(audioContext.destination);
+            }
+        }
+        
+        function setupCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            emdrState.x = canvas.width / 2;
+            resetVisuals();
+        }
+
+        function setupEventListeners() {
+            window.addEventListener('resize', setupCanvas);
+            
+            // Panel Toggles & Closes
+            document.getElementById('theme-selector-btn').addEventListener('click', () => togglePanel(document.getElementById('theme-selector-panel')));
+            document.getElementById('tone-generator-btn').addEventListener('click', () => { setupAudioContext(); togglePanel(document.getElementById('tone-generator-panel')) });
+            document.getElementById('ai-assistant-btn').addEventListener('click', () => { togglePanel(document.getElementById('ai-chat-panel')); document.getElementById('ai-assistant-btn-container').classList.add('hidden'); });
+            document.getElementById('small-timer-display').addEventListener('click', () => togglePanel(document.getElementById('timer-panel')));
+            document.getElementById('emdr-btn').addEventListener('click', () => togglePanel(document.getElementById('emdr-panel')));
+            document.getElementById('acrn-btn').addEventListener('click', () => { setupAudioContext(); togglePanel(document.getElementById('acrn-panel')); });
+            document.getElementById('help-btn').addEventListener('click', () => togglePanel(document.getElementById('help-panel')));
+
+            document.getElementById('close-tone-panel-btn').addEventListener('click', () => document.getElementById('tone-generator-panel').classList.add('hidden'));
+            document.getElementById('close-ai-panel-btn').addEventListener('click', () => { document.getElementById('ai-chat-panel').classList.add('hidden'); document.getElementById('ai-assistant-btn-container').classList.remove('hidden'); });
+            document.getElementById('close-timer-panel-btn').addEventListener('click', () => document.getElementById('timer-panel').classList.add('hidden'));
+            document.getElementById('close-emdr-panel-btn').addEventListener('click', () => document.getElementById('emdr-panel').classList.add('hidden'));
+            document.getElementById('close-acrn-panel-btn').addEventListener('click', () => document.getElementById('acrn-panel').classList.add('hidden'));
+            document.getElementById('close-theme-panel-btn').addEventListener('click', () => document.getElementById('theme-selector-panel').classList.add('hidden'));
+            document.getElementById('close-help-panel-btn').addEventListener('click', () => document.getElementById('help-panel').classList.add('hidden'));
+
+            // Theme Panel
+            document.getElementById('breathing-speed').addEventListener('input', e => {
+                breathInterval = parseFloat(e.target.value);
+                document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+            });
+            
+            // Timer Controls
+            document.getElementById('start-stop-btn').addEventListener('click', handleStartStop);
+            document.getElementById('reset-btn').addEventListener('click', resetTimer);
+
+            // EMDR Controls
+            document.getElementById('emdr-speed').addEventListener('input', e => emdrState.speed = parseFloat(e.target.value));
+            document.getElementById('emdr-size').addEventListener('input', e => emdrState.size = parseFloat(e.target.value));
+            document.getElementById('emdr-color').addEventListener('input', e => emdrState.color = e.target.value);
+            document.getElementById('emdr-autoscale').addEventListener('change', e => emdrState.autoScale = e.target.checked);
+            document.getElementById('start-stop-emdr-btn').addEventListener('click', toggleEmdr);
+            
+            // ACRN Controls
+            document.getElementById('acrn-frequency').addEventListener('input', e => {
+                acrnState.tinnitusFrequency = parseFloat(e.target.value);
+                document.getElementById('acrn-freq-display').textContent = `${acrnState.tinnitusFrequency} Hz`;
+                if(acrnState.testTone) {
+                    acrnState.testTone.frequency.setTargetAtTime(acrnState.tinnitusFrequency, audioContext.currentTime, 0.01);
+                }
+            });
+            document.getElementById('acrn-volume').addEventListener('input', e => {
+                if(acrnGain) acrnGain.gain.setTargetAtTime(parseFloat(e.target.value), audioContext.currentTime, 0.01);
+            });
+            document.getElementById('test-acrn-freq-btn').addEventListener('click', toggleAcrnTestTone);
+            document.getElementById('start-stop-acrn-btn').addEventListener('click', toggleAcrnTherapy);
+
+            // Tone Generator
+            document.querySelectorAll('#tone-generator-panel .tab-btn').forEach(b => b.addEventListener('click', switchTab));
+            document.getElementById('add-tone-btn').addEventListener('click', () => createToneControl());
+            document.getElementById('master-volume').addEventListener('input', e => { if (masterGain) masterGain.gain.setTargetAtTime(parseFloat(e.target.value), audioContext.currentTime, 0.01); });
+            document.getElementById('master-mute-btn').addEventListener('click', toggleMasterMute);
+            document.getElementById('stop-all-btn').addEventListener('click', stopAllAudio);
+            
+            // Help Panel Tabs
+            document.querySelectorAll('.help-tab-btn').forEach(b => b.addEventListener('click', switchTab));
+
+            // Sound Files
+            const dropZone = document.getElementById('drop-zone');
+            dropZone.addEventListener('click', () => document.getElementById('file-upload').click());
+            dropZone.addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('border-blue-500'); });
+            dropZone.addEventListener('dragleave', e => e.currentTarget.classList.remove('border-blue-500'));
+            dropZone.addEventListener('drop', handleFileDrop);
+            document.getElementById('file-upload').addEventListener('change', handleFileUpload);
+            
+            // AI Chat
+            document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage);
+            document.getElementById('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') sendChatMessage(); });
+        }
+        
+        function togglePanel(panel) {
+            document.querySelectorAll('.ui-panel').forEach(p => { if (p !== panel) p.classList.add('hidden'); });
+            panel.classList.toggle('hidden');
+        }
+
+        function switchTab(e) {
+            const tabId = e.target.dataset.tab;
+            const parent = e.target.closest('.ui-panel, #help-panel');
+            parent.querySelectorAll('.tab-content, .help-tab-content').forEach(c => c.classList.add('hidden'));
+            parent.querySelectorAll('.tab-btn, .help-tab-btn').forEach(btn => {
+                btn.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400');
+                btn.classList.add('text-gray-400');
+            });
+            parent.querySelector(`#${tabId}-tab`).classList.remove('hidden');
+            e.target.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
+            e.target.classList.remove('text-gray-400');
+        }
+        
+        function makePanelsDraggable() {
+            document.querySelectorAll('.ui-panel').forEach(makeDraggable);
+        }
+
+        function makeDraggable(panel) {
+            const handle = panel.querySelector('.drag-handle');
+            if (!handle) return;
+            let offsetX, offsetY, isDragging = false;
+
+            handle.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                offsetX = e.clientX - panel.offsetLeft;
+                offsetY = e.clientY - panel.offsetTop;
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+
+            function onMouseMove(e) {
+                if (!isDragging) return;
+                panel.style.left = `${e.clientX - offsetX}px`;
+                panel.style.top = `${e.clientY - offsetY}px`;
+            }
+
+            function onMouseUp() {
+                isDragging = false;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+        }
+
+
+        function populateThemeSelector() {
+            const list = document.getElementById('theme-list'); list.innerHTML = '';
+            for (const key in themes) {
+                const button = document.createElement('button');
+                button.textContent = themes[key].name;
+                button.className = `w-full text-left px-4 py-2 rounded-lg transition ${currentTheme === key ? 'bg-blue-600' : 'hover:bg-gray-700'}`;
+                button.onclick = () => setTheme(key);
+                list.appendChild(button);
+            }
+        }
+        
+        function setTheme(key) { currentTheme = key; populateThemeSelector(); updateAIChatContext(); resetVisuals(); }
+        function handleStartStop() { if (timerRunning) stopTimer(); else startTimer(); }
+        function startTimer() {
+            if (timeRemaining <= 0) {
+                 totalDuration = parseInt(document.getElementById('timer-duration').value, 10) * 60;
+                 if (isNaN(totalDuration) || totalDuration <= 0) return;
+                 timeRemaining = totalDuration;
+            }
+            if(document.getElementById('enable-interval-gong').checked) {
+                const intervalMins = parseInt(document.getElementById('interval-minutes').value, 10);
+                if (!isNaN(intervalMins) && intervalMins > 0) nextGongTime = timeRemaining - (intervalMins * 60);
+            } else { nextGongTime = -1; }
+            timerRunning = true;
+            document.getElementById('start-stop-btn').textContent = 'Pause';
+            document.getElementById('start-stop-btn').classList.replace('bg-blue-600', 'bg-yellow-600');
+            timerIntervalId = setInterval(tick, 1000);
+        }
+        function stopTimer() {
+            timerRunning = false;
+            clearInterval(timerIntervalId);
+            document.getElementById('start-stop-btn').textContent = 'Resume';
+            document.getElementById('start-stop-btn').classList.replace('bg-yellow-600', 'bg-blue-600');
+        }
+        function resetTimer() {
+            stopTimer();
+            totalDuration = parseInt(document.getElementById('timer-duration').value, 10) * 60;
+            timeRemaining = isNaN(totalDuration) ? 0 : totalDuration;
+            updateTimerDisplay();
+            document.getElementById('start-stop-btn').textContent = 'Start';
+            document.getElementById('start-stop-btn').classList.replace('bg-yellow-600', 'bg-blue-600');
+        }
+        function tick() {
+            timeRemaining--;
+            if (nextGongTime >= 0 && timeRemaining <= nextGongTime) {
+                playAlarm('gong');
+                const intervalMins = parseInt(document.getElementById('interval-minutes').value, 10);
+                nextGongTime = (intervalMins > 0) ? nextGongTime - (intervalMins * 60) : -1;
+            }
+            if (timeRemaining <= 0) {
+                timeRemaining = 0;
+                stopTimer();
+                playAlarm(document.getElementById('alarm-sound').value);
+                resetTimer();
+            }
+            updateTimerDisplay();
+        }
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('small-timer-text').textContent = formattedTime;
+            document.getElementById('timer-display-large').textContent = formattedTime;
+        }
+        function playAlarm(type) {
+             if (type === 'none' || !type) return;
+             if (!audioContext) setupAudioContext();
+             const alarmGain = audioContext.createGain(); alarmGain.gain.value = 0.8; alarmGain.connect(masterGain);
+             if(type === 'subtle') {
+                const osc = audioContext.createOscillator(); osc.type = 'sine'; osc.frequency.value = 880;
+                osc.connect(alarmGain); osc.start(); osc.stop(audioContext.currentTime + 0.5);
+             } else if (type === 'gong') {
+                const osc1 = audioContext.createOscillator(), osc2 = audioContext.createOscillator();
+                osc1.type = 'sine'; osc2.type = 'sine'; osc1.frequency.value = 150; osc2.frequency.value = 151.5;
+                const now = audioContext.currentTime;
+                alarmGain.gain.setValueAtTime(0, now);
+                alarmGain.gain.linearRampToValueAtTime(0.7, now + 0.01);
+                alarmGain.gain.exponentialRampToValueAtTime(0.001, now + 5);
+                osc1.connect(alarmGain); osc2.connect(alarmGain);
+                osc1.start(now); osc2.start(now); osc1.stop(now + 6); osc2.stop(now + 6);
+             }
+        }
+
+        // --- Therapeutic Tools ---
+        function toggleEmdr() {
+            emdrState.isRunning = !emdrState.isRunning;
+            const btn = document.getElementById('start-stop-emdr-btn');
+            btn.textContent = emdrState.isRunning ? 'Stop EMDR' : 'Start EMDR';
+            btn.classList.toggle('bg-blue-600', !emdrState.isRunning);
+            btn.classList.toggle('bg-red-600', emdrState.isRunning);
+        }
+        function toggleAcrnTestTone(e) {
+            const btn = e.target;
+            if (acrnState.testTone) {
+                acrnState.testTone.stop(); acrnState.testTone = null;
+                btn.textContent = 'Play Test Tone';
+                btn.classList.remove('bg-yellow-600'); btn.classList.add('bg-gray-600');
+            } else {
+                acrnState.testTone = audioContext.createOscillator();
+                acrnState.testTone.frequency.value = acrnState.tinnitusFrequency;
+                acrnState.testTone.connect(acrnGain); acrnState.testTone.start();
+                btn.textContent = 'Stop Test Tone';
+                btn.classList.add('bg-yellow-600'); btn.classList.remove('bg-gray-600');
+            }
+        }
+        function toggleAcrnTherapy() {
+            acrnState.isRunning = !acrnState.isRunning;
+            const btn = document.getElementById('start-stop-acrn-btn');
+            btn.textContent = acrnState.isRunning ? 'Stop ACRN Therapy' : 'Start ACRN Therapy';
+            btn.classList.toggle('bg-blue-600', !acrnState.isRunning);
+            btn.classList.toggle('bg-red-600', acrnState.isRunning);
+            if (acrnState.isRunning) {
+                if (document.getElementById('enable-acrn-algorithm').checked) {
+                    const f = acrnState.tinnitusFrequency, freqs = [f * 0.5, f * 1.5, f * 0.75, f * 1.25];
+                    acrnState.algorithmNodes = freqs.map(freq => {
+                        const osc = audioContext.createOscillator(); osc.frequency.value = freq;
+                        const gain = audioContext.createGain(); gain.gain.value = 0;
+                        osc.connect(gain).connect(acrnGain); osc.start();
+                        return { osc, gain };
+                    });
+                    acrnState.intervalId = setInterval(() => {
+                        const node = acrnState.algorithmNodes[Math.floor(Math.random() * 4)];
+                        const now = audioContext.currentTime;
+                        node.gain.gain.setValueAtTime(0.3, now); node.gain.gain.setValueAtTime(0, now + 0.05);
+                    }, 200);
+                } else {
+                    acrnState.testTone = audioContext.createOscillator();
+                    acrnState.testTone.frequency.value = acrnState.tinnitusFrequency;
+                    acrnState.testTone.connect(acrnGain); acrnState.testTone.start();
+                }
+            } else {
+                if (acrnState.testTone) { acrnState.testTone.stop(); acrnState.testTone = null; }
+                if (acrnState.intervalId) clearInterval(acrnState.intervalId);
+                acrnState.algorithmNodes.forEach(n => n.osc.stop()); acrnState.algorithmNodes = [];
+            }
+        }
+
+        // --- Audio System ---
+        function populateSolfeggioPresets() {
+            const container = document.getElementById('presets-tab'); container.innerHTML = '';
+            for (const [freq, name] of Object.entries(solfeggioTones)) {
+                const button = document.createElement('button');
+                button.className = 'w-full text-left p-3 bg-gray-900/50 rounded-lg hover:bg-gray-800/80 transition';
+                button.innerHTML = `<div class="font-bold">${freq} Hz</div><div class="text-sm text-gray-400">${name}</div>`;
+                button.onclick = () => applySolfeggioPreset(parseFloat(freq));
+                container.appendChild(button);
+            }
+        }
+        function applySolfeggioPreset(baseFreq) {
+            Object.values(generatedTones).forEach(tone => removeTone(tone.id));
+            createToneControl({ frequency: baseFreq });
+            createToneControl({ frequency: baseFreq * 1.5 });
+            createToneControl({ frequency: baseFreq / 2 });
+            document.querySelector('#tone-generator-panel .tab-btn[data-tab="generated-tones"]')?.click();
+        }
+        function createToneControl(options = {}) {
+            const { frequency=440, x=0, y=0, z=0 } = options;
+            const id = `tone-${Date.now()}-${Math.random()}`;
+            const container = document.getElementById('tone-layers-container');
+            const controlWrapper = document.createElement('div');
+            controlWrapper.id = `wrapper-${id}`; controlWrapper.className = 'p-4 bg-gray-900/50 rounded-lg space-y-3';
+            const playRemoveRow = document.createElement('div'); playRemoveRow.className = 'flex justify-between items-center';
+            const playBtn = document.createElement('button');
+            playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+            playBtn.className = 'p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition';
+            playBtn.onclick = () => toggleTone(id, playBtn);
+            const removeBtn = document.createElement('button'); removeBtn.innerHTML = '&times;';
+            removeBtn.className = 'text-2xl text-gray-400 hover:text-white';
+            removeBtn.onclick = () => removeTone(id);
+            playRemoveRow.append(playBtn, removeBtn);
+            const waveformSelector = document.createElement('select'); waveformSelector.className = 'w-full bg-gray-700 border border-gray-600 rounded-lg px-2 py-1';
+            ['sine', 'square', 'sawtooth', 'triangle'].forEach(type => {
+                const option = document.createElement('option');
+                option.value = type; option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                waveformSelector.appendChild(option);
+            });
+            waveformSelector.onchange = e => updateToneParam(id, 'type', e.target.value);
+            const freqSlider = createSlider(id, 'frequency', 'Freq', frequency, 50, 1200, 1);
+            const volSlider = createSlider(id, 'volume', 'Vol', 0.5, 0, 1, 0.01);
+            const xSlider = createSlider(id, 'x', 'X', x, -10, 10, 0.1);
+            const ySlider = createSlider(id, 'y', 'Y', y, -10, 10, 0.1);
+            const zSlider = createSlider(id, 'z', 'Z', z, -10, 10, 0.1);
+            controlWrapper.append(playRemoveRow, waveformSelector, freqSlider, volSlider, xSlider, ySlider, zSlider);
+            container.prepend(controlWrapper);
+            generatedTones[id] = { id, oscillator: null, gainNode: null, pannerNode: null, isPlaying: false, type: 'sine', frequency, volume: 0.5, x, y, z };
+        }
+        function createSlider(id, param, label, value, min, max, step) {
+            const wrapper = document.createElement('div'); wrapper.className = 'flex items-center space-x-2';
+            const valueDisplay = param === 'frequency' ? `<span class="text-sm w-16 text-right">${value} Hz</span>` : '';
+            wrapper.innerHTML = `<label class="text-sm w-8">${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${value}" class="w-full">${valueDisplay}`;
+            const slider = wrapper.querySelector('input');
+            slider.oninput = e => {
+                const val = parseFloat(e.target.value);
+                updateToneParam(id, param, val);
+                if (param === 'frequency') slider.nextElementSibling.textContent = `${val.toFixed(0)} Hz`;
+            };
+            return wrapper;
+        }
+        function toggleTone(id, btn) {
+            const tone = generatedTones[id]; if (!tone) return;
+            tone.isPlaying = !tone.isPlaying;
+            if (tone.isPlaying) {
+                if (!audioContext) setupAudioContext();
+                tone.oscillator = audioContext.createOscillator();
+                tone.gainNode = audioContext.createGain();
+                tone.pannerNode = audioContext.createPanner();
+                tone.pannerNode.panningModel = 'HRTF';
+                tone.pannerNode.positionX.value = tone.x; tone.pannerNode.positionY.value = tone.y; tone.pannerNode.positionZ.value = tone.z;
+                tone.oscillator.type = tone.type; tone.oscillator.frequency.value = tone.frequency;
+                tone.gainNode.gain.value = tone.volume;
+                tone.oscillator.connect(tone.gainNode).connect(tone.pannerNode).connect(masterGain);
+                tone.oscillator.start();
+                toneVisuals[id] = { ...tone, opacity: 0, targetOpacity: 1 };
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h4v12H6zm8 0h4v12h-4z"/></svg>`;
+                btn.classList.replace('bg-blue-600', 'bg-yellow-600');
+            } else {
+                if (tone.oscillator) {
+                    tone.oscillator.stop(); tone.oscillator.disconnect();
+                    tone.gainNode.disconnect(); tone.pannerNode.disconnect();
+                }
+                tone.oscillator = null; tone.gainNode = null; tone.pannerNode = null;
+                if (toneVisuals[id]) toneVisuals[id].targetOpacity = 0;
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+                btn.classList.replace('bg-yellow-600', 'bg-blue-600');
+            }
+        }
+        function updateToneParam(id, param, value) {
+            const tone = generatedTones[id]; if (!tone) return;
+            tone[param] = value;
+            if (toneVisuals[id]) toneVisuals[id][param] = value;
+            if (tone.isPlaying && audioContext) {
+                const panner = tone.pannerNode;
+                if (param==='frequency') tone.oscillator.frequency.setTargetAtTime(value, audioContext.currentTime, .01);
+                else if (param==='volume') tone.gainNode.gain.setTargetAtTime(value, audioContext.currentTime, .01);
+                else if (param==='type') tone.oscillator.type = value;
+                else if (param==='x'&&panner) panner.positionX.setTargetAtTime(value, audioContext.currentTime, .01);
+                else if (param==='y'&&panner) panner.positionY.setTargetAtTime(value, audioContext.currentTime, .01);
+                else if (param==='z'&&panner) panner.positionZ.setTargetAtTime(value, audioContext.currentTime, .01);
+            }
+        }
+        function removeTone(id) {
+            const tone = generatedTones[id];
+            if (tone && tone.isPlaying) {
+                const wrapper = document.getElementById(`wrapper-${id}`);
+                if (wrapper) toggleTone(id, wrapper.querySelector('button'));
+            }
+            delete generatedTones[id]; delete toneVisuals[id];
+            document.getElementById(`wrapper-${id}`)?.remove();
+        }
+        function createProceduralAudioNode(type) {
+            if (!audioContext) setupAudioContext();
+            const gainNode = audioContext.createGain(); gainNode.gain.value = 0; gainNode.connect(masterGain);
+            let nodes = [], intervalId = null;
+            const createWhiteNoise = () => {
+                const bufferSize = audioContext.sampleRate * 2, noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+                const output = noiseBuffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+                const noise = audioContext.createBufferSource(); noise.buffer = noiseBuffer; noise.loop = true;
+                return noise;
+            };
+            switch (type) {
+                case 'rain': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='highpass';f.frequency.value=1000;n.connect(f).connect(gainNode);nodes=[n];break; }
+                case 'stream': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='lowpass';f.frequency.value=400;n.connect(f).connect(gainNode);nodes=[n];break; }
+                case 'fire': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='bandpass';f.frequency.value=800;f.Q.value=0.5;n.connect(f).connect(gainNode);nodes=[n];break; }
+                case 'wind': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='lowpass';f.frequency.value=500;f.Q.value=5;const l=audioContext.createOscillator();l.type='sine';l.frequency.value=0.2;const lg=audioContext.createGain();lg.gain.value=250;l.connect(lg).connect(f.frequency);n.connect(f).connect(gainNode);nodes=[n,l];break; }
+                case 'chimes': { const p=()=>{const o=audioContext.createOscillator(),g=audioContext.createGain(),s=[523.25,587.33,659.25,783.99,880,1046.5];o.frequency.value=s[Math.floor(Math.random()*s.length)];o.connect(g).connect(gainNode);const N=audioContext.currentTime;g.gain.setValueAtTime(0,N);g.gain.linearRampToValueAtTime(.3,N+.01);g.gain.exponentialRampToValueAtTime(1e-4,N+Math.random()*2+2);o.start(N);o.stop(N+4)};intervalId=setInterval(p,3e3+Math.random()*2e3);break; }
+            }
+            return { gainNode, play: () => { gainNode.gain.setTargetAtTime(0.5, audioContext.currentTime, 0.1); nodes.forEach(n => n.start && n.start(0)); }, stop: () => { gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1); setTimeout(() => { nodes.forEach(n => n.stop && n.stop(0)); }, 200); if (intervalId) clearInterval(intervalId); }, isProcedural: true };
+        }
+        function populateSampleTones() {
+            const container = document.getElementById('sample-tones-container'); container.innerHTML = '';
+            for (const [key, name] of Object.entries(sampleTones)) {
+                const el = document.createElement('div');
+                el.className = 'p-2 bg-gray-900/50 rounded-lg flex items-center justify-between';
+                el.innerHTML = `<span>${name}</span><button data-key="${key}" class="px-3 py-1 text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition">+ Add</button>`;
+                el.querySelector('button').onclick = e => addSoundFileToLayers(e.target.dataset.key, name);
+                container.appendChild(el);
+            }
+        }
+        function addSoundFileToLayers(key, name) { const id = `file-${Date.now()}`; soundFiles[id] = { ...createProceduralAudioNode(key), name, isPlaying: false, isSample: true }; addFileToLayerList(id, name); }
+        function handleFileDrop(e) { e.preventDefault(); if (e.dataTransfer.files) processFiles(e.dataTransfer.files); }
+        function handleFileUpload(e) { if (e.target.files) processFiles(e.target.files); }
+        function processFiles(files) {
+            if (!audioContext) setupAudioContext();
+            for (const file of files) {
+                if (file.type.startsWith('audio/')) {
+                    const id=`file-${Date.now()}-${Math.random()}`,audio=new Audio(URL.createObjectURL(file));audio.loop=true;const source=audioContext.createMediaElementSource(audio),gainNode=audioContext.createGain();gainNode.gain.value=0.5;source.connect(gainNode).connect(masterGain);soundFiles[id]={audio,source,gainNode,name:file.name,isPlaying:false,isProcedural:false};addFileToLayerList(id,file.name)
+                }
+            }
+        }
+        function addFileToLayerList(id, name) {
+            const list = document.getElementById('layered-tracks-container'), wrapper = document.createElement('div'); wrapper.id = `wrapper-${id}`;
+            wrapper.className = 'p-3 bg-gray-800/70 rounded-lg flex items-center space-x-3';
+            const playBtn = document.createElement('button'); playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+            playBtn.className = 'p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition'; playBtn.onclick = () => toggleSoundFile(id, playBtn);
+            const fileNameEl = document.createElement('span'); fileNameEl.textContent = name.length > 20 ? name.substring(0, 17) + '...' : name; fileNameEl.className = 'flex-grow';
+            const volSlider = document.createElement('input'); volSlider.type='range';volSlider.min=0;volSlider.max=1;volSlider.step=0.01;volSlider.value=0.5; volSlider.className = 'w-24';
+            volSlider.oninput = e => { const vol = parseFloat(e.target.value); soundFiles[id].gainNode.gain.setTargetAtTime(vol, audioContext.currentTime, 0.01); };
+            const removeBtn = document.createElement('button'); removeBtn.textContent = '×'; removeBtn.className = 'font-bold text-xl text-gray-400 hover:text-white';
+            removeBtn.onclick = () => removeSoundFile(id);
+            wrapper.append(playBtn, fileNameEl, volSlider, removeBtn); list.appendChild(wrapper);
+        }
+        function toggleSoundFile(id, btn) {
+            const file = soundFiles[id]; if (!file) return;
+            file.isPlaying = !file.isPlaying;
+            if (file.isPlaying) {
+                if (file.isProcedural) file.play(); else file.audio.play().catch(e => console.error(e));
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h4v12H6zm8 0h4v12h-4z"/></svg>`;
+                btn.classList.replace('bg-blue-600', 'bg-yellow-600');
+            } else {
+                if (file.isProcedural) file.stop(); else file.audio.pause();
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+                btn.classList.replace('bg-yellow-600', 'bg-blue-600');
+            }
+        }
+        function removeSoundFile(id) {
+            const file = soundFiles[id];
+            if (file) {
+                if (file.isPlaying) { if (file.isProcedural) file.stop(); else file.audio.pause(); }
+                if (file.source) file.source.disconnect();
+                file.gainNode.disconnect();
+                delete soundFiles[id];
+            }
+            document.getElementById(`wrapper-${id}`)?.remove();
+        }
+        function toggleMasterMute() {
+            if (!masterGain) return;
+            const btn = document.getElementById('master-mute-btn');
+            if (masterGain.gain.value > 0) {
+                masterGain.gain.value = 0;
+                btn.textContent = 'Unmute'; btn.classList.replace('bg-yellow-600', 'bg-green-600');
+            } else {
+                masterGain.gain.value = document.getElementById('master-volume').value;
+                btn.textContent = 'Mute'; btn.classList.replace('bg-green-600', 'bg-yellow-600');
+            }
+        }
+        function stopAllAudio() {
+            Object.keys(generatedTones).forEach(id => { const t = generatedTones[id]; if (t.isPlaying) toggleTone(id, document.querySelector(`#tone-layers-container #wrapper-${id} button`)); });
+            Object.keys(soundFiles).forEach(id => { const f = soundFiles[id]; if (f.isPlaying) toggleSoundFile(id, document.querySelector(`#layered-tracks-container #wrapper-${id} button`)); });
+            if (emdrState.isRunning) toggleEmdr();
+            if (acrnState.isRunning) toggleAcrnTherapy();
+            if (acrnState.testTone) toggleAcrnTestTone({target: document.getElementById('test-acrn-freq-btn')});
+        }
+
+        // --- Visualizations ---
+        let particles = [], mandalas = []; let breathPhase = 0; let breathRadius = 50;
+        function renderLoop(timestamp) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            (visualThemes[currentTheme] || visualThemes.cosmicVoid)(timestamp);
+            drawToneVisuals(timestamp);
+            if (emdrState.isRunning) drawEmdrVisual();
+            requestAnimationFrame(renderLoop);
+        }
+        const visualThemes = { 
+            oceanDepths:t=>{updateBreathingGuide();ctx.strokeStyle='rgba(59,130,246,.8)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(canvas.width/2,canvas.height/2,breathRadius,0,2*Math.PI);ctx.stroke();if(particles.length<50)particles.push(createParticle('rgba(59,130,246,'));particles.forEach((p,i)=>{p.y-=p.speed;p.x+=Math.sin(p.y/50)*p.drift;if(p.y<-p.size)particles.splice(i,1);ctx.fillStyle=`${p.color}${p.opacity})`;ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,2*Math.PI);ctx.fill()})}, 
+            forestWhispers:t=>{updateBreathingGuide();ctx.strokeStyle='rgba(34,197,94,.8)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(canvas.width/2,canvas.height/2,breathRadius,0,2*Math.PI);ctx.stroke();if(mandalas.length===0)createMandalas(3);mandalas.forEach(m=>{ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(m.rotation+t*m.speed);ctx.strokeStyle=`rgba(34,197,94,${m.opacity})`;ctx.lineWidth=m.lineWidth;for(let j=0;j<m.petals;j++){ctx.rotate(2*Math.PI/m.petals);ctx.beginPath();ctx.arc(m.radius,0,m.petalSize,0,2*Math.PI);ctx.stroke()}ctx.restore()})}, 
+            cosmicVoid:t=>{
+                updateBreathingGuide();
+                ctx.strokeStyle = 'rgba(229, 231, 235, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, breathRadius, 0, 2 * Math.PI);
+                ctx.stroke();
+                if(particles.length < 200) particles.push(createStar());
+                particles.forEach((p,i)=>{
+                    p.z -= 0.5;
+                    if(p.z <= 0){ particles.splice(i,1); return; }
+                    const scale = 500 / p.z;
+                    const x = canvas.width / 2 + p.x * scale;
+                    const y = canvas.height / 2 + p.y * scale;
+                    const size = 1.5 * scale;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            }, 
+            sunsetSerenity:t=>{visualThemes.oceanDepths(t);visualThemes.forestWhispers(t)}, 
+            zenGarden:t=>{updateBreathingGuide();ctx.strokeStyle='rgba(200,200,200,.8)';ctx.lineWidth=1;ctx.beginPath();ctx.arc(canvas.width/2,canvas.height/2,breathRadius,0,2*Math.PI);ctx.stroke();if(mandalas.length===0)createMandalas(1);mandalas.forEach(m=>{ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate(m.rotation+t*m.speed);ctx.strokeStyle=`rgba(220,220,220,${m.opacity})`;ctx.lineWidth=m.lineWidth;for(let j=0;j<m.petals;j++){ctx.rotate(2*Math.PI/m.petals);ctx.beginPath();ctx.arc(m.radius,0,m.petalSize,0,2*Math.PI);ctx.stroke()}ctx.restore()})} 
+        };
+        function drawToneVisuals(timestamp) {
+            Object.values(toneVisuals).forEach((vis, index) => {
+                vis.opacity += (vis.targetOpacity - vis.opacity) * 0.1;
+                if (vis.targetOpacity === 0 && vis.opacity < 0.01) { delete toneVisuals[vis.id]; return; }
+                const x = canvas.width/2+(vis.x/10)*(canvas.width/3), y=canvas.height/2-(vis.y/10)*(canvas.height/3), zScale=Math.max(.1,1-vis.z/15), size=(15+Math.sin(timestamp/500+index)*2)*zScale;
+                ctx.beginPath(); ctx.arc(x, y, size, 0, 2*Math.PI); ctx.fillStyle=`rgba(255,255,255,${vis.opacity*.1*zScale})`; ctx.fill();
+                ctx.beginPath(); ctx.arc(x, y, size*.3, 0, 2*Math.PI); ctx.fillStyle=`rgba(255,255,255,${vis.opacity*.2*zScale})`; ctx.fill();
+            });
+        }
+        function drawEmdrVisual() {
+            const padding = 50, center = canvas.width / 2;
+            emdrState.x += emdrState.speed * emdrState.direction;
+            if (emdrState.x > canvas.width - padding || emdrState.x < padding) emdrState.direction *= -1;
+            
+            let currentSize = emdrState.size;
+            if(emdrState.autoScale){
+                const minScaleSize = 10;
+                const distFromCenter = Math.abs(emdrState.x - center);
+                const maxDist = center - padding;
+                const scaleFactor = distFromCenter / maxDist;
+                currentSize = minScaleSize + (emdrState.size - minScaleSize) * scaleFactor;
+            }
+
+            ctx.beginPath();
+            ctx.arc(emdrState.x, canvas.height / 2, currentSize, 0, 2 * Math.PI);
+            ctx.fillStyle = emdrState.color;
+            ctx.fill();
+        }
+        function updateBreathingGuide() {
+             const totalCycleTime = breathInterval * 4; breathPhase = (breathPhase + 1 / (60 * totalCycleTime)) % 1;
+             const phase = breathPhase * 4, minRadius = 40, maxRadius = 100;
+             if (phase < 1) breathRadius = minRadius + (maxRadius - minRadius) * phase;
+             else if (phase < 2) breathRadius = maxRadius;
+             else if (phase < 3) breathRadius = maxRadius - (maxRadius - minRadius) * (phase - 2);
+             else breathRadius = minRadius;
+        }
+        function createParticle(color) { return { x:Math.random()*canvas.width, y:canvas.height+Math.random()*100, size:Math.random()*5+1, speed:Math.random()*.5+.2, drift:Math.random()*.5-.25, opacity:Math.random()*.5+.2, color }; }
+        function createStar() { return { x: Math.random() * canvas.width-canvas.width/2, y: Math.random()*canvas.height-canvas.height/2, z: Math.random()*1000, opacity: Math.random() }; }
+        function createMandalas(count) { mandalas = Array.from({length: count}, (_, i) => ({ radius:50+i*50, rotation:Math.random()*2*Math.PI, speed:(Math.random()-.5)*.0001, petals:Math.floor(Math.random()*6)+3, petalSize:10+Math.random()*20, lineWidth:Math.random()*1.5+.5, opacity:Math.random()*.5+.3 })); }
+        function resetVisuals() { particles = []; mandalas = []; breathPhase = 0; }
+
+        // --- AI Assistant ---
+        const chatBox=document.getElementById("chat-box"),chatInput=document.getElementById("chat-input"),quickRepliesContainer=document.getElementById("quick-replies");function addChatMessage(e,t="ai"){const a=document.createElement("div");a.className=`p-3 rounded-lg max-w-[80%] ${"user"===t?"bg-blue-600 ml-auto":"bg-gray-700 mr-auto"}`,a.textContent=e,chatBox.appendChild(a),chatBox.scrollTop=chatBox.scrollHeight,"user"===t?chatHistory.push({role:"user",parts:[{text:e}]}):chatHistory.push({role:"model",parts:[{text:e}]})}function sendChatMessage(){const e=chatInput.value.trim();e&&(addChatMessage(e,"user"),getAIResponse(e),chatInput.value="")}async function getAIResponse(e){const t=document.createElement("div");t.className="p-3 rounded-lg max-w-[80%] bg-gray-700 mr-auto animate-pulse",t.textContent="● ● ●",chatBox.appendChild(t),chatBox.scrollTop=chatBox.scrollHeight;const a=`You are a friendly and empathetic meditation assistant. Your goal is to provide concise, helpful guidance for users seeking to manage stress, improve focus, or deepen their meditation. The user is currently in the "${themes[currentTheme].name}" theme. Keep responses short and directly related to meditation and mindfulness.`,n={contents:[...chatHistory,{role:"user",parts:[{text:e}]}],systemInstruction:{role:"system",parts:[{text:a}]}},o="";try{const e=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${o}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)});if(!e.ok)throw new Error(`API Error: ${e.statusText}`);const a=await e.json();chatBox.removeChild(t),a.candidates&&a.candidates.length>0&&a.candidates[0].content.parts[0].text?addChatMessage(a.candidates[0].content.parts[0].text,"ai"):addChatMessage("I'm sorry, I couldn't generate a response. Please try again.","ai")}catch(e){console.error("Gemini API call failed:",e),chatBox.removeChild(t),addChatMessage("Sorry, I'm having trouble connecting. Please check your connection or try again later.","ai")}}function updateAIChatContext(){const e={general:["Help me relax","Guide my breathing","I feel stressed"],oceanDepths:["Tell me about ocean meditation","Deep water breathing"],forestWhispers:["Guide a forest visualization","Grounding exercise"],sunsetSerenity:["Focus on gratitude","Evening wind-down"],cosmicVoid:["Expand my awareness","Feeling of spaciousness"],zenGarden:["Help me find stillness","Thoughts on simplicity"]};quickRepliesContainer.innerHTML="";const t=e[currentTheme]||e.general;t.forEach(e=>{const t=document.createElement("button");t.textContent=e,t.className="px-3 py-1 bg-gray-600 rounded-full text-sm hover:bg-gray-500 transition",t.onclick=()=>{chatInput.value=e,sendChatMessage()},quickRepliesContainer.appendChild(t)})}
+        
+        init();
+    </script>
+</body>
+</html>
