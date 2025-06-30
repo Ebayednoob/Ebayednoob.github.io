@@ -63,9 +63,16 @@
     <!-- Main Visualization Canvas -->
     <canvas id="visualization"></canvas>
     
-    <!-- User Auth Area (Simplified) -->
-    <div id="auth-container" class="fixed top-4 right-4 z-50 text-xs text-gray-500">
-        User ID: <span id="user-id-display">Initializing...</span>
+    <!-- User Auth Area -->
+    <div id="auth-container" class="fixed top-4 right-4 z-50">
+        <button id="sign-in-btn" class="px-4 py-2 bg-blue-600 rounded-lg text-white font-semibold hover:bg-blue-700 transition">Sign In with Google</button>
+        <div id="user-profile" class="hidden items-center space-x-3 bg-gray-800/50 backdrop-blur-sm p-2 rounded-full shadow-lg">
+            <img id="user-photo" class="w-8 h-8 rounded-full" src="" alt="User photo">
+            <span id="user-name" class="text-sm font-medium text-white"></span>
+            <button id="sign-out-btn" title="Sign Out" class="p-2 bg-red-600 rounded-full text-white hover:bg-red-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
     </div>
 
     <!-- Persistent Top-Left Menu -->
@@ -482,7 +489,7 @@
     <script type="module">
         // --- Firebase SDKs ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- DOM Elements ---
@@ -536,13 +543,26 @@
             populateSampleTones();
             populateSolfeggioPresets();
             renderLoop();
-            addChatMessage('Welcome! Your settings will be saved automatically. To use the AI, please follow the deployment guide.', 'ai');
+            addChatMessage('Welcome! Please sign in to save your settings. To use the AI, please follow the deployment guide.', 'ai');
             updateAIChatContext();
             resetTimer();
             makePanelsDraggable();
             applySettings(null); // Apply default settings initially
         }
         
+        // --- Authentication Functions ---
+        function signIn() {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider).catch(error => {
+                console.error("Sign in error", error);
+                showNotification("Sign in failed. Please try again.", "error");
+            });
+        }
+
+        function signOutUser() {
+            signOut(auth);
+        }
+
         async function setupFirebase() {
             const firebaseConfig = {
                 apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
@@ -561,27 +581,42 @@
                 setLogLevel('error');
 
                 onAuthStateChanged(auth, async (currentUser) => {
-                    if (currentUser) {
-                        user = currentUser;
+                    const signInBtn = document.getElementById('sign-in-btn');
+                    const userProfileDiv = document.getElementById('user-profile');
+                    const userPhoto = document.getElementById('user-photo');
+                    const userName = document.getElementById('user-name');
+
+                    user = currentUser;
+                    if (user) {
+                        // User is signed in
                         userId = user.uid;
-                        document.getElementById('user-id-display').textContent = userId.substring(0, 8) + '...';
-                        
                         settingsDocRef = doc(db, "users", userId);
-                        
                         isAuthReady = true;
+
+                        signInBtn.classList.add('hidden');
+                        userProfileDiv.classList.remove('hidden');
+                        userProfileDiv.classList.add('flex');
+                        
+                        userPhoto.src = user.photoURL || `https://placehold.co/40x40/7c3aed/ffffff?text=${(user.displayName || 'U').charAt(0)}`;
+                        userName.textContent = user.displayName || 'Signed In';
+                        
                         await loadUserSettings();
                     } else {
-                        try {
-                            await signInAnonymously(auth);
-                        } catch (error) {
-                            console.error("Firebase anonymous sign-in error:", error);
-                            isAuthReady = false;
-                        }
+                        // User is signed out
+                        isAuthReady = false;
+                        userId = null;
+                        settingsDocRef = null;
+                        
+                        signInBtn.classList.remove('hidden');
+                        userProfileDiv.classList.add('hidden');
+                        userProfileDiv.classList.remove('flex');
+                        
+                        applySettings(null); // Reset to defaults
                     }
                 });
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                document.getElementById('user-id-display').textContent = 'Error';
+                showNotification("Could not connect to services.", "error");
             }
         }
 
@@ -609,6 +644,10 @@
         function setupEventListeners() {
             window.addEventListener('resize', setupCanvas);
             
+            // Auth Buttons
+            document.getElementById('sign-in-btn').addEventListener('click', signIn);
+            document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
+
             // Panel Toggles & Closes
             document.getElementById('main-menu-btn').addEventListener('click', () => document.getElementById('menu-icons-container').classList.toggle('hidden'));
             document.getElementById('theme-selector-btn').addEventListener('click', () => togglePanel(document.getElementById('theme-selector-panel')));
@@ -722,7 +761,7 @@
             document.getElementById('reset-all-btn').addEventListener('click', () => {
                 showConfirmation(
                     "Reset All Settings",
-                    "Are you sure you want to reset all settings to their defaults? This cannot be undone.",
+                    "Are you sure you want to reset all settings to their original defaults? This cannot be undone.",
                     () => {
                         applySettings(null);
                         requestSave();
@@ -1130,9 +1169,9 @@
         }
         function applySolfeggioPreset(baseFreq) {
             Object.values(generatedTones).forEach(tone => removeTone(tone.id));
-            createToneControl({ frequency: baseFreq, y: 1 });
-            createToneControl({ frequency: baseFreq * 1.5, x: 5 });
-            createToneControl({ frequency: baseFreq / 2, x: -5 });
+            createToneControl({ frequency: baseFreq, y: 1, color: '#ef4444' });
+            createToneControl({ frequency: baseFreq * 1.5, x: 5, color: '#3b82f6' });
+            createToneControl({ frequency: baseFreq / 2, x: -5, color: '#22c55e' });
             document.querySelector('#tone-generator-panel .tab-btn[data-tab="generated-tones"]')?.click();
         }
         function createToneControl(options = {}) {
@@ -1144,9 +1183,17 @@
             
             const header = document.createElement('div');
             header.className = 'p-4 flex justify-between items-center cursor-pointer';
+            
+            const titleWrapper = document.createElement('div');
+            titleWrapper.className = 'flex items-center space-x-3';
+            const colorIndicator = document.createElement('div');
+            colorIndicator.className = 'w-4 h-4 rounded-full border-2 border-gray-500';
+            colorIndicator.style.backgroundColor = color;
             const title = document.createElement('span');
             title.textContent = "Custom Tone";
             title.className = 'font-semibold';
+            titleWrapper.append(colorIndicator, title);
+
             const headerControls = document.createElement('div');
             headerControls.className = 'flex items-center space-x-2';
             const playBtn = document.createElement('button');
@@ -1160,7 +1207,7 @@
             chevronIcon.innerHTML = `<svg class="w-5 h-5 transition-transform" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>`;
             chevronIcon.className = 'transition-transform';
             headerControls.append(playBtn, removeBtn, chevronIcon);
-            header.append(title, headerControls);
+            header.append(titleWrapper, headerControls);
 
             const content = document.createElement('div');
             content.className = 'p-4 border-t border-gray-700 space-y-3 hidden';
@@ -1186,7 +1233,10 @@
             colorPicker.type = 'color';
             colorPicker.value = color;
             colorPicker.className = 'w-10 h-8 p-1 bg-gray-700 border-none rounded-md cursor-pointer';
-            colorPicker.oninput = e => updateToneParam(id, 'color', e.target.value);
+            colorPicker.oninput = e => {
+                updateToneParam(id, 'color', e.target.value);
+                colorIndicator.style.backgroundColor = e.target.value;
+            };
             
             const isochronicLabel = document.createElement('label');
             isochronicLabel.className = 'flex items-center space-x-2 text-sm';
@@ -1443,6 +1493,16 @@
 
         // --- Visualizations ---
         let particles = [], mandalas = []; let breathPhase = 0; let breathRadius = 50;
+        
+        function hexToRgb(hex) {
+            let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
         function renderLoop(timestamp) {
             // Handle tone streamers effect
             if (toneStreamersEnabled) {
@@ -1507,14 +1567,26 @@
             Object.values(toneVisuals).forEach((vis, index) => {
                 vis.opacity += (vis.targetOpacity - vis.opacity) * 0.1;
                 if (vis.targetOpacity === 0 && vis.opacity < 0.01) { delete toneVisuals[vis.id]; return; }
+                
+                const rgb = hexToRgb(vis.color);
+                if (!rgb) return; // Don't draw if color is invalid
+
                 const x = canvas.width/2+(vis.x/10)*(canvas.width/3), y=canvas.height/2-(vis.y/10)*(canvas.height/3), zScale=Math.max(.1,1-vis.z/15);
                 let size = (15+Math.sin(timestamp/500+index)*2)*zScale;
                 if(vis.isochronic && vis.isPlaying) {
                     const lfoPhase = (timestamp * vis.isoFrequency / 1000) % 1;
                     size *= (1 + Math.sin(lfoPhase * 2 * Math.PI)) / 2;
                 }
-                ctx.beginPath(); ctx.arc(x, y, size, 0, 2*Math.PI); ctx.fillStyle=vis.color+Math.round(vis.opacity*0.2*zScale*255).toString(16).padStart(2,'0'); ctx.fill();
-                ctx.beginPath(); ctx.arc(x, y, size*.3, 0, 2*Math.PI); ctx.fillStyle=vis.color+Math.round(vis.opacity*0.4*zScale*255).toString(16).padStart(2,'0'); ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, 2 * Math.PI);
+                ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${vis.opacity * 0.2 * zScale})`;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(x, y, size * 0.3, 0, 2 * Math.PI);
+                ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${vis.opacity * 0.4 * zScale})`;
+                ctx.fill();
             });
         }
         function drawEmdrVisual() {
