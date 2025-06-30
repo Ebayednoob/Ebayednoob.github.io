@@ -60,8 +60,10 @@
     </style>
 </head>
 <body class="select-none">
+    <!-- Main Visualization Canvas -->
     <canvas id="visualization"></canvas>
     
+    <!-- User Auth Area -->
     <div id="auth-container" class="fixed top-4 right-4 z-50">
         <button id="sign-in-btn" class="px-4 py-2 bg-blue-600 rounded-lg text-white font-semibold hover:bg-blue-700 transition">Sign In with Google</button>
         <div id="user-profile" class="hidden items-center space-x-3 bg-gray-800/50 backdrop-blur-sm p-2 rounded-full shadow-lg">
@@ -73,6 +75,7 @@
         </div>
     </div>
 
+    <!-- Persistent Top-Left Menu -->
     <div id="persistent-menu" class="fixed top-4 left-4 z-50 flex flex-col space-y-2">
         <button id="main-menu-btn" title="Open Menu" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
@@ -99,11 +102,13 @@
         </div>
     </div>
 
-     <div id="small-timer-display" class="fixed bottom-4 left-4 z-50 p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg cursor-pointer flex items-center space-x-2">
+     <!-- Small Timer Display -->
+    <div id="small-timer-display" class="fixed bottom-4 left-4 z-50 p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg cursor-pointer flex items-center space-x-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         <span id="small-timer-text">00:00</span>
     </div>
 
+    <!-- Timer Control Panel -->
     <div id="timer-panel" class="hidden ui-panel" style="bottom: 5rem; left: 1rem;">
         <div class="p-6 w-80">
             <div class="flex justify-between items-center drag-handle">
@@ -149,6 +154,7 @@
         </div>
     </div>
 
+    <!-- EMDR Control Panel -->
     <div id="emdr-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
         <div class="p-6 w-80">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -178,7 +184,8 @@
         </div>
     </div>
     
-    <div id="acrn-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+    <!-- ACRN Control Panel -->
+     <div id="acrn-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
          <div class="p-6 w-80">
             <div class="flex justify-between items-center mb-4 drag-handle">
                 <h2 class="text-xl font-bold">ACRN Tinnitus Tool</h2>
@@ -218,6 +225,7 @@
         </div>
     </div>
 
+    <!-- Help Panel -->
     <div id="help-panel" class="hidden ui-panel" style="top: 5rem; left: 50%; transform: translateX(-50%);">
         <div class="p-6 w-[32rem] max-w-[calc(100vw-2rem)]">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -387,11 +395,12 @@
                         <label for="spin-algorithm" class="block text-sm font-medium mb-1">Algorithm</label>
                         <select id="spin-algorithm" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2">
                             <option value="circular-2d">Circular (2D)</option>
-                            <option value="figureEight-2d">Figure-Eight (2D)</option>
                             <option value="pendulum-2d">Pendulum (2D)</option>
+                            <option value="figureEight-2d">Figure-Eight (2D)</option>
                             <option value="lissajous-3d">Lissajous Knot (3D)</option>
                             <option value="torus-knot-3d">Torus Knot (3D)</option>
                             <option value="spherical-spiral-3d">Spherical Spiral (3D)</option>
+                            <option value="gravitational-orbit-3d">Gravitational Orbit (3D)</option>
                         </select>
                     </div>
                 </div>
@@ -1355,14 +1364,16 @@
         function updateToneParam(id, param, value) {
             const tone = generatedTones[id]; if (!tone) return;
             
-            // Ensure value is finite before setting
-            if (!isFinite(value)) {
+            // Allow string values for color and type
+            if (param !== 'color' && param !== 'type' && !isFinite(value)) {
                 console.warn(`Attempted to set non-finite value for ${param}: ${value}. Aborting.`);
                 return;
             }
 
             tone[param] = value;
-            if (toneVisuals[id]) toneVisuals[id][param] = value;
+            if (toneVisuals[id]) {
+                toneVisuals[id][param] = value;
+            }
             if (tone.isPlaying && audioContext) {
                 const panner = tone.pannerNode;
                 if (param==='frequency' && tone.oscillator) tone.oscillator.frequency.setTargetAtTime(value, audioContext.currentTime, .01);
@@ -1565,7 +1576,11 @@
                 vis.opacity += (vis.targetOpacity - vis.opacity) * 0.1;
                 if (vis.targetOpacity === 0 && vis.opacity < 0.01) { delete toneVisuals[vis.id]; return; }
                 
-                const rgb = hexToRgb(vis.color);
+                // Always get the latest color from the source of truth
+                const currentTone = generatedTones[vis.id];
+                if (!currentTone) return;
+
+                const rgb = hexToRgb(currentTone.color);
                 if (!rgb) return; // Don't draw if color is invalid
 
                 const x = canvas.width/2+(vis.x/10)*(canvas.width/3), y=canvas.height/2-(vis.y/10)*(canvas.height/3), zScale=Math.max(.1,1-vis.z/15);
@@ -1621,27 +1636,31 @@
         function updateSpin() {
             if (!spinState.isRunning || Object.keys(generatedTones).length === 0) return;
 
-            spinState.angle += spinState.speed * 0.01; 
+            spinState.angle += spinState.speed * 0.005; 
 
             Object.values(generatedTones).forEach((tone) => {
                 if (!tone.isPlaying) return;
                 
                 let newX, newY, newZ;
-                const angle = spinState.angle + tone.initialAngle;
                 const R = spinState.radius;
 
                 switch (spinState.algorithm) {
-                    case 'figureEight-2d':
+                    case 'figureEight-2d': {
+                        const angle = spinState.angle + tone.initialAngle;
                         newX = R * Math.sin(angle * 2);
                         newY = tone.y; // Keep Y constant
                         newZ = R * Math.cos(angle);
                         break;
-                    case 'pendulum-2d':
+                    }
+                    case 'pendulum-2d': {
+                        const angle = spinState.angle + tone.initialAngle;
                         newX = R * Math.sin(angle);
                         newY = tone.y; // Keep Y constant
                         newZ = 0;
                         break;
+                    }
                     case 'lissajous-3d': {
+                        const angle = spinState.angle + tone.initialAngle;
                         const wx = 1, wy = 2, wz = 3;
                         newX = R * Math.sin(wx * angle);
                         newY = R * Math.sin(wy * angle);
@@ -1649,6 +1668,7 @@
                         break;
                     }
                     case 'torus-knot-3d': {
+                        const angle = spinState.angle + tone.initialAngle;
                         const p = 2, q = 3;
                         const r = R / 3;
                         newX = (R + r * Math.cos(p * angle)) * Math.cos(q * angle);
@@ -1657,22 +1677,41 @@
                         break;
                     }
                     case 'spherical-spiral-3d': {
-                        // Using a stable parameterization for a Loxodrome (spherical spiral)
-                        const t = (angle / (Math.PI * 2)) % 1.0; // t cycles from 0 to 1
-                        const phi = angle * 1.618; // Azimuthal angle (using golden ratio for nice sweep)
-                        const theta = Math.acos(1 - 2 * t); // Polar angle, sweeps from 0 to PI and back
+                        const angle = spinState.angle + tone.initialAngle;
+                        const t = (angle / (Math.PI * 2)) % 1.0;
+                        const phi = angle * 1.618; 
+                        const theta = Math.acos(1 - 2 * t);
                         
                         newX = R * Math.sin(theta) * Math.cos(phi);
                         newY = R * Math.sin(theta) * Math.sin(phi);
                         newZ = R * Math.cos(theta);
                         break;
                     }
+                    case 'gravitational-orbit-3d': {
+                        const speedMod = Math.sqrt(tone.frequency / 440);
+                        const angle = spinState.angle * speedMod + tone.initialAngle;
+                        const eccentricity = (tone.initialAngle / (Math.PI * 2)) * 0.4;
+                        const a = R; // semi-major axis
+                        const b = a * Math.sqrt(1 - eccentricity * eccentricity); // semi-minor axis
+                        
+                        const x_2d = a * Math.cos(angle);
+                        const z_2d = b * Math.sin(angle);
+
+                        const inclination = (tone.initialAngle * 3) % (Math.PI / 6);
+                        
+                        newX = x_2d;
+                        newY = z_2d * Math.sin(inclination);
+                        newZ = z_2d * Math.cos(inclination);
+                        break;
+                    }
                     case 'circular-2d':
-                    default:
+                    default: {
+                        const angle = spinState.angle + tone.initialAngle;
                         newX = R * Math.cos(angle);
                         newY = tone.y; // Keep Y constant
                         newZ = R * Math.sin(angle);
                         break;
+                    }
                 }
                 
                 updateToneParam(tone.id, 'x', newX);
