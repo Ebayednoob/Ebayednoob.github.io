@@ -62,6 +62,7 @@
                 </a>
                 <div class="flex items-center space-x-6">
                     <button id="projects-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Projects</button>
+                    <button id="pages-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Pages</button>
                     <button id="tutorials-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Tutorials</button>
                     
                     <div id="auth-container" class="pl-4 border-l border-gray-700">
@@ -126,6 +127,7 @@
         const contentArea = document.getElementById('content-area');
         const homeBtn = document.getElementById('home-btn');
         const projectsBtn = document.getElementById('projects-btn');
+        const pagesBtn = document.getElementById('pages-btn');
         const tutorialsBtn = document.getElementById('tutorials-btn');
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
@@ -190,6 +192,7 @@
         });
 
         projectsBtn.addEventListener('click', () => loadContent('projects.html', projectsBtn));
+        pagesBtn.addEventListener('click', () => loadContent('pages.html', pagesBtn));
         tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html', tutorialsBtn));
 
 
