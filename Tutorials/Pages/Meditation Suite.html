@@ -6,6 +6,16 @@
     <title>Comprehensive Meditation System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        window.firebase = {
+            initializeApp, getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+            getFirestore, doc, setDoc, getDoc
+        };
+    </script>
     <style>
         :root {
             --bg-color: #0a0a0a;
@@ -49,6 +59,16 @@
 <body class="select-none">
     <!-- Main Visualization Canvas -->
     <canvas id="visualization"></canvas>
+    
+    <!-- User Auth Area -->
+    <div id="auth-container" class="fixed top-4 right-4 z-50">
+        <button id="sign-in-btn" class="px-4 py-2 bg-blue-600 rounded-lg text-white font-semibold hover:bg-blue-700 transition">Sign In</button>
+        <div id="user-profile" class="hidden items-center space-x-3">
+            <img id="user-photo" class="w-10 h-10 rounded-full" src="" alt="User photo">
+            <button id="sign-out-btn" class="px-4 py-2 bg-red-600 rounded-lg text-white font-semibold hover:bg-red-700 transition">Sign Out</button>
+        </div>
+    </div>
+
 
     <!-- Persistent Top-Left Menu -->
     <div id="persistent-menu" class="fixed top-4 left-4 z-50 flex flex-col space-y-2">
@@ -363,7 +383,11 @@
         const canvas = document.getElementById('visualization');
         const ctx = canvas.getContext('2d');
         
-        // --- State ---
+        // --- Firebase State ---
+        let auth, db, user, userId, userDocRef;
+        let settingsSaveTimeout;
+
+        // --- App State ---
         let audioContext;
         let masterGain;
         let acrnGain;
@@ -387,18 +411,57 @@
         const solfeggioTones = { 174:'Relief & Security', 285:'Healing & Rejuvenation', 396:'Liberating Guilt & Fear', 417:'Facilitating Change', 528:'Transformation & Miracles', 639:'Connecting Relationships', 741:'Awakening Intuition', 852:'Returning to Spirit', 963:'Connecting with Oneness' };
         const sampleTones = { 'rain':'Gentle Rain', 'fire':'Crackling Fire', 'stream':'Babbling Brook', 'wind':'Howling Wind', 'chimes':'Wind Chimes' };
 
+        // --- Initialization ---
         function init() {
+            setupFirebase();
             setupCanvas();
             setupEventListeners();
             populateThemeSelector();
             populateSampleTones();
             populateSolfeggioPresets();
-            setTheme(currentTheme);
             renderLoop();
-            addChatMessage('Welcome! How can I help you today?', 'ai');
+            addChatMessage('Welcome! Please sign in to save your settings.', 'ai');
             updateAIChatContext();
             resetTimer();
             makePanelsDraggable();
+            applySettings(null); // Apply default settings initially
+        }
+        
+        function setupFirebase() {
+             const firebaseConfig = {
+                apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
+                authDomain: "gitlabs-3e081.firebaseapp.com",
+                projectId: "gitlabs-3e081",
+                storageBucket: "gitlabs-3e081.appspot.com",
+                messagingSenderId: "46943115268",
+                appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
+                measurementId: "G-M3MLTNVRH0"
+            };
+            const app = window.firebase.initializeApp(firebaseConfig);
+            auth = window.firebase.getAuth(app);
+            db = window.firebase.getFirestore(app);
+            
+            window.firebase.onAuthStateChanged(auth, async (currentUser) => {
+                user = currentUser;
+                if (user) {
+                    // User is signed in
+                    userId = user.uid;
+                    userDocRef = window.firebase.doc(db, "users", userId);
+                    document.getElementById('sign-in-btn').classList.add('hidden');
+                    const profileDiv = document.getElementById('user-profile');
+                    profileDiv.classList.remove('hidden');
+                    profileDiv.classList.add('flex');
+                    document.getElementById('user-photo').src = user.photoURL || 'https://placehold.co/40x40/7c3aed/ffffff?text=U';
+                    loadUserSettings();
+                } else {
+                    // User is signed out
+                    userId = null;
+                    userDocRef = null;
+                    document.getElementById('sign-in-btn').classList.remove('hidden');
+                    document.getElementById('user-profile').classList.add('hidden');
+                    applySettings(null); // Reset to defaults
+                }
+            });
         }
 
         function setupAudioContext() {
@@ -423,6 +486,10 @@
         function setupEventListeners() {
             window.addEventListener('resize', setupCanvas);
             
+            // Auth
+            document.getElementById('sign-in-btn').addEventListener('click', signIn);
+            document.getElementById('sign-out-btn').addEventListener('click', signOut);
+
             // Panel Toggles & Closes
             document.getElementById('theme-selector-btn').addEventListener('click', () => togglePanel(document.getElementById('theme-selector-panel')));
             document.getElementById('tone-generator-btn').addEventListener('click', () => { setupAudioContext(); togglePanel(document.getElementById('tone-generator-panel')) });
@@ -444,6 +511,7 @@
             document.getElementById('breathing-speed').addEventListener('input', e => {
                 breathInterval = parseFloat(e.target.value);
                 document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+                requestSave();
             });
             
             // Timer Controls
@@ -451,10 +519,10 @@
             document.getElementById('reset-btn').addEventListener('click', resetTimer);
 
             // EMDR Controls
-            document.getElementById('emdr-speed').addEventListener('input', e => emdrState.speed = parseFloat(e.target.value));
-            document.getElementById('emdr-size').addEventListener('input', e => emdrState.size = parseFloat(e.target.value));
-            document.getElementById('emdr-color').addEventListener('input', e => emdrState.color = e.target.value);
-            document.getElementById('emdr-autoscale').addEventListener('change', e => emdrState.autoScale = e.target.checked);
+            document.getElementById('emdr-speed').addEventListener('input', e => { emdrState.speed = parseFloat(e.target.value); requestSave(); });
+            document.getElementById('emdr-size').addEventListener('input', e => { emdrState.size = parseFloat(e.target.value); requestSave(); });
+            document.getElementById('emdr-color').addEventListener('input', e => { emdrState.color = e.target.value; requestSave(); });
+            document.getElementById('emdr-autoscale').addEventListener('change', e => { emdrState.autoScale = e.target.checked; requestSave(); });
             document.getElementById('start-stop-emdr-btn').addEventListener('click', toggleEmdr);
             
             // ACRN Controls
@@ -464,9 +532,11 @@
                 if(acrnState.testTone) {
                     acrnState.testTone.frequency.setTargetAtTime(acrnState.tinnitusFrequency, audioContext.currentTime, 0.01);
                 }
+                requestSave();
             });
             document.getElementById('acrn-volume').addEventListener('input', e => {
                 if(acrnGain) acrnGain.gain.setTargetAtTime(parseFloat(e.target.value), audioContext.currentTime, 0.01);
+                requestSave();
             });
             document.getElementById('test-acrn-freq-btn').addEventListener('click', toggleAcrnTestTone);
             document.getElementById('start-stop-acrn-btn').addEventListener('click', toggleAcrnTherapy);
@@ -474,7 +544,7 @@
             // Tone Generator
             document.querySelectorAll('#tone-generator-panel .tab-btn').forEach(b => b.addEventListener('click', switchTab));
             document.getElementById('add-tone-btn').addEventListener('click', () => createToneControl());
-            document.getElementById('master-volume').addEventListener('input', e => { if (masterGain) masterGain.gain.setTargetAtTime(parseFloat(e.target.value), audioContext.currentTime, 0.01); });
+            document.getElementById('master-volume').addEventListener('input', e => { if (masterGain) masterGain.gain.setTargetAtTime(parseFloat(e.target.value), audioContext.currentTime, 0.01); requestSave(); });
             document.getElementById('master-mute-btn').addEventListener('click', toggleMasterMute);
             document.getElementById('stop-all-btn').addEventListener('click', stopAllAudio);
             
@@ -494,11 +564,120 @@
             document.getElementById('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') sendChatMessage(); });
         }
         
-        function togglePanel(panel) {
-            document.querySelectorAll('.ui-panel').forEach(p => { if (p !== panel) p.classList.add('hidden'); });
-            panel.classList.toggle('hidden');
+        // --- Firebase Functions ---
+        function signIn() {
+            const provider = new window.firebase.GoogleAuthProvider();
+            window.firebase.signInWithPopup(auth, provider).catch(error => console.error("Sign in error", error));
         }
 
+        function signOut() {
+            window.firebase.signOut(auth);
+        }
+        
+        function requestSave() {
+            if (!user) return; // Don't save if not logged in
+            clearTimeout(settingsSaveTimeout);
+            settingsSaveTimeout = setTimeout(saveUserSettings, 1500); // Debounce saves
+        }
+
+        async function saveUserSettings() {
+            if (!userDocRef) return;
+            const settings = {
+                theme: currentTheme,
+                breathInterval,
+                emdr: {
+                    speed: emdrState.speed,
+                    size: emdrState.size,
+                    color: emdrState.color,
+                    autoScale: emdrState.autoScale,
+                },
+                acrn: {
+                    frequency: acrnState.tinnitusFrequency,
+                    volume: document.getElementById('acrn-volume').value,
+                },
+                customTones: Object.values(generatedTones).map(t => ({
+                    frequency: t.frequency, volume: t.volume, type: t.type,
+                    x: t.x, y: t.y, z: t.z
+                })),
+                panelPositions: getPanelPositions()
+            };
+            try {
+                await window.firebase.setDoc(userDocRef, settings, { merge: true });
+                console.log("Settings saved.");
+            } catch (error) {
+                console.error("Error saving settings: ", error);
+            }
+        }
+        
+        async function loadUserSettings() {
+            if (!userDocRef) return;
+            const docSnap = await window.firebase.getDoc(userDocRef);
+            if (docSnap.exists()) {
+                console.log("Loading user settings...");
+                applySettings(docSnap.data());
+            } else {
+                console.log("No saved settings found, using defaults.");
+                applySettings(null);
+            }
+        }
+
+        function applySettings(settings) {
+            // Clear existing state before applying new settings
+            Object.values(generatedTones).forEach(tone => removeTone(tone.id));
+            
+            const s = settings || {}; // Use empty object for defaults
+            
+            // Theme and Breathing
+            setTheme(s.theme || 'oceanDepths');
+            breathInterval = s.breathInterval || 4;
+            document.getElementById('breathing-speed').value = breathInterval;
+            document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+
+            // EMDR
+            const emdr = s.emdr || {};
+            emdrState.speed = emdr.speed || 5;
+            emdrState.size = emdr.size || 30;
+            emdrState.color = emdr.color || '#3b82f6';
+            emdrState.autoScale = emdr.autoScale || false;
+            document.getElementById('emdr-speed').value = emdrState.speed;
+            document.getElementById('emdr-size').value = emdrState.size;
+            document.getElementById('emdr-color').value = emdrState.color;
+            document.getElementById('emdr-autoscale').checked = emdrState.autoScale;
+            
+            // ACRN
+            const acrn = s.acrn || {};
+            acrnState.tinnitusFrequency = acrn.frequency || 4000;
+            const acrnVol = acrn.volume || 0.5;
+            document.getElementById('acrn-frequency').value = acrnState.tinnitusFrequency;
+            document.getElementById('acrn-freq-display').textContent = `${acrnState.tinnitusFrequency} Hz`;
+            document.getElementById('acrn-volume').value = acrnVol;
+            if(acrnGain) acrnGain.gain.value = acrnVol;
+
+            // Custom Tones
+            const customTones = s.customTones || [];
+            document.getElementById('tone-layers-container').innerHTML = '';
+            customTones.forEach(toneData => createToneControl(toneData));
+
+            // Panel Positions
+            const positions = s.panelPositions || {};
+            document.querySelectorAll('.ui-panel').forEach(panel => {
+                if(positions[panel.id]) {
+                    panel.style.top = positions[panel.id].top;
+                    panel.style.left = positions[panel.id].left;
+                }
+            });
+        }
+        
+        function getPanelPositions() {
+            const positions = {};
+            document.querySelectorAll('.ui-panel').forEach(panel => {
+                positions[panel.id] = { top: panel.style.top, left: panel.style.left };
+            });
+            return positions;
+        }
+
+
+        function togglePanel(panel) { document.querySelectorAll('.ui-panel').forEach(p => { if (p !== panel) p.classList.add('hidden'); }); panel.classList.toggle('hidden'); }
         function switchTab(e) {
             const tabId = e.target.dataset.tab;
             const parent = e.target.closest('.ui-panel, #help-panel');
@@ -515,12 +694,10 @@
         function makePanelsDraggable() {
             document.querySelectorAll('.ui-panel').forEach(makeDraggable);
         }
-
         function makeDraggable(panel) {
             const handle = panel.querySelector('.drag-handle');
             if (!handle) return;
             let offsetX, offsetY, isDragging = false;
-
             handle.addEventListener('mousedown', (e) => {
                 isDragging = true;
                 offsetX = e.clientX - panel.offsetLeft;
@@ -528,17 +705,16 @@
                 document.addEventListener('mousemove', onMouseMove);
                 document.addEventListener('mouseup', onMouseUp);
             });
-
             function onMouseMove(e) {
                 if (!isDragging) return;
                 panel.style.left = `${e.clientX - offsetX}px`;
                 panel.style.top = `${e.clientY - offsetY}px`;
             }
-
             function onMouseUp() {
                 isDragging = false;
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
+                requestSave(); // Save panel position after dragging
             }
         }
 
@@ -549,11 +725,10 @@
                 const button = document.createElement('button');
                 button.textContent = themes[key].name;
                 button.className = `w-full text-left px-4 py-2 rounded-lg transition ${currentTheme === key ? 'bg-blue-600' : 'hover:bg-gray-700'}`;
-                button.onclick = () => setTheme(key);
+                button.onclick = () => { setTheme(key); requestSave(); };
                 list.appendChild(button);
             }
         }
-        
         function setTheme(key) { currentTheme = key; populateThemeSelector(); updateAIChatContext(); resetVisuals(); }
         function handleStartStop() { if (timerRunning) stopTimer(); else startTimer(); }
         function startTimer() {
@@ -699,7 +874,7 @@
             document.querySelector('#tone-generator-panel .tab-btn[data-tab="generated-tones"]')?.click();
         }
         function createToneControl(options = {}) {
-            const { frequency=440, x=0, y=0, z=0 } = options;
+            const { frequency=440, x=0, y=0, z=0, type='sine', volume=0.5 } = options;
             const id = `tone-${Date.now()}-${Math.random()}`;
             const container = document.getElementById('tone-layers-container');
             const controlWrapper = document.createElement('div');
@@ -714,20 +889,21 @@
             removeBtn.onclick = () => removeTone(id);
             playRemoveRow.append(playBtn, removeBtn);
             const waveformSelector = document.createElement('select'); waveformSelector.className = 'w-full bg-gray-700 border border-gray-600 rounded-lg px-2 py-1';
-            ['sine', 'square', 'sawtooth', 'triangle'].forEach(type => {
+            ['sine', 'square', 'sawtooth', 'triangle'].forEach(t => {
                 const option = document.createElement('option');
-                option.value = type; option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                option.value = t; option.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+                if (t === type) option.selected = true;
                 waveformSelector.appendChild(option);
             });
             waveformSelector.onchange = e => updateToneParam(id, 'type', e.target.value);
             const freqSlider = createSlider(id, 'frequency', 'Freq', frequency, 50, 1200, 1);
-            const volSlider = createSlider(id, 'volume', 'Vol', 0.5, 0, 1, 0.01);
+            const volSlider = createSlider(id, 'volume', 'Vol', volume, 0, 1, 0.01);
             const xSlider = createSlider(id, 'x', 'X', x, -10, 10, 0.1);
             const ySlider = createSlider(id, 'y', 'Y', y, -10, 10, 0.1);
             const zSlider = createSlider(id, 'z', 'Z', z, -10, 10, 0.1);
             controlWrapper.append(playRemoveRow, waveformSelector, freqSlider, volSlider, xSlider, ySlider, zSlider);
             container.prepend(controlWrapper);
-            generatedTones[id] = { id, oscillator: null, gainNode: null, pannerNode: null, isPlaying: false, type: 'sine', frequency, volume: 0.5, x, y, z };
+            generatedTones[id] = { id, oscillator: null, gainNode: null, pannerNode: null, isPlaying: false, type, frequency, volume, x, y, z };
         }
         function createSlider(id, param, label, value, min, max, step) {
             const wrapper = document.createElement('div'); wrapper.className = 'flex items-center space-x-2';
@@ -782,6 +958,7 @@
                 else if (param==='y'&&panner) panner.positionY.setTargetAtTime(value, audioContext.currentTime, .01);
                 else if (param==='z'&&panner) panner.positionZ.setTargetAtTime(value, audioContext.currentTime, .01);
             }
+            requestSave();
         }
         function removeTone(id) {
             const tone = generatedTones[id];
@@ -791,6 +968,7 @@
             }
             delete generatedTones[id]; delete toneVisuals[id];
             document.getElementById(`wrapper-${id}`)?.remove();
+            requestSave();
         }
         function createProceduralAudioNode(type) {
             if (!audioContext) setupAudioContext();
@@ -965,7 +1143,7 @@
         function resetVisuals() { particles = []; mandalas = []; breathPhase = 0; }
 
         // --- AI Assistant ---
-        const chatBox=document.getElementById("chat-box"),chatInput=document.getElementById("chat-input"),quickRepliesContainer=document.getElementById("quick-replies");function addChatMessage(e,t="ai"){const a=document.createElement("div");a.className=`p-3 rounded-lg max-w-[80%] ${"user"===t?"bg-blue-600 ml-auto":"bg-gray-700 mr-auto"}`,a.textContent=e,chatBox.appendChild(a),chatBox.scrollTop=chatBox.scrollHeight,"user"===t?chatHistory.push({role:"user",parts:[{text:e}]}):chatHistory.push({role:"model",parts:[{text:e}]})}function sendChatMessage(){const e=chatInput.value.trim();e&&(addChatMessage(e,"user"),getAIResponse(e),chatInput.value="")}async function getAIResponse(e){const t=document.createElement("div");t.className="p-3 rounded-lg max-w-[80%] bg-gray-700 mr-auto animate-pulse",t.textContent="● ● ●",chatBox.appendChild(t),chatBox.scrollTop=chatBox.scrollHeight;const a=`You are a friendly and empathetic meditation assistant. Your goal is to provide concise, helpful guidance for users seeking to manage stress, improve focus, or deepen their meditation. The user is currently in the "${themes[currentTheme].name}" theme. Keep responses short and directly related to meditation and mindfulness.`,n={contents:[...chatHistory,{role:"user",parts:[{text:e}]}],systemInstruction:{role:"system",parts:[{text:a}]}},o="";try{const e=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${o}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)});if(!e.ok)throw new Error(`API Error: ${e.statusText}`);const a=await e.json();chatBox.removeChild(t),a.candidates&&a.candidates.length>0&&a.candidates[0].content.parts[0].text?addChatMessage(a.candidates[0].content.parts[0].text,"ai"):addChatMessage("I'm sorry, I couldn't generate a response. Please try again.","ai")}catch(e){console.error("Gemini API call failed:",e),chatBox.removeChild(t),addChatMessage("Sorry, I'm having trouble connecting. Please check your connection or try again later.","ai")}}function updateAIChatContext(){const e={general:["Help me relax","Guide my breathing","I feel stressed"],oceanDepths:["Tell me about ocean meditation","Deep water breathing"],forestWhispers:["Guide a forest visualization","Grounding exercise"],sunsetSerenity:["Focus on gratitude","Evening wind-down"],cosmicVoid:["Expand my awareness","Feeling of spaciousness"],zenGarden:["Help me find stillness","Thoughts on simplicity"]};quickRepliesContainer.innerHTML="";const t=e[currentTheme]||e.general;t.forEach(e=>{const t=document.createElement("button");t.textContent=e,t.className="px-3 py-1 bg-gray-600 rounded-full text-sm hover:bg-gray-500 transition",t.onclick=()=>{chatInput.value=e,sendChatMessage()},quickRepliesContainer.appendChild(t)})}
+        const chatBox=document.getElementById("chat-box"),chatInput=document.getElementById("chat-input"),quickRepliesContainer=document.getElementById("quick-replies");function addChatMessage(e,t="ai"){const a=document.createElement("div");a.className=`p-3 rounded-lg max-w-[80%] ${"user"===t?"bg-blue-600 ml-auto":"bg-gray-700 mr-auto"}`,a.textContent=e,chatBox.appendChild(a),chatBox.scrollTop=chatBox.scrollHeight,"user"===t?chatHistory.push({role:"user",parts:[{text:e}]}):chatHistory.push({role:"model",parts:[{text:e}]})}function sendChatMessage(){const e=chatInput.value.trim();e&&(addChatMessage(e,"user"),getAIResponse(e),chatInput.value="")}async function getAIResponse(e){const t=document.createElement("div");t.className="p-3 rounded-lg max-w-[80%] bg-gray-700 mr-auto animate-pulse",t.textContent="● ● ●",chatBox.appendChild(t),chatBox.scrollTop=chatBox.scrollHeight;const a=`You are a friendly and empathetic meditation assistant. Your goal is to provide concise, helpful guidance for users seeking to manage stress, improve focus, or deepen their meditation. The user is currently in the "${themes[currentTheme].name}" theme. Keep responses short and directly related to meditation and mindfulness.`,n={contents:[...chatHistory,{role:"user",parts:[{text:e}]}],systemInstruction:{role:"system",parts:[{text:a}]}},o="";try{const e=await fetch(`/api/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)});if(!e.ok)throw new Error(`API Error: ${e.statusText}`);const a=await e.json();chatBox.removeChild(t),a.candidates&&a.candidates.length>0&&a.candidates[0].content.parts[0].text?addChatMessage(a.candidates[0].content.parts[0].text,"ai"):addChatMessage("I'm sorry, I couldn't generate a response. Please try again.","ai")}catch(e){console.error("Gemini API call failed:",e),chatBox.removeChild(t),addChatMessage("Sorry, I'm having trouble connecting. This may be due to network issues or API restrictions. For a deployed version, a backend proxy or Cloud Function is needed.","ai")}}function updateAIChatContext(){const e={general:["Help me relax","Guide my breathing","I feel stressed"],oceanDepths:["Tell me about ocean meditation","Deep water breathing"],forestWhispers:["Guide a forest visualization","Grounding exercise"],sunsetSerenity:["Focus on gratitude","Evening wind-down"],cosmicVoid:["Expand my awareness","Feeling of spaciousness"],zenGarden:["Help me find stillness","Thoughts on simplicity"]};quickRepliesContainer.innerHTML="";const t=e[currentTheme]||e.general;t.forEach(e=>{const t=document.createElement("button");t.textContent=e,t.className="px-3 py-1 bg-gray-600 rounded-full text-sm hover:bg-gray-500 transition",t.onclick=()=>{chatInput.value=e,sendChatMessage()},quickRepliesContainer.appendChild(t)})}
         
         init();
     </script>
