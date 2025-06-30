@@ -60,10 +60,8 @@
     </style>
 </head>
 <body class="select-none">
-    <!-- Main Visualization Canvas -->
     <canvas id="visualization"></canvas>
     
-    <!-- User Auth Area -->
     <div id="auth-container" class="fixed top-4 right-4 z-50">
         <button id="sign-in-btn" class="px-4 py-2 bg-blue-600 rounded-lg text-white font-semibold hover:bg-blue-700 transition">Sign In with Google</button>
         <div id="user-profile" class="hidden items-center space-x-3 bg-gray-800/50 backdrop-blur-sm p-2 rounded-full shadow-lg">
@@ -75,7 +73,6 @@
         </div>
     </div>
 
-    <!-- Persistent Top-Left Menu -->
     <div id="persistent-menu" class="fixed top-4 left-4 z-50 flex flex-col space-y-2">
         <button id="main-menu-btn" title="Open Menu" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
@@ -102,13 +99,11 @@
         </div>
     </div>
 
-     <!-- Small Timer Display -->
-    <div id="small-timer-display" class="fixed bottom-4 left-4 z-50 p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg cursor-pointer flex items-center space-x-2">
+     <div id="small-timer-display" class="fixed bottom-4 left-4 z-50 p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg cursor-pointer flex items-center space-x-2">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
         <span id="small-timer-text">00:00</span>
     </div>
 
-    <!-- Timer Control Panel -->
     <div id="timer-panel" class="hidden ui-panel" style="bottom: 5rem; left: 1rem;">
         <div class="p-6 w-80">
             <div class="flex justify-between items-center drag-handle">
@@ -154,7 +149,6 @@
         </div>
     </div>
 
-    <!-- EMDR Control Panel -->
     <div id="emdr-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
         <div class="p-6 w-80">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -184,8 +178,7 @@
         </div>
     </div>
     
-    <!-- ACRN Control Panel -->
-     <div id="acrn-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+    <div id="acrn-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
          <div class="p-6 w-80">
             <div class="flex justify-between items-center mb-4 drag-handle">
                 <h2 class="text-xl font-bold">ACRN Tinnitus Tool</h2>
@@ -225,7 +218,6 @@
         </div>
     </div>
 
-    <!-- Help Panel -->
     <div id="help-panel" class="hidden ui-panel" style="top: 5rem; left: 50%; transform: translateX(-50%);">
         <div class="p-6 w-[32rem] max-w-[calc(100vw-2rem)]">
             <div class="flex justify-between items-center mb-4 drag-handle">
@@ -365,8 +357,8 @@
                     <div id="layered-tracks-container" class="space-y-2 p-2 bg-gray-900/50 rounded-lg min-h-[50px]"></div>
                 </div>
                 <div>
-                     <h3 class="font-semibold mb-2">Sample Tones</h3>
-                     <div id="sample-tones-container" class="space-y-2"></div>
+                     <h3 class="font-semibold mb-2">Meditation Sounds</h3>
+                     <div id="meditation-sounds-container" class="space-y-2"></div>
                 </div>
                  <div>
                      <h3 class="font-semibold mb-2">Upload Your Own</h3>
@@ -532,7 +524,16 @@
         
         const themes = { oceanDepths:{name:'Ocean Depths'}, forestWhispers:{name:'Forest Whispers'}, sunsetSerenity:{name:'Sunset Serenity'}, cosmicVoid:{name:'Cosmic Void'}, zenGarden:{name:'Zen Garden'} };
         const solfeggioTones = { 174:'Relief & Security', 285:'Healing & Rejuvenation', 396:'Liberating Guilt & Fear', 417:'Facilitating Change', 528:'Transformation & Miracles', 639:'Connecting Relationships', 741:'Awakening Intuition', 852:'Returning to Spirit', 963:'Connecting with Oneness' };
-        const sampleTones = { 'rain':'Gentle Rain', 'fire':'Crackling Fire', 'stream':'Babbling Brook', 'wind':'Howling Wind', 'chimes':'Wind Chimes' };
+        
+        const meditationSounds = {
+            'Gentle Rain': "Pages/Meditation Suite/Resources/Rain Sounds.mp3",
+            'Crackling Fire': "Pages/Meditation Suite/Resources/Fire Sounds.mp3",
+            'Babbling Brook': "Pages/Meditation Suite/Resources/Stream Sounds.mp3",
+            'Howling Wind': "Pages/Meditation Suite/Resources/Wind Sounds.mp3",
+            'Native flutes': "Pages/Meditation Suite/Resources/Native Flute Meditation.mp3",
+            '432hz Soundscape': "Pages/Meditation Suite/Resources/432hz Meditative Soundscape - 7 Chakra Cycle.mp3"
+        };
+
 
         // --- Initialization ---
         function init() {
@@ -540,7 +541,7 @@
             setupCanvas();
             setupEventListeners();
             populateThemeSelector();
-            populateSampleTones();
+            populateMeditationSounds();
             populateSolfeggioPresets();
             renderLoop();
             addChatMessage('Welcome! Please sign in to save your settings. To use the AI, please follow the deployment guide.', 'ai');
@@ -1390,44 +1391,36 @@
             document.getElementById(`wrapper-${id}`)?.remove();
             requestSave();
         }
-        function createProceduralAudioNode(type) {
-            if (!audioContext) setupAudioContext();
-            const gainNode = audioContext.createGain(); gainNode.gain.value = 0; gainNode.connect(masterGain);
-            let nodes = [], intervalId = null;
-            const createWhiteNoise = () => {
-                const bufferSize = audioContext.sampleRate * 2, noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-                const output = noiseBuffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-                const noise = audioContext.createBufferSource(); noise.buffer = noiseBuffer; noise.loop = true;
-                return noise;
-            };
-            switch (type) {
-                case 'rain': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='highpass';f.frequency.value=1000;n.connect(f).connect(gainNode);nodes=[n];break; }
-                case 'stream': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='lowpass';f.frequency.value=400;n.connect(f).connect(gainNode);nodes=[n];break; }
-                case 'fire': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='bandpass';f.frequency.value=800;f.Q.value=0.5;n.connect(f).connect(gainNode);nodes=[n];break; }
-                case 'wind': { const n=createWhiteNoise(),f=audioContext.createBiquadFilter();f.type='lowpass';f.frequency.value=500;f.Q.value=5;const l=audioContext.createOscillator();l.type='sine';l.frequency.value=0.2;const lg=audioContext.createGain();lg.gain.value=250;l.connect(lg).connect(f.frequency);n.connect(f).connect(gainNode);nodes=[n,l];break; }
-                case 'chimes': { const p=()=>{const o=audioContext.createOscillator(),g=audioContext.createGain(),s=[523.25,587.33,659.25,783.99,880,1046.5];o.frequency.value=s[Math.floor(Math.random()*s.length)];o.connect(g).connect(gainNode);const N=audioContext.currentTime;g.gain.setValueAtTime(0,N);g.gain.linearRampToValueAtTime(.3,N+.01);g.gain.exponentialRampToValueAtTime(1e-4,N+Math.random()*2+2);o.start(N);o.stop(N+4)};intervalId=setInterval(p,3e3+Math.random()*2e3);break; }
-            }
-            return { gainNode, play: () => { gainNode.gain.setTargetAtTime(0.5, audioContext.currentTime, 0.1); nodes.forEach(n => n.start && n.start(0)); }, stop: () => { gainNode.gain.setTargetAtTime(0, audioContext.currentTime, 0.1); setTimeout(() => { nodes.forEach(n => n.stop && n.stop(0)); }, 200); if (intervalId) clearInterval(intervalId); }, isProcedural: true };
-        }
-        function populateSampleTones() {
-            const container = document.getElementById('sample-tones-container'); container.innerHTML = '';
-            for (const [key, name] of Object.entries(sampleTones)) {
+        function populateMeditationSounds() {
+            const container = document.getElementById('meditation-sounds-container'); container.innerHTML = '';
+            for (const [name, url] of Object.entries(meditationSounds)) {
                 const el = document.createElement('div');
                 el.className = 'p-2 bg-gray-900/50 rounded-lg flex items-center justify-between';
-                el.innerHTML = `<span>${name}</span><button data-key="${key}" class="px-3 py-1 text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition">+ Add</button>`;
-                el.querySelector('button').onclick = e => addSoundFileToLayers(e.target.dataset.key, name);
+                el.innerHTML = `<span>${name}</span><button class="px-3 py-1 text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition">+ Add</button>`;
+                el.querySelector('button').onclick = () => addUrlToLayers(name, url);
                 container.appendChild(el);
             }
         }
-        function addSoundFileToLayers(key, name) { const id = `file-${Date.now()}`; soundFiles[id] = { ...createProceduralAudioNode(key), name, isPlaying: false, isSample: true }; addFileToLayerList(id, name); }
+        function addUrlToLayers(name, url) {
+            if (!audioContext) setupAudioContext();
+            const id = `file-${Date.now()}-${Math.random()}`;
+            const audio = new Audio(url);
+            audio.loop = true;
+            const source = audioContext.createMediaElementSource(audio);
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = 0.5;
+            source.connect(gainNode).connect(masterGain);
+            soundFiles[id] = { audio, source, gainNode, name: name, isPlaying: false, isProcedural: false };
+            addFileToLayerList(id, name);
+        }
         function handleFileDrop(e) { e.preventDefault(); if (e.dataTransfer.files) processFiles(e.dataTransfer.files); }
         function handleFileUpload(e) { if (e.target.files) processFiles(e.target.files); }
         function processFiles(files) {
             if (!audioContext) setupAudioContext();
             for (const file of files) {
                 if (file.type.startsWith('audio/')) {
-                    const id=`file-${Date.now()}-${Math.random()}`,audio=new Audio(URL.createObjectURL(file));audio.loop=true;const source=audioContext.createMediaElementSource(audio),gainNode=audioContext.createGain();gainNode.gain.value=0.5;source.connect(gainNode).connect(masterGain);soundFiles[id]={audio,source,gainNode,name:file.name,isPlaying:false,isProcedural:false};addFileToLayerList(id,file.name)
+                    const url = URL.createObjectURL(file);
+                    addUrlToLayers(file.name, url);
                 }
             }
         }
@@ -1447,11 +1440,11 @@
             const file = soundFiles[id]; if (!file) return;
             file.isPlaying = !file.isPlaying;
             if (file.isPlaying) {
-                if (file.isProcedural) file.play(); else file.audio.play().catch(e => console.error(e));
+                file.audio.play().catch(e => console.error("Error playing audio:", e));
                 btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h4v12H6zm8 0h4v12h-4z"/></svg>`;
                 btn.classList.replace('bg-blue-600', 'bg-yellow-600');
             } else {
-                if (file.isProcedural) file.stop(); else file.audio.pause();
+                file.audio.pause();
                 btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
                 btn.classList.replace('bg-yellow-600', 'bg-blue-600');
             }
@@ -1459,9 +1452,13 @@
         function removeSoundFile(id) {
             const file = soundFiles[id];
             if (file) {
-                if (file.isPlaying) { if (file.isProcedural) file.stop(); else file.audio.pause(); }
+                if (file.isPlaying) { file.audio.pause(); }
                 if (file.source) file.source.disconnect();
                 file.gainNode.disconnect();
+                // Revoke object URL if it was created from a user-uploaded file
+                if (file.audio.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(file.audio.src);
+                }
                 delete soundFiles[id];
             }
             document.getElementById(`wrapper-${id}`)?.remove();
