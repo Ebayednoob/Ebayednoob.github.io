@@ -535,12 +535,12 @@
         const solfeggioTones = { 174:'Relief & Security', 285:'Healing & Rejuvenation', 396:'Liberating Guilt & Fear', 417:'Facilitating Change', 528:'Transformation & Miracles', 639:'Connecting Relationships', 741:'Awakening Intuition', 852:'Returning to Spirit', 963:'Connecting with Oneness' };
         
         const meditationSounds = {
-            'Gentle Rain': "https://ebayednoob.github.io/Pages/Meditation Suite/Resources/Rain Sounds.mp3",
-            'Crackling Fire': "https://ebayednoob.github.io/Pages/Meditation Suite/Resources/Fire Sounds.mp3",
-            'Babbling Brook': "https://ebayednoob.github.io/Pages/Meditation Suite/Resources/Stream Sounds.mp3",
-            'Howling Wind': "https://ebayednoob.github.io/Pages/Meditation Suite/Resources/Wind Sounds.mp3",
-            'Native flutes': "https://ebayednoob.github.io/Pages/Meditation Suite/Resources/Native Flute Meditation.mp3",
-            '432hz Soundscape': "https://ebayednoob.github.io/Pages/Meditation Suite/Resources/432hz Meditative Soundscape - 7 Chakra Cycle.mp3"
+            'Gentle Rain': "https://ebayednoob.github.io/resources/Rain Sounds.mp3",
+            'Crackling Fire': "https://ebayednoob.github.io/resources/Fire Sounds.mp3",
+            'Babbling Brook': "https://ebayednoob.github.io/resources/Stream Sounds.mp3",
+            'Howling Wind': "https://ebayednoob.github.io/resources/Wind Sounds.mp3",
+            'Native flutes': "https://ebayednoob.github.io/resources/Native Flute Meditation.mp3",
+            '432hz Soundscape': "https://ebayednoob.github.io/resources/432hz Meditative Soundscape - 7 Chakra Cycle.mp3"
         };
 
 
@@ -1419,7 +1419,7 @@
             audio.loop = true;
             const source = audioContext.createMediaElementSource(audio);
             const gainNode = audioContext.createGain();
-            gainNode.gain.value = 0.5;
+            gainNode.gain.value = 0.8; // Increased default gain
             source.connect(gainNode).connect(masterGain);
             soundFiles[id] = { audio, source, gainNode, name: name, isPlaying: false, isProcedural: false };
             addFileToLayerList(id, name);
@@ -1441,7 +1441,7 @@
             const playBtn = document.createElement('button'); playBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
             playBtn.className = 'p-2 rounded-full bg-blue-600 hover:bg-blue-700 transition'; playBtn.onclick = () => toggleSoundFile(id, playBtn);
             const fileNameEl = document.createElement('span'); fileNameEl.textContent = name.length > 20 ? name.substring(0, 17) + '...' : name; fileNameEl.className = 'flex-grow';
-            const volSlider = document.createElement('input'); volSlider.type='range';volSlider.min=0;volSlider.max=1;volSlider.step=0.01;volSlider.value=0.5; volSlider.className = 'w-24';
+            const volSlider = document.createElement('input'); volSlider.type='range';volSlider.min=0;volSlider.max=1;volSlider.step=0.01;volSlider.value=0.8; volSlider.className = 'w-24';
             volSlider.oninput = e => { const vol = parseFloat(e.target.value); soundFiles[id].gainNode.gain.setTargetAtTime(vol, audioContext.currentTime, 0.01); };
             const removeBtn = document.createElement('button'); removeBtn.textContent = '×'; removeBtn.className = 'font-bold text-xl text-gray-400 hover:text-white';
             removeBtn.onclick = () => removeSoundFile(id);
