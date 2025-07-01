@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hemi-Sync Gateway</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0c0a1e; /* Deep indigo */
+            --text-color: #e0e7ff; /* Lavender white */
+            --panel-bg: rgba(23, 21, 48, 0.8);
+            --panel-border: rgba(129, 140, 248, 0.2);
+            --input-bg: #1e1b34;
+            --input-border: #4f46e5;
+            --tab-inactive-text: #a5b4fc;
+            --tab-active-text: #ffffff;
+            --tab-active-border: #818cf8;
+            --details-bg: rgba(255, 255, 255, 0.05);
+            --primary-color: #6366f1; /* Indigo */
+        }
+        
+        body[data-theme='light'] {
+            --bg-color: #eef2ff;
+            --text-color: #1e1b4b;
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --panel-border: rgba(0, 0, 0, 0.1);
+            --input-bg: #e0e7ff;
+            --input-border: #a5b4fc;
+            --tab-inactive-text: #4338ca;
+            --tab-active-text: #312e81;
+            --tab-active-border: #4f46e5;
+            --details-bg: rgba(0, 0, 0, 0.05);
+            --primary-color: #4f46e5;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+        #visualization {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        .ui-panel {
+            position: fixed; /* Necessary for dragging */
+            background-color: var(--panel-bg);
+            color: var(--text-color);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        .drag-handle {
+            cursor: move;
+        }
+        .ui-panel::-webkit-scrollbar { width: 8px; }
+        .ui-panel::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+        .ui-panel::-webkit-scrollbar-thumb { background: var(--primary-color); border-radius: 10px; }
+        .ui-panel::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+        .btn-active {
+            background-color: var(--primary-color) !important;
+            color: white !important;
+        }
+        .tab-btn, .settings-tab-btn {
+            color: var(--tab-inactive-text);
+            border-color: transparent;
+        }
+        .tab-btn.active, .settings-tab-btn.active {
+            color: var(--tab-active-text);
+            border-color: var(--tab-active-border);
+        }
+        input, select {
+            background-color: var(--input-bg);
+            border-color: var(--input-border);
+        }
+        details > summary {
+            cursor: pointer;
+            padding: 0.75rem;
+            background-color: var(--details-bg);
+            border-radius: 0.5rem;
+            font-weight: 600;
+        }
+        details[open] > summary {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        details > div {
+            padding: 0.75rem;
+            background-color: var(--details-bg);
+            border-bottom-left-radius: 0.5rem;
+            border-bottom-right-radius: 0.5rem;
+        }
+
+        /* Custom Modal for Notifications and Confirmations */
+        #notification-modal, #confirmation-modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+    </style>
+</head>
+<body data-theme="dark" class="select-none">
+    <canvas id="visualization"></canvas>
+    
+    <div id="auth-container" class="fixed top-4 right-4 z-50">
+        <button id="sign-in-btn" class="px-4 py-2 bg-indigo-600 rounded-lg text-white font-semibold hover:bg-indigo-700 transition">Sign In with Google</button>
+        <div id="user-profile" class="hidden items-center space-x-3 bg-gray-800/50 backdrop-blur-sm p-2 rounded-full shadow-lg">
+            <img id="user-photo" class="w-8 h-8 rounded-full" src="" alt="User photo">
+            <span id="user-name" class="text-sm font-medium text-white"></span>
+            <button id="sign-out-btn" title="Sign Out" class="p-2 bg-red-600 rounded-full text-white hover:bg-red-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="persistent-menu" class="fixed top-4 left-4 z-50 flex flex-col space-y-2">
+        <button id="main-menu-btn" title="Open Menu" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <div id="menu-icons-container" class="hidden flex-col space-y-2">
+            <button id="theme-selector-btn" title="Select Visual Theme" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6.364 6.364 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </button>
+            <button id="audio-engine-btn" title="Audio Engine" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4c0 .55.45 1 1 1h3l7 7V2L4 9H1c-.55 0-1 .45-1 1z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </button>
+             <button id="share-btn" title="Share Settings" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </button>
+            <button id="settings-btn" title="Settings & Guide" class="p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.73l-.15-.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.73l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+        </div>
+    </div>
+
+    <div id="small-timer-display" class="fixed bottom-4 left-4 z-50 p-3 bg-gray-800/50 backdrop-blur-sm rounded-full text-white hover:bg-gray-700/70 transition-colors duration-300 shadow-lg cursor-pointer flex items-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span id="small-timer-text">00:00</span>
+    </div>
+
+    <div id="timer-panel" class="hidden ui-panel" style="bottom: 5rem; left: 1rem;">
+        <div class="p-6 w-80">
+            <div class="flex justify-between items-center drag-handle">
+                <h2 class="text-xl font-bold">Session Timer</h2>
+                <button id="close-timer-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            
+            <div class="text-center my-4">
+                <h1 id="timer-display-large" class="text-6xl font-bold">00:00</h1>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="timer-duration" class="block text-sm font-medium mb-1">Set Duration (minutes)</label>
+                    <input type="number" id="timer-duration" value="20" min="1" class="w-full rounded-lg px-3 py-2">
+                </div>
+
+                <div class="flex space-x-2">
+                    <button id="start-stop-btn" class="flex-1 py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Start</button>
+                    <button id="reset-btn" class="flex-1 py-2 bg-gray-600 rounded-lg hover:bg-gray-700 transition">Reset</button>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-4 border-t border-[var(--panel-border)] space-y-4">
+                <h3 class="font-semibold">Alerts</h3>
+                <div>
+                    <label for="alarm-sound" class="block text-sm font-medium mb-1">End of Session Alarm</label>
+                    <select id="alarm-sound" class="w-full rounded-lg px-3 py-2">
+                        <option value="none">None</option>
+                        <option value="subtle">Subtle Chime</option>
+                        <option value="gong">Meditation Gong</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="audio-engine-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+        <div class="p-6 w-96">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Audio Engine</h2>
+                <button id="close-audio-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+
+            <div class="flex border-b border-[var(--panel-border)] mb-4 text-sm">
+                <button data-tab="engine" class="tab-btn py-2 px-4 border-b-2 active">Engine</button>
+                <button data-tab="orbit" class="tab-btn py-2 px-4 border-b-2">Orbit</button>
+            </div>
+            
+            <div id="engine-tab" class="tab-content space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Target State Presets</label>
+                    <div id="brainwave-presets" class="grid grid-cols-2 gap-2"></div>
+                </div>
+
+                <div class="border-t border-[var(--panel-border)] my-4"></div>
+
+                <div>
+                    <label for="carrier-freq" class="block text-sm font-medium mb-1">Carrier Frequency (Hz)</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="range" id="carrier-freq" min="40" max="500" value="136.1" step="0.1" class="w-full">
+                        <input type="number" id="carrier-freq-display" value="136.1" class="w-20 text-center rounded-md p-1">
+                    </div>
+                </div>
+                <div>
+                    <label for="beat-freq" class="block text-sm font-medium mb-1">Beat Frequency (Hz)</label>
+                     <div class="flex items-center space-x-2">
+                        <input type="range" id="beat-freq" min="0.5" max="40" value="7.83" step="0.01" class="w-full">
+                        <input type="number" id="beat-freq-display" value="7.83" class="w-20 text-center rounded-md p-1">
+                    </div>
+                    <div id="beat-freq-label" class="text-center text-xs text-indigo-300 mt-1">Theta / Alpha</div>
+                </div>
+                <div>
+                    <label for="binaural-volume" class="block text-sm font-medium mb-1">Volume</label>
+                    <input type="range" id="binaural-volume" min="0" max="1" value="0.5" step="0.01" class="w-full">
+                </div>
+                
+                <div class="border-t border-[var(--panel-border)] my-4"></div>
+
+                <div class="space-y-4">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="isochronic-enable" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="ml-2 font-semibold">Enable Isochronic Modulation</span>
+                    </label>
+                    <div id="isochronic-controls" class="hidden space-y-4 pl-6">
+                        <label for="isochronic-freq" class="block text-sm font-medium mb-1">Modulation Frequency (Hz)</label>
+                         <div class="flex items-center space-x-2">
+                            <input type="range" id="isochronic-freq" min="1" max="40" value="10" step="0.1" class="w-full">
+                            <input type="number" id="isochronic-freq-display" value="10" class="w-20 text-center rounded-md p-1">
+                        </div>
+                    </div>
+                </div>
+
+                <button id="start-stop-binaural-btn" class="w-full py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Start Engine</button>
+            </div>
+
+            <div id="orbit-tab" class="hidden tab-content space-y-4">
+                <p class="text-xs text-indigo-300 italic">Create binaural tone pairs that orbit around you. Uses frequencies from the Engine tab.</p>
+                <div>
+                    <label for="orbit-algorithm" class="block text-sm font-medium mb-1">Orbit Algorithm</label>
+                    <select id="orbit-algorithm" class="w-full rounded-lg px-3 py-2">
+                        <option value="circular">Circular</option>
+                        <option value="elliptical">Elliptical</option>
+                        <option value="figureEight">Figure-Eight</option>
+                    </select>
+                </div>
+                <div id="orbit-shape-controls" class="hidden space-y-2">
+                     <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="orbit-autoscale-shape" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="ml-2 text-sm">Auto-scale Shape</span>
+                    </label>
+                    <div id="orbit-shape-manual-controls">
+                        <label for="orbit-shape" class="block text-sm font-medium mb-1">Orbit Shape (Width/Height Ratio)</label>
+                        <input type="range" id="orbit-shape" min="0.1" max="1.0" value="1.0" step="0.05" class="w-full">
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="orbit-autoscale-speed" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        <span class="ml-2 text-sm">Auto-scale Speed</span>
+                    </label>
+                    <div id="orbit-speed-manual-controls">
+                        <label for="orbit-speed" class="block text-sm font-medium mb-1">Orbit Speed (Oscillations/sec)</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="range" id="orbit-speed" min="0.1" max="5" value="4" step="0.1" class="w-full">
+                            <input type="number" id="orbit-speed-display" value="4.0" class="w-20 text-center rounded-md p-1">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span>Active Pairs: <span id="orbit-pair-count">0</span></span>
+                    <div class="flex space-x-2">
+                         <button id="add-orbit-pair-btn" class="px-3 py-1 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition text-sm">+ Add Pair</button>
+                         <button id="remove-all-orbits-btn" class="px-3 py-1 bg-red-800 rounded-lg hover:bg-red-700 transition text-sm">Remove All</button>
+                    </div>
+                </div>
+                 <button id="start-stop-orbit-btn" class="w-full py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Start Orbit</button>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="settings-panel" class="hidden ui-panel" style="top: 5rem; left: 50%; transform: translateX(-50%);">
+        <div class="p-6 w-[32rem] max-w-[calc(100vw-2rem)]">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Settings & Guide</h2>
+                <button id="close-settings-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="flex border-b border-[var(--panel-border)] mb-4 text-sm flex-wrap">
+                <button data-tab="settings" class="settings-tab-btn py-2 px-4 border-b-2 active">Settings</button>
+                <button data-tab="guide" class="settings-tab-btn py-2 px-4 border-b-2">Hemi-Sync Guide</button>
+            </div>
+            <div class="space-y-4 text-sm leading-relaxed">
+                <div id="settings-tab" class="settings-tab-content space-y-4">
+                    <div>
+                        <h3 class="font-bold mb-2">UI Theme</h3>
+                        <div class="flex items-center space-x-4">
+                            <span>Dark</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="theme-toggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-indigo-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                            </label>
+                            <span>Light</span>
+                        </div>
+                    </div>
+                    <div class="border-t border-[var(--panel-border)] my-2"></div>
+                    <div>
+                        <h3 class="font-bold mb-2">Visual Effects</h3>
+                        <label class="flex items-center mt-2">
+                            <input type="checkbox" id="tracers-enable" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="ml-2">Enable Visual Tracers (Ghosting)</span>
+                        </label>
+                        <div class="mt-2 pl-6 space-y-3 border-l-2 border-indigo-900/50">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="side-strobes-enable" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-2">Enable Side Strobes</span>
+                            </label>
+                            <div id="strobe-controls" class="hidden space-y-3">
+                                <div class="flex items-center space-x-2">
+                                    <label for="strobe-color" class="text-sm">Color:</label>
+                                    <input type="color" id="strobe-color" value="#c7d2fe" class="w-10 h-8 p-1 bg-gray-700 border-none rounded-md cursor-pointer">
+                                </div>
+                                <div>
+                                    <label for="strobe-freq-multiplier" class="block text-sm mb-1">Frequency Multiplier:</label>
+                                    <input type="range" id="strobe-freq-multiplier" min="0.25" max="4" value="1" step="0.25" class="w-full">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border-t border-[var(--panel-border)] my-2"></div>
+                    <div>
+                        <h3 class="font-bold mb-2">Performance</h3>
+                         <label class="flex items-center">
+                            <input type="checkbox" id="minimalist-mode-enable" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="ml-2">Minimalist Mode (Fewer effects)</span>
+                        </label>
+                        <label class="flex items-center mt-2">
+                            <input type="checkbox" id="persistent-mode-enable" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <span class="ml-2">Persistent Mode (Audio in background)</span>
+                        </label>
+                        <p class="text-xs text-gray-400 mt-1">Persistent mode may increase battery usage.</p>
+                    </div>
+                </div>
+                <div id="guide-tab" class="hidden settings-tab-content space-y-2">
+                    <details open>
+                        <summary>What is Hemi-Sync?</summary>
+                        <div class="mt-2 space-y-1">
+                            <p>Hemi-Sync® is a patented audio technology that uses binaural beats to help synchronize the left and right hemispheres of your brain. This "hemispheric synchronization" can facilitate deep relaxation, focus, and altered states of consciousness.</p>
+                            <ul class="list-disc list-inside mt-2 space-y-1">
+                                <li><strong>Binaural Beats:</strong> Two slightly different frequencies are played into each ear via headphones. Your brain perceives a third, phantom "beat" at the frequency difference between the two tones. This beat entrains your brainwaves toward a desired state.</li>
+                                <li><strong>Isochronic Tones:</strong> A single tone is rapidly turned on and off. This creates a distinct, rhythmic pulse that is also very effective for brainwave entrainment and does not require headphones.</li>
+                            </ul>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Using the Binaural Beats Engine</summary>
+                        <div class="mt-2 space-y-1">
+                           <p>This panel gives you full control over your brainwave entrainment session.</p>
+                           <ul class="list-disc list-inside mt-2 space-y-1">
+                               <li><strong>Target State Presets:</strong> Choose a preset to quickly target a specific brainwave state.</li>
+                               <li><strong>Carrier Frequency:</strong> This is the base tone. Lower frequencies (like 136.1 Hz, the "OM" frequency) are often used for meditation.</li>
+                               <li><strong>Beat Frequency:</strong> This is the target brainwave frequency for binaural beats.</li>
+                               <li><strong>Isochronic Modulation:</strong> Enable this to pulse the audio at a set frequency instead of using two different tones. Adjust the modulation frequency to match your desired brainwave state.</li>
+                               <li><strong>Orbit:</strong> Add pairs of binaural tones that circle around you, creating a dynamic, spatial soundscape. The speed of the orbit can be controlled.</li>
+                           </ul>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>AI Assistant</summary>
+                        <div class="mt-2 space-y-1">
+                            <p>Your personal guide for exploring consciousness, powered by Gemini. It can provide context-aware suggestions and encouragement for your Hemi-Sync sessions.</p>
+                            <ul class="list-disc list-inside mt-2 space-y-1">
+                                <li><strong>Contextual Guidance:</strong> The AI knows your target brainwave state and can offer relevant advice.</li>
+                                <li><strong>Quick Replies:</strong> Use the suggested prompts for common requests like deepening relaxation or exploring Focus Levels.</li>
+                                <li><strong>Chat:</strong> Ask anything related to your practice. For example, "What is Focus 10?" or "How can I let go of physical sensations?"</li>
+                                <li><strong>Optimal Use:</strong> Use the AI at the beginning of a session to set an intention. If you feel stuck or distracted, open the panel and ask for help.</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="theme-selector-panel" class="hidden ui-panel" style="top: 5rem; left: 1rem;">
+        <div class="p-6 w-72">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Select Visual Theme</h2>
+                <button id="close-theme-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div id="theme-list" class="space-y-2"></div>
+            <div class="mt-6 pt-4 border-t border-[var(--panel-border)] space-y-4">
+                <h3 class="font-semibold mb-2">Breathing Guide Speed</h3>
+                <div class="flex items-center space-x-2">
+                    <label for="breathing-speed" class="text-sm">3s</label>
+                    <input type="range" id="breathing-speed" min="3" max="8" step="0.1" value="5" class="w-full">
+                    <label for="breathing-speed" class="text-sm">8s</label>
+                </div>
+                <div class="text-center text-sm mt-1">Interval: <span id="breathing-speed-value">5.0</span>s</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="ai-chat-panel" class="hidden ui-panel" style="bottom: 1rem; right: 1rem;">
+        <div class="p-4 w-96 max-w-[calc(100vw-2rem)]">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-lg font-bold">AI Gateway Assistant</h2>
+                <button id="close-ai-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div id="chat-box" class="h-64 overflow-y-auto mb-4 p-2 bg-gray-900/50 rounded-lg space-y-4"></div>
+            <div id="quick-replies" class="flex flex-wrap gap-2 mb-4"></div>
+            <div class="flex space-x-2">
+                <input type="text" id="chat-input" class="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ask for guidance...">
+                <button id="send-chat-btn" class="px-4 py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Send</button>
+            </div>
+        </div>
+    </div>
+    <div id="ai-assistant-btn-container" class="fixed bottom-4 right-4 z-50">
+        <button id="ai-assistant-btn" title="AI Assistant" class="p-4 bg-purple-600 rounded-full text-white hover:bg-purple-700 transition-transform hover:scale-110 duration-300 shadow-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 0 0-2.3 19.46a10 10 0 0 0 4.6 0A10 10 0 0 0 12 2Z"/><path d="M12 12a5 5 0 0 0-5 5"/><path d="M12 8a.5.5 0 0 1 .5.5v0a.5.5 0 0 1-.5.5h0a.5.5 0 0 1-.5-.5v0a.5.5 0 0 1 .5-.5Z"/></svg>
+        </button>
+    </div>
+
+    <div id="share-panel" class="hidden ui-panel" style="top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <div class="p-6 w-[32rem] max-w-[calc(100vw-2rem)]">
+            <div class="flex justify-between items-center mb-4 drag-handle">
+                <h2 class="text-xl font-bold">Share & Import Settings</h2>
+                <button id="close-share-panel-btn" class="p-1 text-gray-400 hover:text-white">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-semibold mb-2">Export Your Settings</h3>
+                    <p class="text-sm text-gray-400 mb-2">Click the button to generate a shareable code for your current setup.</p>
+                    <button id="export-btn" class="w-full py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700 transition">Generate Export Code</button>
+                    <textarea id="export-code" readonly class="w-full h-24 mt-2 bg-gray-900/50 border border-gray-600 rounded-lg p-2 text-xs" placeholder="Your code will appear here..."></textarea>
+                    <button id="copy-code-btn" class="w-full mt-2 py-2 text-sm bg-gray-600 rounded-lg hover:bg-gray-700 transition">Copy to Clipboard</button>
+                </div>
+                <div class="border-t border-[var(--panel-border)] my-4"></div>
+                <div>
+                    <h3 class="font-semibold mb-2">Import Settings</h3>
+                    <p class="text-sm text-gray-400 mb-2">Paste a code from another user below and click import to load their setup.</p>
+                    <textarea id="import-code" class="w-full h-24 bg-gray-700 border border-gray-600 rounded-lg p-2 text-xs" placeholder="Paste settings code here..."></textarea>
+                    <button id="import-btn" class="w-full mt-2 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition">Import Settings</button>
+                </div>
+                 <div class="border-t border-[var(--panel-border)] my-4"></div>
+                <div>
+                    <h3 class="font-semibold mb-2">Reset</h3>
+                     <p class="text-sm text-gray-400 mb-2">This will reset all settings to their original defaults. This cannot be undone.</p>
+                    <button id="reset-all-btn" class="w-full py-2 bg-red-800 rounded-lg hover:bg-red-700 transition">Reset All to Default</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification-modal" class="fixed top-5 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg opacity-0 -translate-y-20 pointer-events-none">
+        <p id="notification-message"></p>
+    </div>
+
+    <div id="confirmation-modal" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 opacity-0 pointer-events-none">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-4" id="confirmation-title">Are you sure?</h3>
+            <p class="text-gray-300 mb-6" id="confirmation-message">This action cannot be undone.</p>
+            <div class="flex justify-end space-x-4">
+                <button id="confirm-cancel-btn" class="px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-500 transition">Cancel</button>
+                <button id="confirm-action-btn" class="px-4 py-2 bg-red-600 rounded-lg hover:bg-red-500 transition">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // --- Firebase SDKs ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- DOM Elements ---
+        const canvas = document.getElementById('visualization');
+        const ctx = canvas.getContext('2d');
+        
+        // --- Firebase State ---
+        let app, auth, db, user, userId, settingsDocRef;
+        let settingsSaveTimeout;
+        let isAuthReady = false;
+
+        // --- App State ---
+        let audioContext;
+        let masterGain;
+        let chatHistory = [];
+        let currentUiTheme = 'dark';
+        let persistentModeEnabled = false;
+        let animationFrameId;
+        let tracersEnabled = true;
+        let sideStrobesEnabled = false;
+        let strobeColor = '#c7d2fe';
+        let strobeFreqMultiplier = 1;
+        let minimalistModeEnabled = false;
+        
+        // --- Hemi-Sync State ---
+        let binauralState = {
+            isRunning: false,
+            carrierFreq: 136.1,
+            beatFreq: 7.83,
+            volume: 0.5,
+            isochronicEnabled: false,
+            isochronicFreq: 10,
+            oscL: null,
+            oscR: null,
+            gainNode: null,
+            lfo: null,
+            lfoGain: null,
+        };
+
+        let orbitState = {
+            isRunning: false,
+            speed: 4, // oscillations per second
+            pairs: [], // { id, oscL, oscR, pannerL, pannerR, gain, audioRadius, angleOffset }
+            algorithm: 'circular',
+            xyRatio: 1.0,
+            autoScaleSpeed: false,
+            autoScaleShape: false
+        };
+        
+        // Timer State
+        let timerIntervalId = null, timerRunning = false, timeRemaining = 0, totalDuration = 0;
+        
+        // Visuals State
+        let currentTheme = 'gateway';
+        let breathInterval = 5;
+        let particles = [];
+        let breathPhase = 0;
+        let breathRadius = 50;
+
+        const themes = { 
+            gateway: { name: 'Gateway' },
+            mindseye: { name: "Mind's Eye" },
+            deepSpace: { name: 'Deep Space' },
+            liquidMind: { name: 'Liquid Mind' },
+            fivePointFractal: { name: '5-Point Fractal' },
+            sixPointFractal: { name: '6-Point Fractal' },
+            sevenPointFractal: { name: '7-Point Fractal' }
+        };
+        
+        const brainwavePresets = {
+            'Delta (1-4 Hz)': { beat: 2.5, carrier: 100, name: 'Deep Sleep / Healing' },
+            'Theta (4-8 Hz)': { beat: 6, carrier: 120, name: 'Deep Meditation / REM' },
+            'Alpha (8-12 Hz)': { beat: 10, carrier: 136.1, name: 'Relaxed Focus' },
+            'Beta (13-30 Hz)': { beat: 18, carrier: 150, name: 'Active Thinking' },
+            'Gamma (30-100 Hz)': { beat: 40, carrier: 180, name: 'Peak Performance' }
+        };
+
+
+        // --- Initialization ---
+        function init() {
+            setupFirebase();
+            setupCanvas();
+            setupEventListeners();
+            populateThemeSelector();
+            populateBrainwavePresets();
+            startRenderLoop();
+            addChatMessage('Welcome to the Hemi-Sync Gateway. Please sign in to save your settings. For the AI, follow the deployment guide.', 'ai');
+            updateAIChatContext();
+            resetTimer();
+            makePanelsDraggable();
+            applySettings(null); // Apply default settings initially
+        }
+        
+        // --- Authentication Functions ---
+        function signIn() {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider).catch(error => {
+                console.error("Sign in error", error);
+                showNotification("Sign in failed. Please try again.", "error");
+            });
+        }
+
+        function signOutUser() {
+            signOut(auth);
+        }
+
+        async function setupFirebase() {
+            const firebaseConfig = {
+                apiKey: "AIzaSyAnBBcdczugJzl_5u1aLJb-OiHvvtDgHvY",
+                authDomain: "gitlabs-3e081.firebaseapp.com",
+                projectId: "gitlabs-3e081",
+                storageBucket: "gitlabs-3e081.appspot.com",
+                messagingSenderId: "46943115268",
+                appId: "1:46943115268:web:d6746d2cb953a2847d7d51",
+                measurementId: "G-M3MLTNVRH0"
+            };
+            
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('error');
+
+                onAuthStateChanged(auth, async (currentUser) => {
+                    const signInBtn = document.getElementById('sign-in-btn');
+                    const userProfileDiv = document.getElementById('user-profile');
+                    const userPhoto = document.getElementById('user-photo');
+                    const userName = document.getElementById('user-name');
+
+                    user = currentUser;
+                    if (user) {
+                        userId = user.uid;
+                        settingsDocRef = doc(db, "users", userId);
+                        isAuthReady = true;
+
+                        signInBtn.classList.add('hidden');
+                        userProfileDiv.classList.remove('hidden');
+                        userProfileDiv.classList.add('flex');
+                        
+                        userPhoto.src = user.photoURL || `https://placehold.co/40x40/7c3aed/ffffff?text=${(user.displayName || 'U').charAt(0)}`;
+                        userName.textContent = user.displayName || 'Signed In';
+                        
+                        await loadUserSettings();
+                    } else {
+                        isAuthReady = false;
+                        userId = null;
+                        settingsDocRef = null;
+                        
+                        signInBtn.classList.remove('hidden');
+                        userProfileDiv.classList.add('hidden');
+                        userProfileDiv.classList.remove('flex');
+                        
+                        applySettings(null); // Reset to defaults
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showNotification("Could not connect to services.", "error");
+            }
+        }
+
+        function setupAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                masterGain = audioContext.createGain();
+                masterGain.gain.value = 0.5; // Global volume
+                masterGain.connect(audioContext.destination);
+            }
+        }
+        
+        function setupCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            resetVisuals();
+        }
+
+        function setupEventListeners() {
+            window.addEventListener('resize', setupCanvas);
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Auth Buttons
+            document.getElementById('sign-in-btn').addEventListener('click', signIn);
+            document.getElementById('sign-out-btn').addEventListener('click', signOutUser);
+
+            // Panel Toggles & Closes
+            document.getElementById('main-menu-btn').addEventListener('click', () => document.getElementById('menu-icons-container').classList.toggle('hidden'));
+            document.getElementById('theme-selector-btn').addEventListener('click', () => togglePanel(document.getElementById('theme-selector-panel')));
+            document.getElementById('audio-engine-btn').addEventListener('click', () => { setupAudioContext(); togglePanel(document.getElementById('audio-engine-panel')) });
+            document.getElementById('ai-assistant-btn').addEventListener('click', () => { togglePanel(document.getElementById('ai-chat-panel')); document.getElementById('ai-assistant-btn-container').classList.add('hidden'); });
+            document.getElementById('small-timer-display').addEventListener('click', () => togglePanel(document.getElementById('timer-panel')));
+            document.getElementById('settings-btn').addEventListener('click', () => togglePanel(document.getElementById('settings-panel')));
+            document.getElementById('share-btn').addEventListener('click', () => togglePanel(document.getElementById('share-panel')));
+
+            document.getElementById('close-audio-panel-btn').addEventListener('click', () => document.getElementById('audio-engine-panel').classList.add('hidden'));
+            document.getElementById('close-ai-panel-btn').addEventListener('click', () => { document.getElementById('ai-chat-panel').classList.add('hidden'); document.getElementById('ai-assistant-btn-container').classList.remove('hidden'); });
+            document.getElementById('close-timer-panel-btn').addEventListener('click', () => document.getElementById('timer-panel').classList.add('hidden'));
+            document.getElementById('close-theme-panel-btn').addEventListener('click', () => document.getElementById('theme-selector-panel').classList.add('hidden'));
+            document.getElementById('close-settings-panel-btn').addEventListener('click', () => document.getElementById('settings-panel').classList.add('hidden'));
+            document.getElementById('close-share-panel-btn').addEventListener('click', () => document.getElementById('share-panel').classList.add('hidden'));
+
+            // Theme Panel
+            document.getElementById('breathing-speed').addEventListener('input', e => {
+                breathInterval = parseFloat(e.target.value);
+                document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+                requestSave();
+            });
+            
+            // Settings Panel
+            document.querySelectorAll('.settings-tab-btn').forEach(b => b.addEventListener('click', (e) => {
+                const tabId = e.target.dataset.tab;
+                const parent = e.target.closest('.ui-panel');
+                parent.querySelectorAll('.settings-tab-content').forEach(c => c.classList.add('hidden'));
+                parent.querySelectorAll('.settings-tab-btn').forEach(btn => btn.classList.remove('active'));
+                parent.querySelector(`#${tabId}-tab`).classList.remove('hidden');
+                e.target.classList.add('active');
+            }));
+            document.getElementById('theme-toggle').addEventListener('change', (e) => {
+                setUiTheme(e.target.checked ? 'light' : 'dark');
+            });
+            document.getElementById('persistent-mode-enable').addEventListener('change', e => {
+                persistentModeEnabled = e.target.checked;
+                requestSave();
+            });
+            document.getElementById('tracers-enable').addEventListener('change', e => {
+                tracersEnabled = e.target.checked;
+                requestSave();
+            });
+            document.getElementById('side-strobes-enable').addEventListener('change', e => {
+                sideStrobesEnabled = e.target.checked;
+                document.getElementById('strobe-controls').classList.toggle('hidden', !sideStrobesEnabled);
+                requestSave();
+            });
+            document.getElementById('strobe-color').addEventListener('input', e => {
+                strobeColor = e.target.value;
+                requestSave();
+            });
+            document.getElementById('strobe-freq-multiplier').addEventListener('input', e => {
+                strobeFreqMultiplier = parseFloat(e.target.value);
+                requestSave();
+            });
+            document.getElementById('minimalist-mode-enable').addEventListener('change', e => {
+                minimalistModeEnabled = e.target.checked;
+                resetVisuals(); // Reset to apply new complexity level
+                requestSave();
+            });
+
+
+            // Timer Controls
+            document.getElementById('start-stop-btn').addEventListener('click', handleStartStop);
+            document.getElementById('reset-btn').addEventListener('click', resetTimer);
+
+            // Audio Engine Panel Tabs
+            document.querySelectorAll('#audio-engine-panel .tab-btn').forEach(b => b.addEventListener('click', (e) => {
+                const tabId = e.target.dataset.tab;
+                const parent = e.target.closest('.ui-panel');
+                parent.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                parent.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                parent.querySelector(`#${tabId}-tab`).classList.remove('hidden');
+                e.target.classList.add('active');
+            }));
+
+
+            // Engine Tab Controls
+            const carrierFreqSlider = document.getElementById('carrier-freq');
+            const carrierFreqDisplay = document.getElementById('carrier-freq-display');
+            const beatFreqSlider = document.getElementById('beat-freq');
+            const beatFreqDisplay = document.getElementById('beat-freq-display');
+            
+            carrierFreqSlider.addEventListener('input', e => {
+                const val = parseFloat(e.target.value);
+                binauralState.carrierFreq = val;
+                carrierFreqDisplay.value = val.toFixed(1);
+                updateBinauralFrequencies();
+            });
+            carrierFreqDisplay.addEventListener('change', e => {
+                const val = parseFloat(e.target.value);
+                binauralState.carrierFreq = val;
+                carrierFreqSlider.value = val;
+                updateBinauralFrequencies();
+            });
+
+            beatFreqSlider.addEventListener('input', e => {
+                const val = parseFloat(e.target.value);
+                binauralState.beatFreq = val;
+                beatFreqDisplay.value = val.toFixed(2);
+                updateBeatFreqLabel(val);
+                updateBinauralFrequencies();
+            });
+             beatFreqDisplay.addEventListener('change', e => {
+                const val = parseFloat(e.target.value);
+                binauralState.beatFreq = val;
+                beatFreqSlider.value = val;
+                updateBeatFreqLabel(val);
+                updateBinauralFrequencies();
+            });
+
+            document.getElementById('binaural-volume').addEventListener('input', e => {
+                binauralState.volume = parseFloat(e.target.value);
+                if (binauralState.gainNode) {
+                    if (binauralState.isochronicEnabled && binauralState.lfoGain) {
+                        binauralState.lfoGain.gain.setTargetAtTime(binauralState.volume, audioContext.currentTime, 0.01);
+                    } else {
+                        binauralState.gainNode.gain.setTargetAtTime(binauralState.volume, audioContext.currentTime, 0.01);
+                    }
+                }
+                orbitState.pairs.forEach(pair => {
+                    if (pair.gain) {
+                        pair.gain.gain.setTargetAtTime(binauralState.volume, audioContext.currentTime, 0.01);
+                    }
+                });
+            });
+            document.getElementById('start-stop-binaural-btn').addEventListener('click', toggleBinauralEngine);
+            
+            // Isochronic Controls
+            document.getElementById('isochronic-enable').addEventListener('change', e => {
+                binauralState.isochronicEnabled = e.target.checked;
+                document.getElementById('isochronic-controls').classList.toggle('hidden', !binauralState.isochronicEnabled);
+                if (binauralState.isRunning) {
+                    // Re-create audio graph to apply/remove modulation
+                    toggleBinauralEngine(); // Stop
+                    toggleBinauralEngine(); // Start with new settings
+                }
+                requestSave();
+            });
+            const isoFreqSlider = document.getElementById('isochronic-freq');
+            const isoFreqDisplay = document.getElementById('isochronic-freq-display');
+            isoFreqSlider.addEventListener('input', e => {
+                const val = parseFloat(e.target.value);
+                binauralState.isochronicFreq = val;
+                isoFreqDisplay.value = val.toFixed(1);
+                if (binauralState.lfo) {
+                    binauralState.lfo.frequency.setTargetAtTime(val, audioContext.currentTime, 0.01);
+                }
+            });
+            isoFreqDisplay.addEventListener('change', e => {
+                const val = parseFloat(e.target.value);
+                binauralState.isochronicFreq = val;
+                isoFreqSlider.value = val;
+                 if (binauralState.lfo) {
+                    binauralState.lfo.frequency.setTargetAtTime(val, audioContext.currentTime, 0.01);
+                }
+            });
+
+            // Orbit Tab Controls
+            document.getElementById('start-stop-orbit-btn').addEventListener('click', toggleOrbit);
+            document.getElementById('add-orbit-pair-btn').addEventListener('click', addOrbitPair);
+            document.getElementById('remove-all-orbits-btn').addEventListener('click', removeAllOrbits);
+            document.getElementById('orbit-algorithm').addEventListener('change', e => {
+                orbitState.algorithm = e.target.value;
+                const showShapeControls = orbitState.algorithm === 'elliptical' || orbitState.algorithm === 'figureEight';
+                document.getElementById('orbit-shape-controls').classList.toggle('hidden', !showShapeControls);
+                requestSave();
+            });
+            document.getElementById('orbit-shape').addEventListener('input', e => {
+                orbitState.xyRatio = parseFloat(e.target.value);
+                requestSave();
+            });
+            document.getElementById('orbit-autoscale-speed').addEventListener('change', e => {
+                orbitState.autoScaleSpeed = e.target.checked;
+                document.getElementById('orbit-speed-manual-controls').classList.toggle('hidden', orbitState.autoScaleSpeed);
+                requestSave();
+            });
+            document.getElementById('orbit-autoscale-shape').addEventListener('change', e => {
+                orbitState.autoScaleShape = e.target.checked;
+                document.getElementById('orbit-shape-manual-controls').classList.toggle('hidden', orbitState.autoScaleShape);
+                requestSave();
+            });
+            const orbitSpeedSlider = document.getElementById('orbit-speed');
+            const orbitSpeedDisplay = document.getElementById('orbit-speed-display');
+            orbitSpeedSlider.addEventListener('input', e => {
+                const val = parseFloat(e.target.value);
+                orbitState.speed = val;
+                orbitSpeedDisplay.value = val.toFixed(1);
+                requestSave();
+            });
+            orbitSpeedDisplay.addEventListener('change', e => {
+                const val = parseFloat(e.target.value);
+                orbitState.speed = val;
+                orbitSpeedSlider.value = val;
+                requestSave();
+            });
+
+
+            // Share Panel
+            document.getElementById('export-btn').addEventListener('click', exportSettings);
+            document.getElementById('copy-code-btn').addEventListener('click', copyExportCode);
+            document.getElementById('import-btn').addEventListener('click', importSettings);
+            document.getElementById('reset-all-btn').addEventListener('click', () => {
+                showConfirmation(
+                    "Reset All Settings",
+                    "Are you sure you want to reset all settings to their original defaults? This cannot be undone.",
+                    () => {
+                        applySettings(null);
+                        requestSave();
+                    }
+                );
+            });
+
+            // AI Chat
+            document.getElementById('send-chat-btn').addEventListener('click', sendChatMessage);
+            document.getElementById('chat-input').addEventListener('keypress', e => { if (e.key === 'Enter') sendChatMessage(); });
+        }
+        
+        // --- Firebase Functions ---
+        function requestSave() {
+            if (!isAuthReady || !settingsDocRef) return;
+            clearTimeout(settingsSaveTimeout);
+            settingsSaveTimeout = setTimeout(saveUserSettings, 1500); // Debounce saves
+        }
+
+        async function saveUserSettings() {
+            if (!isAuthReady || !settingsDocRef) return;
+            const settings = {
+                theme: currentTheme,
+                uiTheme: currentUiTheme,
+                breathInterval,
+                persistentModeEnabled,
+                tracersEnabled,
+                sideStrobesEnabled,
+                strobeColor,
+                strobeFreqMultiplier,
+                minimalistModeEnabled,
+                binaural: {
+                    carrierFreq: binauralState.carrierFreq,
+                    beatFreq: binauralState.beatFreq,
+                    volume: binauralState.volume,
+                    isochronicEnabled: binauralState.isochronicEnabled,
+                    isochronicFreq: binauralState.isochronicFreq,
+                },
+                orbit: {
+                    speed: orbitState.speed,
+                    pairCount: orbitState.pairs.length,
+                    algorithm: orbitState.algorithm,
+                    xyRatio: orbitState.xyRatio,
+                    autoScaleSpeed: orbitState.autoScaleSpeed,
+                    autoScaleShape: orbitState.autoScaleShape
+                },
+                panelPositions: getPanelPositions()
+            };
+            try {
+                await setDoc(settingsDocRef, settings, { merge: true });
+            } catch (error) {
+                console.error("Error saving settings to Firestore: ", error);
+            }
+        }
+        
+        async function loadUserSettings() {
+            if (!isAuthReady || !settingsDocRef) {
+                applySettings(null); // Use defaults if we can't load
+                return;
+            }
+            try {
+                const docSnap = await getDoc(settingsDocRef);
+                if (docSnap.exists()) {
+                    applySettings(docSnap.data());
+                } else {
+                    applySettings(null);
+                    requestSave(); // Save the default settings for the new user
+                }
+            } catch (error) {
+                console.error("Error loading settings from Firestore:", error);
+                applySettings(null);
+            }
+        }
+
+        function applySettings(settings) {
+            const s = settings || {}; // Use empty object for defaults
+            
+            // Theme and Breathing
+            setUiTheme(s.uiTheme || 'dark');
+            setTheme(s.theme || 'gateway');
+            breathInterval = s.breathInterval || 5;
+            document.getElementById('breathing-speed').value = breathInterval;
+            document.getElementById('breathing-speed-value').textContent = breathInterval.toFixed(1);
+            
+            // Visuals & Performance
+            persistentModeEnabled = s.persistentModeEnabled ?? false;
+            tracersEnabled = s.tracersEnabled ?? true;
+            sideStrobesEnabled = s.sideStrobesEnabled ?? false;
+            strobeColor = s.strobeColor || '#c7d2fe';
+            strobeFreqMultiplier = s.strobeFreqMultiplier || 1;
+            minimalistModeEnabled = s.minimalistModeEnabled ?? false;
+            document.getElementById('persistent-mode-enable').checked = persistentModeEnabled;
+            document.getElementById('tracers-enable').checked = tracersEnabled;
+            document.getElementById('side-strobes-enable').checked = sideStrobesEnabled;
+            document.getElementById('strobe-controls').classList.toggle('hidden', !sideStrobesEnabled);
+            document.getElementById('strobe-color').value = strobeColor;
+            document.getElementById('strobe-freq-multiplier').value = strobeFreqMultiplier;
+            document.getElementById('minimalist-mode-enable').checked = minimalistModeEnabled;
+
+
+            // Binaural Beats
+            const binaural = s.binaural || {};
+            binauralState.carrierFreq = binaural.carrierFreq || 136.1;
+            binauralState.beatFreq = binaural.beatFreq || 7.83;
+            binauralState.volume = binaural.volume || 0.5;
+            binauralState.isochronicEnabled = binaural.isochronicEnabled ?? false;
+            binauralState.isochronicFreq = binaural.isochronicFreq || 10;
+            
+            document.getElementById('carrier-freq').value = binauralState.carrierFreq;
+            document.getElementById('carrier-freq-display').value = binauralState.carrierFreq.toFixed(1);
+            document.getElementById('beat-freq').value = binauralState.beatFreq;
+            document.getElementById('beat-freq-display').value = binauralState.beatFreq.toFixed(2);
+            document.getElementById('binaural-volume').value = binauralState.volume;
+            document.getElementById('isochronic-enable').checked = binauralState.isochronicEnabled;
+            document.getElementById('isochronic-controls').classList.toggle('hidden', !binauralState.isochronicEnabled);
+            document.getElementById('isochronic-freq').value = binauralState.isochronicFreq;
+            document.getElementById('isochronic-freq-display').value = binauralState.isochronicFreq.toFixed(1);
+            updateBeatFreqLabel(binauralState.beatFreq);
+
+            // Orbit
+            const orbit = s.orbit || {};
+            orbitState.speed = orbit.speed || 4;
+            orbitState.algorithm = orbit.algorithm || 'circular';
+            orbitState.xyRatio = orbit.xyRatio || 1.0;
+            orbitState.autoScaleSpeed = orbit.autoScaleSpeed ?? false;
+            orbitState.autoScaleShape = orbit.autoScaleShape ?? false;
+            
+            document.getElementById('orbit-speed').value = orbitState.speed;
+            document.getElementById('orbit-speed-display').value = orbitState.speed.toFixed(1);
+            document.getElementById('orbit-algorithm').value = orbitState.algorithm;
+            document.getElementById('orbit-shape').value = orbitState.xyRatio;
+            document.getElementById('orbit-autoscale-speed').checked = orbitState.autoScaleSpeed;
+            document.getElementById('orbit-autoscale-shape').checked = orbitState.autoScaleShape;
+            document.getElementById('orbit-speed-manual-controls').classList.toggle('hidden', orbitState.autoScaleSpeed);
+            const showShapeControls = orbitState.algorithm === 'elliptical' || orbitState.algorithm === 'figureEight';
+            const shapeControlsContainer = document.getElementById('orbit-shape-controls');
+            shapeControlsContainer.classList.toggle('hidden', !showShapeControls);
+            document.getElementById('orbit-shape-manual-controls').classList.toggle('hidden', orbitState.autoScaleShape);
+
+            const pairCount = orbit.pairCount || 0;
+            removeAllOrbits();
+            for(let i=0; i < pairCount; i++) {
+                addOrbitPair();
+            }
+
+            // Panel Positions
+            const positions = s.panelPositions || {};
+            document.querySelectorAll('.ui-panel').forEach(panel => {
+                if(positions[panel.id]) {
+                    panel.style.top = positions[panel.id].top;
+                    panel.style.left = positions[panel.id].left;
+                }
+            });
+        }
+        
+        function getPanelPositions() {
+            const positions = {};
+            document.querySelectorAll('.ui-panel').forEach(panel => {
+                positions[panel.id] = { top: panel.style.top, left: panel.style.left };
+            });
+            return positions;
+        }
+
+        function togglePanel(panel) { document.querySelectorAll('.ui-panel').forEach(p => { if (p !== panel) p.classList.add('hidden'); }); panel.classList.toggle('hidden'); }
+        
+        function makePanelsDraggable() {
+            document.querySelectorAll('.ui-panel').forEach(makeDraggable);
+        }
+        function makeDraggable(panel) {
+            const handle = panel.querySelector('.drag-handle');
+            if (!handle) return;
+            let offsetX, offsetY, isDragging = false;
+            
+            function onMouseMove(e) {
+                if (!isDragging) return;
+                panel.style.left = `${e.clientX - offsetX}px`;
+                panel.style.top = `${e.clientY - offsetY}px`;
+            }
+
+            function onMouseUp() {
+                isDragging = false;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                requestSave(); // Save panel position after dragging
+            }
+            
+            handle.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                offsetX = e.clientX - panel.offsetLeft;
+                offsetY = e.clientY - panel.offsetTop;
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        function populateThemeSelector() {
+            const list = document.getElementById('theme-list'); list.innerHTML = '';
+            for (const key in themes) {
+                const button = document.createElement('button');
+                button.textContent = themes[key].name;
+                button.className = `w-full text-left px-4 py-2 rounded-lg transition ${currentTheme === key ? 'bg-indigo-600' : 'hover:bg-indigo-900/70'}`;
+                button.onclick = () => { setTheme(key); requestSave(); };
+                list.appendChild(button);
+            }
+        }
+        function setTheme(key) { currentTheme = key; populateThemeSelector(); updateAIChatContext(); resetVisuals(); }
+        function setUiTheme(theme) {
+            document.body.dataset.theme = theme;
+            currentUiTheme = theme;
+            document.getElementById('theme-toggle').checked = theme === 'light';
+            requestSave();
+        }
+        function handleStartStop() { if (timerRunning) stopTimer(); else startTimer(); }
+        function startTimer() {
+            if (timeRemaining <= 0) {
+                totalDuration = parseInt(document.getElementById('timer-duration').value, 10) * 60;
+                if (isNaN(totalDuration) || totalDuration <= 0) return;
+                timeRemaining = totalDuration;
+            }
+            timerRunning = true;
+            document.getElementById('start-stop-btn').textContent = 'Pause';
+            document.getElementById('start-stop-btn').classList.replace('bg-indigo-600', 'bg-yellow-600');
+            timerIntervalId = setInterval(tick, 1000);
+        }
+        function stopTimer() {
+            timerRunning = false;
+            clearInterval(timerIntervalId);
+            document.getElementById('start-stop-btn').textContent = 'Resume';
+            document.getElementById('start-stop-btn').classList.replace('bg-yellow-600', 'bg-indigo-600');
+        }
+        function resetTimer() {
+            stopTimer();
+            totalDuration = parseInt(document.getElementById('timer-duration').value, 10) * 60;
+            timeRemaining = isNaN(totalDuration) ? 0 : totalDuration;
+            updateTimerDisplay();
+            document.getElementById('start-stop-btn').textContent = 'Start';
+            document.getElementById('start-stop-btn').classList.replace('bg-yellow-600', 'bg-indigo-600');
+        }
+        function tick() {
+            timeRemaining--;
+            if (timeRemaining <= 0) {
+                timeRemaining = 0;
+                stopTimer();
+                playAlarm(document.getElementById('alarm-sound').value);
+                resetTimer();
+            }
+            updateTimerDisplay();
+        }
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            document.getElementById('small-timer-text').textContent = formattedTime;
+            document.getElementById('timer-display-large').textContent = formattedTime;
+        }
+        function playAlarm(type) {
+             if (type === 'none' || !type) return;
+             if (!audioContext) setupAudioContext();
+             const alarmGain = audioContext.createGain(); alarmGain.gain.value = 0.8; alarmGain.connect(masterGain);
+             if(type === 'subtle') {
+                 const osc = audioContext.createOscillator(); osc.type = 'sine'; osc.frequency.value = 880;
+                 osc.connect(alarmGain); osc.start(); osc.stop(audioContext.currentTime + 0.5);
+             } else if (type === 'gong') {
+                 const osc1 = audioContext.createOscillator(), osc2 = audioContext.createOscillator();
+                 osc1.type = 'sine'; osc2.type = 'sine'; osc1.frequency.value = 150; osc2.frequency.value = 151.5;
+                 const now = audioContext.currentTime;
+                 alarmGain.gain.setValueAtTime(0, now);
+                 alarmGain.gain.linearRampToValueAtTime(0.7, now + 0.01);
+                 alarmGain.gain.exponentialRampToValueAtTime(0.001, now + 5);
+                 osc1.connect(alarmGain); osc2.connect(alarmGain);
+                 osc1.start(now); osc2.start(now); osc1.stop(now + 6); osc2.stop(now + 6);
+             }
+        }
+
+        // --- Hemi-Sync Audio Engine ---
+        function populateBrainwavePresets() {
+            const container = document.getElementById('brainwave-presets');
+            container.innerHTML = '';
+            for (const [key, value] of Object.entries(brainwavePresets)) {
+                const button = document.createElement('button');
+                button.className = 'p-2 text-left bg-indigo-900/50 rounded-lg hover:bg-indigo-800/80 transition';
+                button.innerHTML = `<div class="font-semibold text-sm">${key}</div><div class="text-xs text-indigo-300">${value.name}</div>`;
+                button.onclick = () => applyBrainwavePreset(value.beat, value.carrier);
+                container.appendChild(button);
+            }
+        }
+
+        function applyBrainwavePreset(beat, carrier) {
+            binauralState.beatFreq = beat;
+            binauralState.carrierFreq = carrier;
+            document.getElementById('beat-freq').value = beat;
+            document.getElementById('beat-freq-display').value = beat.toFixed(2);
+            document.getElementById('carrier-freq').value = carrier;
+            document.getElementById('carrier-freq-display').value = carrier.toFixed(1);
+            updateBeatFreqLabel(beat);
+            updateBinauralFrequencies();
+        }
+
+        function updateBeatFreqLabel(freq) {
+            let label = "Sub-Delta";
+            if (freq >= 40) label = "Gamma";
+            else if (freq >= 13) label = "Beta";
+            else if (freq >= 8) label = "Alpha";
+            else if (freq >= 4) label = "Theta";
+            else if (freq >= 0.5) label = "Delta";
+            document.getElementById('beat-freq-label').textContent = label;
+            updateAIChatContext();
+        }
+        
+        function toggleBinauralEngine() {
+            if (binauralState.isRunning) {
+                // Stop the engine
+                binauralState.isRunning = false;
+                if (binauralState.oscL) binauralState.oscL.stop();
+                if (binauralState.oscR) binauralState.oscR.stop();
+                if (binauralState.lfo) binauralState.lfo.stop();
+                binauralState.gainNode?.disconnect();
+                Object.assign(binauralState, { oscL: null, oscR: null, gainNode: null, lfo: null, lfoGain: null });
+            } else {
+                 // Start the engine
+                if (orbitState.isRunning) {
+                    toggleOrbit(); // Ensure orbit is off
+                }
+                binauralState.isRunning = true;
+                if (!audioContext) setupAudioContext();
+                
+                binauralState.gainNode = audioContext.createGain();
+                binauralState.oscL = audioContext.createOscillator();
+                binauralState.oscR = audioContext.createOscillator();
+                
+                updateBinauralFrequencies();
+
+                const pannerL = audioContext.createStereoPanner(); pannerL.pan.value = -1;
+                const pannerR = audioContext.createStereoPanner(); pannerR.pan.value = 1;
+                binauralState.oscL.connect(pannerL).connect(binauralState.gainNode);
+                binauralState.oscR.connect(pannerR).connect(binauralState.gainNode);
+                binauralState.gainNode.connect(masterGain);
+                
+                if (binauralState.isochronicEnabled) {
+                    binauralState.gainNode.gain.value = 0;
+                    binauralState.lfo = audioContext.createOscillator();
+                    binauralState.lfo.type = 'square';
+                    binauralState.lfo.frequency.value = binauralState.isochronicFreq;
+                    binauralState.lfoGain = audioContext.createGain();
+                    binauralState.lfoGain.gain.value = binauralState.volume;
+                    binauralState.lfo.connect(binauralState.lfoGain);
+                    binauralState.lfoGain.connect(binauralState.gainNode.gain);
+                    binauralState.lfo.start();
+                } else {
+                    binauralState.gainNode.gain.value = binauralState.volume;
+                }
+                
+                binauralState.oscL.start();
+                binauralState.oscR.start();
+            }
+            const btn = document.getElementById('start-stop-binaural-btn');
+            btn.textContent = binauralState.isRunning ? 'Stop Engine' : 'Start Engine';
+            btn.classList.toggle('bg-indigo-600', !binauralState.isRunning);
+            btn.classList.toggle('bg-red-600', binauralState.isRunning);
+        }
+        
+        function updateBinauralFrequencies() {
+            if (!binauralState.isRunning || !audioContext) return;
+            
+            const freq1 = binauralState.carrierFreq - (binauralState.beatFreq / 2);
+            const freq2 = binauralState.carrierFreq + (binauralState.beatFreq / 2);
+            
+            binauralState.oscL.frequency.setTargetAtTime(freq1, audioContext.currentTime, 0.01);
+            binauralState.oscR.frequency.setTargetAtTime(freq2, audioContext.currentTime, 0.01);
+            requestSave();
+        }
+
+        // --- Orbit Functions ---
+        function toggleOrbit() {
+            if (orbitState.isRunning) {
+                // Stop orbit
+                orbitState.isRunning = false;
+                orbitState.pairs.forEach(pair => stopOrbitPair(pair));
+            } else {
+                // Start orbit
+                if (binauralState.isRunning) {
+                    toggleBinauralEngine(); // Ensure main engine is off
+                }
+                orbitState.isRunning = true;
+                orbitState.pairs.forEach(pair => startOrbitPair(pair));
+            }
+            const btn = document.getElementById('start-stop-orbit-btn');
+            btn.textContent = orbitState.isRunning ? 'Stop Orbit' : 'Start Orbit';
+            btn.classList.toggle('bg-indigo-600', !orbitState.isRunning);
+            btn.classList.toggle('bg-red-600', orbitState.isRunning);
+            requestSave();
+        }
+
+        function addOrbitPair() {
+            const PHI = 1.61803398875;
+            const baseAudioRadius = 5;
+            const lastRadius = orbitState.pairs.length > 0 ? orbitState.pairs[orbitState.pairs.length - 1].audioRadius : baseAudioRadius / PHI;
+            const newAudioRadius = lastRadius * PHI;
+
+            const id = `orbit-${Date.now()}`;
+            const pair = {
+                id,
+                oscL: null, oscR: null,
+                pannerL: null, pannerR: null,
+                gain: null,
+                audioRadius: newAudioRadius,
+                angleOffset: Math.random() * 2 * Math.PI
+            };
+            orbitState.pairs.push(pair);
+            document.getElementById('orbit-pair-count').textContent = orbitState.pairs.length;
+
+            if (orbitState.isRunning) {
+                startOrbitPair(pair);
+            }
+            requestSave();
+        }
+
+        function removeAllOrbits() {
+            if (orbitState.isRunning) {
+                toggleOrbit(); // Stop the orbit engine
+            }
+            orbitState.pairs.forEach(pair => stopOrbitPair(pair)); // Ensure any lingering nodes are stopped
+            orbitState.pairs = [];
+            document.getElementById('orbit-pair-count').textContent = 0;
+            requestSave();
+        }
+
+        function startOrbitPair(pair) {
+            if (!audioContext) setupAudioContext();
+            
+            pair.gain = audioContext.createGain();
+            pair.gain.gain.value = binauralState.volume;
+            pair.gain.connect(masterGain);
+
+            pair.oscL = audioContext.createOscillator();
+            pair.pannerL = audioContext.createPanner();
+            pair.pannerL.panningModel = 'HRTF';
+            pair.oscL.frequency.value = binauralState.carrierFreq - (binauralState.beatFreq / 2);
+            pair.oscL.connect(pair.pannerL).connect(pair.gain);
+            pair.oscL.start();
+
+            pair.oscR = audioContext.createOscillator();
+            pair.pannerR = audioContext.createPanner();
+            pair.pannerR.panningModel = 'HRTF';
+            pair.oscR.frequency.value = binauralState.carrierFreq + (binauralState.beatFreq / 2);
+            pair.oscR.connect(pair.pannerR).connect(pair.gain);
+            pair.oscR.start();
+        }
+
+        function stopOrbitPair(pair) {
+            if (pair.oscL) pair.oscL.stop();
+            if (pair.oscR) pair.oscR.stop();
+            if (pair.gain) pair.gain.disconnect();
+            Object.assign(pair, { oscL: null, oscR: null, gain: null, pannerL: null, pannerR: null });
+        }
+
+        function updateOrbit(timestamp) {
+            if (!orbitState.isRunning || !audioContext) return;
+
+            const time = timestamp / 1000;
+            const R = 10; // Base radius for panner positioning
+
+            let currentSpeed = orbitState.speed;
+            if (orbitState.autoScaleSpeed) {
+                const minSpeed = 0.1;
+                const maxSpeed = 5.0;
+                const pulse = (Math.sin(breathPhase * 2 * Math.PI) + 1) / 2;
+                currentSpeed = minSpeed + (maxSpeed - minSpeed) * pulse;
+            }
+
+            let currentXYRatio = orbitState.xyRatio;
+            if (orbitState.autoScaleShape) {
+                const minRatio = 0.2;
+                const maxRatio = 1.0;
+                const pulse = (Math.cos(breathPhase * 2 * Math.PI) + 1) / 2;
+                currentXYRatio = minRatio + (maxRatio - minRatio) * pulse;
+            }
+
+            orbitState.pairs.forEach(pair => {
+                if (!pair.pannerL || !pair.pannerR) return;
+
+                const angle = time * currentSpeed * (2 * Math.PI) + pair.angleOffset;
+                
+                let x1, y1, z1;
+
+                switch (orbitState.algorithm) {
+                    case 'figureEight':
+                        x1 = R * Math.sin(angle * 2);
+                        y1 = 0;
+                        z1 = R * Math.cos(angle) * currentXYRatio;
+                        break;
+                    case 'elliptical':
+                        x1 = R * Math.cos(angle);
+                        y1 = 0;
+                        z1 = R * Math.sin(angle) * currentXYRatio;
+                        break;
+                    case 'circular':
+                    default:
+                        x1 = R * Math.cos(angle);
+                        y1 = 0;
+                        z1 = R * Math.sin(angle);
+                        break;
+                }
+                
+                const x2 = -x1, y2 = -y1, z2 = -z1;
+                
+                pair.pannerL.positionX.setTargetAtTime(x1 * (pair.audioRadius / R), audioContext.currentTime, 0.01);
+                pair.pannerL.positionY.setTargetAtTime(y1, audioContext.currentTime, 0.01);
+                pair.pannerL.positionZ.setTargetAtTime(z1 * (pair.audioRadius / R), audioContext.currentTime, 0.01);
+                
+                pair.pannerR.positionX.setTargetAtTime(x2 * (pair.audioRadius / R), audioContext.currentTime, 0.01);
+                pair.pannerR.positionY.setTargetAtTime(y2, audioContext.currentTime, 0.01);
+                pair.pannerR.positionZ.setTargetAtTime(z2 * (pair.audioRadius / R), audioContext.currentTime, 0.01);
+            });
+        }
+
+
+        // --- Visualizations ---
+        function startRenderLoop() {
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            
+            function render(timestamp) {
+                if (tracersEnabled) {
+                    ctx.fillStyle = document.body.dataset.theme === 'light' ? 'rgba(238, 242, 255, 0.1)' : 'rgba(12, 10, 30, 0.1)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                } else {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+                
+                (visualThemes[currentTheme] || visualThemes.gateway)(timestamp);
+
+                if (sideStrobesEnabled) drawSideStrobes(timestamp);
+                if (orbitState.isRunning) drawOrbitVisuals(timestamp);
+                
+                updateOrbit(timestamp);
+
+                animationFrameId = requestAnimationFrame(render);
+            }
+            animationFrameId = requestAnimationFrame(render);
+        }
+        
+        function handleVisibilityChange() {
+            if (!persistentModeEnabled) return;
+            if (document.hidden) {
+                cancelAnimationFrame(animationFrameId);
+            } else {
+                startRenderLoop();
+            }
+        }
+
+        function hexToRgb(hex) {
+            let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r: 200, g: 210, b: 254};
+        }
+
+        function drawSideStrobes(timestamp) {
+            if (!binauralState.isRunning) return;
+
+            const timeInSeconds = timestamp / 1000;
+
+            const leftFreq = (binauralState.carrierFreq - binauralState.beatFreq / 2) * strobeFreqMultiplier;
+            const rightFreq = (binauralState.carrierFreq + binauralState.beatFreq / 2) * strobeFreqMultiplier;
+
+            const leftPhase = (timeInSeconds * leftFreq) % 1;
+            const rightPhase = (timeInSeconds * rightFreq) % 1;
+
+            const leftOpacity = Math.pow(Math.sin(leftPhase * 2 * Math.PI), 16) * 0.08;
+            const rightOpacity = Math.pow(Math.sin(rightPhase * 2 * Math.PI), 16) * 0.08;
+            
+            const rgb = hexToRgb(strobeColor);
+
+            if (leftOpacity > 0.005) {
+                const gradL = ctx.createRadialGradient(0, canvas.height / 2, 0, 0, canvas.height / 2, canvas.width / 3);
+                gradL.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${leftOpacity})`);
+                gradL.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
+                ctx.fillStyle = gradL;
+                ctx.fillRect(0, 0, canvas.width / 2, canvas.height);
+            }
+
+            if (rightOpacity > 0.005) {
+                const gradR = ctx.createRadialGradient(canvas.width, canvas.height / 2, 0, canvas.width, canvas.height / 2, canvas.width / 3);
+                gradR.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${rightOpacity})`);
+                gradR.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
+                ctx.fillStyle = gradR;
+                ctx.fillRect(canvas.width / 2, 0, canvas.width / 2, canvas.height);
+            }
+        }
+
+        function drawOrbitVisuals(timestamp) {
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const time = timestamp / 1000;
+            const PHI = 1.618;
+
+            let currentSpeed = orbitState.speed;
+            if (orbitState.autoScaleSpeed) {
+                const minSpeed = 0.1;
+                const maxSpeed = 5.0;
+                const pulse = (Math.sin(breathPhase * 2 * Math.PI) + 1) / 2;
+                currentSpeed = minSpeed + (maxSpeed - minSpeed) * pulse;
+            }
+
+            let currentXYRatio = orbitState.xyRatio;
+            if (orbitState.autoScaleShape) {
+                const minRatio = 0.2;
+                const maxRatio = 1.0;
+                const pulse = (Math.cos(breathPhase * 2 * Math.PI) + 1) / 2;
+                currentXYRatio = minRatio + (maxRatio - minRatio) * pulse;
+            }
+
+            orbitState.pairs.forEach((pair, index) => {
+                const baseVisualRadius = breathRadius + 40;
+                const visualOrbitRadiusX = baseVisualRadius * Math.pow(PHI, index * 0.5);
+                const visualOrbitRadiusY = visualOrbitRadiusX * (orbitState.algorithm === 'circular' ? 1 : currentXYRatio);
+
+                const angle = time * currentSpeed * 2 * Math.PI + pair.angleOffset;
+                
+                let x1, y1, x2, y2;
+                
+                if (orbitState.algorithm === 'figureEight') {
+                    x1 = centerX + Math.sin(angle * 2) * visualOrbitRadiusX;
+                    y1 = centerY + Math.cos(angle) * visualOrbitRadiusY;
+                } else { // Circular and Elliptical
+                    x1 = centerX + Math.cos(angle) * visualOrbitRadiusX;
+                    y1 = centerY + Math.sin(angle) * visualOrbitRadiusY;
+                }
+
+                x2 = centerX + (centerX - x1);
+                y2 = centerY + (centerY - y1);
+                
+                ctx.fillStyle = 'rgba(224, 231, 255, 0.7)';
+                ctx.beginPath();
+                ctx.arc(x1, y1, 5, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(x2, y2, 5, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+        }
+        
+        function drawNPointFractal(t, points, isStar = false) {
+            const center_x = canvas.width / 2;
+            const center_y = canvas.height / 2;
+            const maxDepth = minimalistModeEnabled ? 3 : 4;
+            
+            const pulseCycleDuration = breathInterval * 2 * 1000;
+            const timeFactor = (t % pulseCycleDuration) / pulseCycleDuration;
+            const pulseAngle = timeFactor * 2 * Math.PI;
+            const zoom = (Math.sin(pulseAngle - Math.PI / 2) + 1) / 2;
+
+            ctx.save();
+            ctx.translate(center_x, center_y);
+
+            function drawRecursiveShape(x, y, size, angle, depth) {
+                if (depth > maxDepth) return;
+
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+
+                const hue = (250 + (t / 150) + depth * 20) % 360;
+                const lightness = 90 - depth * 10;
+                const opacity = 1 - (depth / (maxDepth + 1));
+                ctx.strokeStyle = `hsla(${hue}, 100%, ${lightness}%, ${opacity})`;
+                ctx.lineWidth = Math.max(0.5, 3 - depth);
+
+                ctx.beginPath();
+                for (let i = 0; i <= points; i++) {
+                    const angleMultiplier = isStar ? Math.floor(points / 2) : 1;
+                    const pointAngle = (i * 2 * Math.PI * angleMultiplier / points) - Math.PI / 2;
+                    const px = size * Math.cos(pointAngle);
+                    const py = size * Math.sin(pointAngle);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+                
+                const newSize = size * 0.5;
+                const newAngle = angle + t / 50000;
+
+                for (let i = 0; i < points; i++) {
+                    const vertexAngle = (i * 2 * Math.PI / points) - Math.PI / 2;
+                    const offset = size;
+                    const offsetX = x + offset * Math.cos(vertexAngle + angle);
+                    const offsetY = y + offset * Math.sin(vertexAngle + angle);
+                    drawRecursiveShape(offsetX, offsetY, newSize, newAngle, depth + 1);
+                }
+            }
+            
+            const initialSize = canvas.width * (0.02 + zoom * 0.2);
+            const initialAngle = t / 20000;
+            drawRecursiveShape(0, 0, initialSize, initialAngle, 0);
+
+            ctx.restore();
+        }
+
+        const visualThemes = {
+            gateway: (t) => {
+                updateBreathingGuide();
+                const beatFreq = binauralState.isRunning ? binauralState.beatFreq : 4;
+                const waveSpeed = t * 0.0001;
+                const waveCount = minimalistModeEnabled ? 2 : 5;
+
+                for(let i=0; i<waveCount; i++) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(165, 180, 252, ${0.1 + (i/waveCount)*0.2})`;
+                    ctx.lineWidth = 1 + (i/waveCount) * 2;
+                    for(let x=0; x < canvas.width; x++) {
+                        const y = canvas.height / 2 + Math.sin(x / (50 + i*20) + waveSpeed * (i+1) * 20) * (beatFreq * 2) * Math.cos(waveSpeed * i);
+                        ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+                
+                ctx.strokeStyle='rgba(224, 231, 255, .8)';
+                ctx.lineWidth=2;
+                ctx.beginPath();
+                ctx.arc(canvas.width/2,canvas.height/2,breathRadius,0,2*Math.PI);
+                ctx.stroke();
+            },
+            mindseye: (t) => {
+                updateBreathingGuide();
+                const center_x = canvas.width / 2;
+                const center_y = canvas.height / 2;
+                const beatFreq = binauralState.isRunning ? binauralState.beatFreq : 4;
+
+                const layers = minimalistModeEnabled ? 2 : 5;
+                for (let i = 0; i < layers; i++) {
+                    const radius = breathRadius + i * 20 + Math.sin(t * 0.0005 + i) * 10;
+                    const points = 3 + Math.floor(beatFreq / 4);
+                    const rotation = t * 0.0001 * (i % 2 === 0 ? 1 : -1);
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(center_x + radius * Math.cos(rotation), center_y + radius * Math.sin(rotation));
+                    for (let j = 1; j <= points; j++) {
+                        const angle = (j * 2 * Math.PI / points) + rotation;
+                        ctx.lineTo(center_x + radius * Math.cos(angle), center_y + radius * Math.sin(angle));
+                    }
+                    ctx.closePath();
+                    ctx.strokeStyle = `rgba(199, 210, 254, ${0.1 + (i/layers)*0.3})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            },
+            deepSpace: (t) => {
+                if(particles.length < (minimalistModeEnabled ? 50 : 200)) particles.push(createStar());
+                particles.forEach((p,i) => {
+                    p.z -= 0.5;
+                    if(p.z <= 0){ particles.splice(i,1); return; }
+                    const scale = (500 / p.z) * (canvas.width / 1000);
+                    const x = canvas.width / 2 + p.x * scale;
+                    const y = canvas.height / 2 + p.y * scale;
+                    const size = Math.max(0.1, 1.5 * scale);
+                    ctx.fillStyle = `rgba(255, 255, 255, ${p.opacity})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            },
+            liquidMind: (t) => {
+                if(particles.length < (minimalistModeEnabled ? 15 : 50)) particles.push(createLiquidParticle());
+                particles.forEach((p, i) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= 1;
+                    if(p.life <= 0) particles.splice(i, 1);
+                    
+                    p.vx += (Math.random() - 0.5) * 0.1;
+                    p.vy += (Math.random() - 0.5) * 0.1;
+                    
+                    if(p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if(p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                    ctx.beginPath();
+                    ctx.fillStyle = `rgba(129, 140, 248, ${p.life / 500})`;
+                    ctx.arc(p.x, p.y, p.size, 0, 2 * Math.PI);
+                    ctx.fill();
+                });
+            },
+            fivePointFractal: (t) => {
+                drawNPointFractal(t, 5, true);
+            },
+            sixPointFractal: (t) => {
+                drawNPointFractal(t, 6, false);
+            },
+            sevenPointFractal: (t) => {
+                drawNPointFractal(t, 7, true);
+            }
+        };
+
+        function updateBreathingGuide() {
+            const totalCycleTime = breathInterval * 2; // Inhale + Exhale
+            breathPhase = (performance.now() / (1000 * totalCycleTime)) % 1;
+            const phaseAngle = breathPhase * 2 * Math.PI;
+            
+            const minRadius = 40, maxRadius = 100;
+            breathRadius = minRadius + (maxRadius - minRadius) * (0.5 + Math.sin(phaseAngle - Math.PI/2) * 0.5);
+        }
+        function createStar() { return { x: Math.random() * canvas.width - canvas.width/2, y: Math.random()*canvas.height - canvas.height/2, z: Math.random()*1000, opacity: Math.random() }; }
+        function createLiquidParticle() {
+            return {
+                x: canvas.width / 2, y: canvas.height / 2,
+                vx: (Math.random() - 0.5) * 2, vy: (Math.random() - 0.5) * 2,
+                size: Math.random() * 3 + 1,
+                life: Math.random() * 300 + 200
+            };
+        }
+        function resetVisuals() { particles = []; breathPhase = 0; }
+        
+        // --- AI Assistant ---
+        const AI_PROXY_URL = "https://your-project-name.vercel.app/api/chat";
+
+        const chatBox=document.getElementById("chat-box"),chatInput=document.getElementById("chat-input"),quickRepliesContainer=document.getElementById("quick-replies");
+        function addChatMessage(text, sender = "ai") {
+            const messageEl = document.createElement("div");
+            messageEl.className = `p-3 rounded-lg max-w-[80%] ${sender === "user" ? "bg-indigo-600 ml-auto" : "bg-gray-700 mr-auto"}`;
+            messageEl.textContent = text;
+            chatBox.appendChild(messageEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            if (sender === "user") {
+                chatHistory.push({ role: "user", parts: [{ text }] });
+            } else {
+                chatHistory.push({ role: "model", parts: [{ text }] });
+            }
+        }
+        function sendChatMessage() {
+            const prompt = chatInput.value.trim();
+            if (prompt) {
+                addChatMessage(prompt, "user");
+                getAIResponse(prompt);
+                chatInput.value = "";
+            }
+        }
+        async function getAIResponse(prompt) {
+            const loadingEl = document.createElement("div");
+            loadingEl.className = "p-3 rounded-lg max-w-[80%] bg-gray-700 mr-auto animate-pulse";
+            loadingEl.textContent = "● ● ●";
+            chatBox.appendChild(loadingEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            if (AI_PROXY_URL.includes("your-project-name")) {
+                chatBox.removeChild(loadingEl);
+                addChatMessage("AI not configured. Please deploy the serverless function and update the AI_PROXY_URL in the script.", "ai");
+                return;
+            }
+            
+            const beatFreqLabel = document.getElementById('beat-freq-label').textContent;
+            const systemInstruction = `You are an empathetic Hemi-Sync and meditation assistant. Your goal is to provide concise, helpful guidance for exploring consciousness. The user is currently in the "${themes[currentTheme].name}" visual theme and targeting the "${beatFreqLabel}" brainwave state. Guide them in concepts like Focus 10 (mind awake, body asleep), Focus 12 (expanded awareness), and letting go. Keep responses brief and encouraging.`;
+            const payload = {
+                contents: [...chatHistory, { role: "user", parts: [{ text: prompt }] }],
+                systemInstruction: { role: "system", parts: [{ text: systemInstruction }] }
+            };
+
+            try {
+                const response = await fetch(AI_PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText} - ${await response.text()}`);
+                }
+                
+                const result = await response.json();
+                chatBox.removeChild(loadingEl);
+
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts[0].text) {
+                    const aiText = result.candidates[0].content.parts[0].text;
+                    addChatMessage(aiText, "ai");
+                } else {
+                    addChatMessage("I'm sorry, I couldn't generate a response. Please try again.", "ai");
+                }
+            } catch (error) {
+                console.error("AI Proxy call failed:", error);
+                chatBox.removeChild(loadingEl);
+                addChatMessage("Sorry, I'm having trouble connecting to the AI assistant.", "ai");
+            }
+        }
+        function updateAIChatContext(){
+            const beatFreqLabel = document.getElementById('beat-freq-label').textContent;
+            const quickReplyOptions={
+                general:["What is Focus 10?","Help me let go","Guide my breathing"],
+                Delta:["Deep relaxation prompt", "Release physical tension"],
+                Theta:["Explore my inner world", "Access creativity"],
+                Alpha:["How to enter Focus 10?", "Quiet my mind"],
+                Beta:["Help me focus my energy", "Prepare for a task"],
+                Gamma:["Peak awareness prompt", "Problem solving state"]
+            };
+            quickRepliesContainer.innerHTML="";
+            const replies=quickReplyOptions[beatFreqLabel]||quickReplyOptions.general;
+            replies.forEach(reply=>{
+                const btn=document.createElement("button");
+                btn.textContent=reply,btn.className="px-3 py-1 bg-gray-600 rounded-full text-sm hover:bg-gray-500 transition",
+                btn.onclick=()=>{chatInput.value=reply,sendChatMessage()},
+                quickRepliesContainer.appendChild(btn)
+            })
+        }
+        
+        // --- Share/Import & Notification Functions ---
+        function exportSettings() {
+            const settings = {
+                theme: currentTheme, 
+                breathInterval,
+                tracersEnabled,
+                sideStrobesEnabled,
+                strobeColor,
+                strobeFreqMultiplier,
+                minimalistModeEnabled,
+                binaural: {
+                    carrierFreq: binauralState.carrierFreq,
+                    beatFreq: binauralState.beatFreq,
+                    volume: binauralState.volume,
+                    isochronicEnabled: binauralState.isochronicEnabled,
+                    isochronicFreq: binauralState.isochronicFreq,
+                },
+                orbit: {
+                    speed: orbitState.speed,
+                    pairCount: orbitState.pairs.length,
+                    algorithm: orbitState.algorithm,
+                    xyRatio: orbitState.xyRatio,
+                    autoScaleSpeed: orbitState.autoScaleSpeed,
+                    autoScaleShape: orbitState.autoScaleShape,
+                },
+                panelPositions: getPanelPositions()
+            };
+            const settingsString = JSON.stringify(settings);
+            const encodedSettings = btoa(settingsString); // Base64 encode
+            document.getElementById('export-code').value = encodedSettings;
+        }
+
+        function copyExportCode() {
+            const exportArea = document.getElementById('export-code');
+            exportArea.select();
+            exportArea.setSelectionRange(0, 99999); // For mobile devices
+            document.execCommand('copy');
+            showNotification('Settings code copied to clipboard!');
+        }
+
+        function importSettings() {
+            const importCode = document.getElementById('import-code').value.trim();
+            if (!importCode) return;
+            try {
+                const decodedString = atob(importCode); // Base64 decode
+                const settings = JSON.parse(decodedString);
+                applySettings(settings);
+                showNotification('Settings imported successfully!');
+                document.getElementById('share-panel').classList.add('hidden');
+            } catch (e) {
+                console.error("Import failed:", e);
+                showNotification("Invalid settings code. Please check and try again.", "error");
+            }
+        }
+        
+        function showNotification(message, type = 'success') {
+            const modal = document.getElementById('notification-modal');
+            const messageEl = document.getElementById('notification-message');
+            
+            messageEl.textContent = message;
+            modal.classList.remove('bg-green-500', 'bg-red-500');
+            modal.classList.add(type === 'success' ? 'bg-green-500' : 'bg-red-500');
+            
+            modal.classList.remove('opacity-0', '-translate-y-20');
+            
+            setTimeout(() => {
+                modal.classList.add('opacity-0', '-translate-y-20');
+            }, 3000);
+        }
+        
+        function showConfirmation(title, message, onConfirm) {
+            const modal = document.getElementById('confirmation-modal');
+            document.getElementById('confirmation-title').textContent = title;
+            document.getElementById('confirmation-message').textContent = message;
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            
+            const cancelBtn = document.getElementById('confirm-cancel-btn');
+            const actionBtn = document.getElementById('confirm-action-btn');
+            
+            const close = () => {
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                actionBtn.replaceWith(actionBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+            };
+            
+            document.getElementById('confirm-cancel-btn').onclick = close;
+            document.getElementById('confirm-action-btn').onclick = () => {
+                onConfirm();
+                close();
+            };
+        }
+
+        // --- Start the App ---
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
