@@ -128,7 +128,7 @@
                 if (e.target.classList.contains('component')) {
                     let width = 100, height = 60;
                     if(e.target.id === 'pwm-board') { width = 150; height = 80; }
-                    if(e.target.id === 'signal-generator') { height = 80; }
+                    if(e.target.id === 'signal-generator') { width = 150; height = 100; }
                     draggingComponent = {
                         id: e.target.id,
                         type: e.target.id.replace('-', '_'),
@@ -285,8 +285,6 @@
                     drawCanvas();
                 }
             });
-
-            // REMOVED: canvas.addEventListener('wheel', ...);
             
             canvas.addEventListener('dblclick', (e) => {
                 if (isSimulating) return;
@@ -379,7 +377,7 @@
 
             function drawVoltageRails() {
                 const railYTop = 20;
-                const railYBottom = 780; // Adjusted for larger canvas
+                const railYBottom = 780;
                 
                 ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3 / view.scale;
                 ctx.beginPath(); ctx.moveTo(-10000, railYTop); ctx.lineTo(10000, railYTop); ctx.stroke();
@@ -476,8 +474,27 @@
                 ctx.fillStyle = '#d1fae5';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.font = `${14 / view.scale}px Inter`;
-                ctx.fillText(comp.text, comp.x + comp.width / 2, comp.y + comp.height / 2);
+                
+                if (comp.type === 'signal_generator') {
+                    // Draw screen and text for signal generator
+                    const screenX = comp.x + 5;
+                    const screenY = comp.y + 5;
+                    const screenW = comp.width - 10;
+                    const screenH = comp.height - 35;
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(screenX, screenY, screenW, screenH);
+                    
+                    ctx.fillStyle = '#6ee7b7';
+                    ctx.font = `${12 / view.scale}px "Courier New", monospace`;
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`Freq: ${comp.properties.frequency} Hz`, screenX + 10, screenY + screenH / 3);
+                    ctx.fillText(`Duty: ${comp.properties.dutyCycle} %`, screenX + 10, screenY + (screenH * 2 / 3));
+
+                } else {
+                    ctx.font = `${14 / view.scale}px Inter`;
+                    ctx.fillText(comp.text, comp.x + comp.width / 2, comp.y + comp.height / 2);
+                }
+
                 
                 const terminals = getComponentTerminals(comp);
                 for(const name in terminals) {
@@ -592,6 +609,9 @@
                             const newVal = parseFloat(e.target.value);
                             if(!isNaN(newVal)){
                                 selectedComponent.properties[e.target.dataset.key] = newVal;
+                                if (isSimulating) { // Redraw component text if sim is running
+                                    drawCanvas();
+                                }
                             }
                         });
                         propDiv.appendChild(label);
@@ -672,6 +692,7 @@
                     if (signalGen) {
                         const { frequency, dutyCycle } = signalGen.properties;
                         const spectrumData = calculatePWMSpectrum(frequency, dutyCycle / 100);
+                        drawWaveform(frequency, dutyCycle, `waveform-svg-${board.uid}`);
                         drawSpectrum(spectrumData, frequency, `spectrum-svg-${board.uid}`);
 
                         const period = 1 / frequency;
@@ -754,21 +775,62 @@
                     
                     const title = document.createElement('h2');
                     title.className = 'text-xl font-semibold text-green-300 mb-4';
-                    title.textContent = `Spectrum Analysis for Board #${board.uid}`;
+                    title.textContent = `Analysis for Board #${board.uid}`;
                     
-                    const svgContainer = document.createElement('div');
-                    svgContainer.className = 'bg-gray-800 p-4 rounded-lg';
-                    
-                    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                    svg.id = `spectrum-svg-${board.uid}`;
-                    svg.setAttribute('width', '100%');
-                    svg.setAttribute('height', '300');
-                    
-                    svgContainer.appendChild(svg);
+                    const waveformContainer = document.createElement('div');
+                    waveformContainer.className = 'bg-gray-800 p-4 rounded-lg mb-4';
+                    const waveformSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    waveformSvg.id = `waveform-svg-${board.uid}`;
+                    waveformSvg.setAttribute('width', '100%');
+                    waveformSvg.setAttribute('height', '100');
+                    waveformContainer.appendChild(waveformSvg);
+
+                    const spectrumContainerDiv = document.createElement('div');
+                    spectrumContainerDiv.className = 'bg-gray-800 p-4 rounded-lg';
+                    const spectrumSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    spectrumSvg.id = `spectrum-svg-${board.uid}`;
+                    spectrumSvg.setAttribute('width', '100%');
+                    spectrumSvg.setAttribute('height', '300');
+                    spectrumContainerDiv.appendChild(spectrumSvg);
+
                     chartWrapper.appendChild(title);
-                    chartWrapper.appendChild(svgContainer);
+                    chartWrapper.appendChild(waveformContainer);
+                    chartWrapper.appendChild(spectrumContainerDiv);
                     spectrumContainer.appendChild(chartWrapper);
                 });
+            }
+            
+            function drawWaveform(frequency, dutyCycle, svgId) {
+                const svg = d3.select(`#${svgId}`);
+                if (svg.empty()) return;
+
+                const { width, height } = svg.node().getBoundingClientRect();
+                if (width === 0) return;
+                svg.selectAll("*").remove();
+                const margin = { top: 10, right: 10, bottom: 20, left: 30 };
+
+                const period = 1 / frequency;
+                const t_on = period * (dutyCycle / 100);
+
+                const data = [
+                    {t: 0, v: 0},
+                    {t: 0, v: 1},
+                    {t: t_on, v: 1},
+                    {t: t_on, v: 0},
+                    {t: period, v: 0}
+                ];
+
+                const xScale = d3.scaleLinear().domain([0, period]).range([margin.left, width - margin.right]);
+                const yScale = d3.scaleLinear().domain([-0.1, 1.1]).range([height - margin.bottom, margin.top]);
+                const axisColor = "#6ee7b7";
+
+                svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`).call(d3.axisBottom(xScale).ticks(5, ".2s")).attr("color", axisColor).selectAll("text").attr("fill", axisColor);
+                svg.append("g").attr("transform", `translate(${margin.left},0)`).call(d3.axisLeft(yScale).ticks(2)).attr("color", axisColor).selectAll("text").attr("fill", axisColor);
+
+                const line = d3.line().x(d => xScale(d.t)).y(d => yScale(d.v));
+                svg.append("path").datum(data).attr("fill", "none").attr("stroke", "#f87171").attr("stroke-width", 2).attr("d", line);
+
+                svg.append("text").attr("x", width/2).attr("y", height - 2).attr("fill", axisColor).attr("text-anchor", "middle").style("font-size", "12px").text("Time (s)");
             }
 
             function drawSpectrum(data, fundamentalFreq, svgId) {
@@ -789,13 +851,31 @@
                 svg.append("text").attr("transform", "rotate(-90)").attr("y", 15).attr("x", -height / 2).attr("fill", axisColor).attr("text-anchor", "middle").text("Amplitude");
 
                 svg.selectAll("rect.bar").data(data).enter().append("rect").attr("class", "bar").attr("x", d => xScale(d.frequency) - 2).attr("y", d => yScale(d.amplitude)).attr("width", 4).attr("height", d => height - margin.bottom - yScale(d.amplitude)).attr("fill", d => d.frequency === 0 ? "#a78bfa" : (d.frequency === fundamentalFreq ? "#f87171" : "#60a5fa"));
+
+                // Add harmonic labels
+                svg.selectAll("text.harmonic-label").data(data).enter()
+                    .filter(d => d.frequency > 0 && (d.frequency / fundamentalFreq) % 2 !== 0)
+                    .append("text")
+                    .attr("class", "harmonic-label")
+                    .attr("x", d => xScale(d.frequency))
+                    .attr("y", d => yScale(d.amplitude) - 5)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#a7f3d0")
+                    .style("font-size", "10px")
+                    .text(d => {
+                        const harmonicOrder = Math.round(d.frequency / fundamentalFreq);
+                        if (harmonicOrder === 1) return "Fundamental";
+                        if (harmonicOrder === 3) return "3rd Harmonic";
+                        if (harmonicOrder === 5) return "5th Harmonic";
+                        return null;
+                    });
             }
             
             function loadPreset() {
                 stopSimulation();
                 
                 const dc = { id:'dc-supply', type:'dc_supply', text:'DC Supply', width:100, height:60, x:50, y:50, uid:1, properties:getDefaultProperties('dc_supply') };
-                const sg = { id:'signal-generator', type:'signal_generator', text:'Signal Gen', width:100, height:80, x:50, y:200, uid:2, properties:{...getDefaultProperties('signal_generator'), frequency: 40} };
+                const sg = { id:'signal-generator', type:'signal_generator', text:'Signal Gen', width:150, height:100, x:50, y:200, uid:2, properties:{...getDefaultProperties('signal_generator'), frequency: 40} };
                 const board = { id:'pwm-board', type:'pwm_board', text:'PWM Board', width:150, height:80, x:225, y:150, uid:3, properties:getDefaultProperties('pwm_board') };
                 
                 const leds = [];
@@ -810,7 +890,7 @@
                 wires = [
                     { start:{component:dc, name:'positive'}, end:{component:{uid:'V_RAIL_POS_150', type:'rail', x:150, y:20}}, bendPoints:[], uid:101, isActive:false },
                     { start:{component:dc, name:'negative'}, end:{component:{uid:'V_RAIL_NEG_150', type:'rail', x:150, y:780}}, bendPoints:[], uid:102, isActive:false },
-                    { start:{component:sg, name:'SIG OUT'}, end:{component:board, name:'SIG IN'}, bendPoints:[{x:100, y:290}, {x:225, y:290}], uid:103, isActive:false },
+                    { start:{component:sg, name:'SIG OUT'}, end:{component:board, name:'SIG IN'}, bendPoints:[{x:125, y:310}, {x:225, y:310}], uid:103, isActive:false },
                     { start:{component:{uid:'V_RAIL_POS_250', type:'rail', x:250, y:20}, name:'V+'}, end:{component:board, name:'DC+ IN'}, bendPoints:[], uid:104, isActive:false },
                     { start:{component:{uid:'V_RAIL_NEG_300', type:'rail', x:300, y:780}, name:'GND'}, end:{component:board, name:'DC- IN'}, bendPoints:[], uid:105, isActive:false },
                 ];
