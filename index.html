@@ -97,6 +97,7 @@
                     <button id="projects-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Projects</button>
                     <button id="pages-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Pages</button>
                     <button id="tutorials-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Tutorials</button>
+                    <button id="research-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Research</button>
                     <!-- New button for the Codex Module -->
                     <button id="codex-btn" class="nav-btn text-lg text-gray-300 hover:text-white transition-colors pb-1">Codex</button>
                     
@@ -289,6 +290,7 @@
         const projectsBtn = document.getElementById('projects-btn');
         const pagesBtn = document.getElementById('pages-btn');
         const tutorialsBtn = document.getElementById('tutorials-btn');
+        const researchBtn = document.getElementById('research-btn');
         const codexBtn = document.getElementById('codex-btn'); // Codex button
         const loginBtn = document.getElementById('login-btn');
         const logoutBtn = document.getElementById('logout-btn');
@@ -351,6 +353,13 @@
                 if (!response.ok) throw new Error(`Could not load ${filePath}. Status: ${response.status}`);
                 contentArea.innerHTML = await response.text();
                 
+                // If we've loaded the research page, we need to initialize its script
+                if (filePath === 'research.html') {
+                    const script = document.createElement('script');
+                    script.src = 'research.js'; // Assuming the logic is in research.js
+                    document.body.appendChild(script);
+                }
+
                 navButtons.forEach(btn => btn.classList.remove('nav-active'));
                 if(buttonToActivate) {
                     buttonToActivate.classList.add('nav-active');
@@ -372,6 +381,7 @@
         projectsBtn.addEventListener('click', () => loadContent('projects.html', projectsBtn));
         pagesBtn.addEventListener('click', () => loadContent('pages.html', pagesBtn));
         tutorialsBtn.addEventListener('click', () => loadContent('tutorials.html', tutorialsBtn));
+        researchBtn.addEventListener('click', () => loadContent('research.html', researchBtn));
         codexBtn.addEventListener('click', () => {
             if (mainPageAnimationId) cancelAnimationFrame(mainPageAnimationId);
             contentArea.classList.add('hidden');
@@ -396,11 +406,11 @@
                  event.preventDefault();
                  const elementToToggle = document.getElementById(toggleTarget.getAttribute('data-toggle-id'));
                  if (elementToToggle) {
-                     elementToToggle.classList.toggle('hidden');
-                     const icon = toggleTarget.querySelector('span:last-child');
-                     if(icon) {
-                        icon.textContent = elementToToggle.classList.contains('hidden') ? '+' : '-';
-                     }
+                       elementToToggle.classList.toggle('hidden');
+                       const icon = toggleTarget.querySelector('span:last-child');
+                       if(icon) {
+                           icon.textContent = elementToToggle.classList.contains('hidden') ? '+' : '-';
+                       }
                  }
             }
             // Logic for tutorial buttons
