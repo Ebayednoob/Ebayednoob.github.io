@@ -12,7 +12,8 @@ const toBinary = (num, length) => {
     return Math.floor(num).toString(2).padStart(length, '0');
 };
 
-const createShdCcpPacket = (r, g, b, a) => {
+const createShdCcpPacket = (pixel) => {
+    const { r, g, b, a } = pixel;
     const quatW = toBinary(r, 8);
     const quatX = toBinary(g, 8);
     const quatY = toBinary(b, 8);
@@ -20,10 +21,11 @@ const createShdCcpPacket = (r, g, b, a) => {
     const compressedQuaternion = `${quatW}${quatX}${quatY}${quatZ}`;
     const structuralFormId = toBinary(r % 16, 4);
     const amplitudeId = toBinary(g % 8, 3);
-    const reserved = toBinary(0, 1);
+    const reserved = toBinary(0, 1); // Always 0 in this version
     const frequencyId = toBinary(b % 32, 5);
     const spinClassId = toBinary(a % 8, 3);
     const payloadScalingFactor = toBinary(Math.floor(((r + g + b) / 3) * (65535 / 255)), 16);
+
     return {
         compressedQuaternion,
         structuralFormId,
@@ -32,7 +34,9 @@ const createShdCcpPacket = (r, g, b, a) => {
         frequencyId,
         spinClassId,
         payloadScalingFactor,
-        fullPacket: `${compressedQuaternion}${structuralFormId}${amplitudeId}${reserved}${frequencyId}${spinClassId}${payloadScalingFactor}`
+        isCompressed: false, // Always false
+        runLength: 1,
+        pixel,
     };
 };
 
@@ -49,11 +53,12 @@ const Tooltip = ({ text, children }) => (
 
 const PacketVisualizer = ({ packet }) => {
     if (!packet) return null;
+    
     const fields = [
         { name: 'Quaternion (RGBA)', value: packet.compressedQuaternion, color: 'text-green-400', bits: 32, desc: 'W(R), X(G), Y(B), Z(A) components, 8 bits each.' },
         { name: 'Struct ID', value: packet.structuralFormId, color: 'text-cyan-400', bits: 4, desc: 'Maps to a pre-compiled computational kernel.' },
         { name: 'Amplitude ID', value: packet.amplitudeId, color: 'text-yellow-400', bits: 3, desc: 'Represents concept magnitude or importance.' },
-        { name: 'Reserved', value: packet.reserved, color: 'text-gray-500', bits: 1, desc: 'Reserved for future use or parity.' },
+        { name: 'Reserved', value: packet.reserved, color: 'text-gray-500', bits: 1, desc: 'Compression Flag: OFF' },
         { name: 'Frequency ID', value: packet.frequencyId, color: 'text-purple-400', bits: 5, desc: 'Maps to GPU operational states.' },
         { name: 'Spin Class ID', value: packet.spinClassId, color: 'text-orange-400', bits: 3, desc: 'Maps to a rotational behavior or state update rule.' },
         { name: 'Payload Scale', value: packet.payloadScalingFactor, color: 'text-red-400', bits: 16, desc: 'A universal scaling factor for the payload.' },
@@ -124,19 +129,16 @@ const QFTSimulator = ({ pixelHistory, currentFrame }) => {
     );
 };
 
-const HolographicViewer = ({ videoFrames, currentFrame, dimensions, trailLength, isLive }) => {
+const HolographicViewer = ({ videoFrames, currentFrame, dimensions, trailLength, isTemporalLinkingEnabled, similarityTolerance, linkOpacity }) => {
     const mountRef = useRef(null);
-    const mainPointsRef = useRef(null);
-    const trailPointsRef = useRef([]);
     const rendererRef = useRef(null);
-    const sceneRef = useRef(null);
+    const frameGroupsRef = useRef([]);
 
     useEffect(() => {
-        if (!mountRef.current || (!videoFrames.length && !isLive)) return;
+        if (!mountRef.current || !videoFrames.length) return;
 
         const { width, height } = dimensions;
         const scene = new THREE.Scene();
-        sceneRef.current = scene;
         const camera = new THREE.PerspectiveCamera(75, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         rendererRef.current = renderer;
@@ -148,43 +150,27 @@ const HolographicViewer = ({ videoFrames, currentFrame, dimensions, trailLength,
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        const positions = new Float32Array(width * height * 3);
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const i = (y * width + x) * 3;
-                positions[i] = x - width / 2;
-                positions[i + 1] = -y + height / 2;
-                positions[i + 2] = 0;
-            }
-        }
-        
-        trailPointsRef.current.forEach(points => scene.remove(points));
-        trailPointsRef.current = [];
+        frameGroupsRef.current.forEach(group => scene.remove(group));
+        frameGroupsRef.current = [];
 
-        if (mainPointsRef.current) scene.remove(mainPointsRef.current);
-        const mainGeometry = new THREE.BufferGeometry();
-        mainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        mainGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(width * height * 3), 3));
-        const mainMaterial = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, sizeAttenuation: true });
-        mainPointsRef.current = new THREE.Points(mainGeometry, mainMaterial);
-        scene.add(mainPointsRef.current);
-        
-        for (let i = 0; i < trailLength; i++) {
-            const trailGeometry = new THREE.BufferGeometry();
-            trailGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            trailGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(width * height * 3), 3));
+        for (let i = 0; i < trailLength + 1; i++) {
+            const group = new THREE.Group();
+            const pointsGeometry = new THREE.BufferGeometry();
+            pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3), 3));
+            pointsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3), 3));
+            const pointsMaterial = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, transparent: true });
+            const points = new THREE.Points(pointsGeometry, pointsMaterial);
             
-            const trailMaterial = new THREE.PointsMaterial({
-                size: 1.5,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.5 - (i * (0.5 / trailLength))
-            });
+            const linesGeometry = new THREE.BufferGeometry();
+            linesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3 * 2), 3));
+            linesGeometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3 * 2), 3));
+            const linesMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true });
+            const lines = new THREE.LineSegments(linesGeometry, linesMaterial);
 
-            const trailPoints = new THREE.Points(trailGeometry, trailMaterial);
-            trailPoints.position.z = -(i + 1) * 3;
-            trailPointsRef.current.push(trailPoints);
-            scene.add(trailPoints);
+            group.add(points);
+            group.add(lines);
+            scene.add(group);
+            frameGroupsRef.current.push(group);
         }
 
         camera.position.z = Math.max(width, height) / 1.5;
@@ -212,41 +198,85 @@ const HolographicViewer = ({ videoFrames, currentFrame, dimensions, trailLength,
                 mountRef.current.removeChild(rendererRef.current.domElement);
             }
         };
-    }, [dimensions, videoFrames.length, trailLength, isLive]);
+    }, [dimensions, videoFrames.length, trailLength]);
 
     useEffect(() => {
-        if (!videoFrames.length) return;
+        if (!videoFrames.length || !frameGroupsRef.current.length) return;
 
-        if (mainPointsRef.current) {
-            const frameData = videoFrames[currentFrame].data;
-            const colors = mainPointsRef.current.geometry.attributes.color.array;
-            for (let i = 0; i < frameData.length / 4; i++) {
-                const colorIndex = i * 3;
-                const dataIndex = i * 4;
-                colors[colorIndex] = frameData[dataIndex] / 255;
-                colors[colorIndex + 1] = frameData[dataIndex + 1] / 255;
-                colors[colorIndex + 2] = frameData[dataIndex + 2] / 255;
+        const { width, height } = dimensions;
+        const COLOR_TOLERANCE = (similarityTolerance / 100) * 255;
+
+        frameGroupsRef.current.forEach((group, i) => {
+            const frameIndex = (currentFrame - i + videoFrames.length) % videoFrames.length;
+            const frameData = videoFrames[frameIndex]?.data;
+            if (!frameData) return;
+
+            const isMainFrame = i === 0;
+            group.position.z = -i * 5;
+
+            const points = group.children[0];
+            const lines = group.children[1];
+
+            const pPos = points.geometry.attributes.position.array;
+            const pCol = points.geometry.attributes.color.array;
+            const lPos = lines.geometry.attributes.position.array;
+            const lCol = lines.geometry.attributes.color.array;
+            
+            let pCount = 0;
+            let lCount = 0;
+
+            if (isTemporalLinkingEnabled && !isMainFrame) {
+                const prevFrameIndex = (frameIndex - 1 + videoFrames.length) % videoFrames.length;
+                const prevFrameData = videoFrames[prevFrameIndex]?.data;
+                if (!prevFrameData) return;
+
+                for (let pIdx = 0; pIdx < frameData.length / 4; pIdx++) {
+                    const cIdx = pIdx * 4;
+                    const r1 = frameData[cIdx], g1 = frameData[cIdx+1], b1 = frameData[cIdx+2];
+                    const r2 = prevFrameData[cIdx], g2 = prevFrameData[cIdx+1], b2 = prevFrameData[cIdx+2];
+                    
+                    const isSimilar = Math.abs(r1 - r2) < COLOR_TOLERANCE && Math.abs(g1 - g2) < COLOR_TOLERANCE && Math.abs(b1 - b2) < COLOR_TOLERANCE;
+                    
+                    const x = (pIdx % width) - width / 2;
+                    const y = -(Math.floor(pIdx / width)) + height / 2;
+
+                    if (isSimilar) {
+                        lPos[lCount * 6] = x; lPos[lCount * 6 + 1] = y; lPos[lCount * 6 + 2] = 5;
+                        lPos[lCount * 6 + 3] = x; lPos[lCount * 6 + 4] = y; lPos[lCount * 6 + 5] = 0;
+                        lCol[lCount * 6] = r1/255; lCol[lCount * 6 + 1] = g1/255; lCol[lCount * 6 + 2] = b1/255;
+                        lCol[lCount * 6 + 3] = r1/255; lCol[lCount * 6 + 4] = g1/255; lCol[lCount * 6 + 5] = b1/255;
+                        lCount++;
+                    } else {
+                        pPos[pCount * 3] = x; pPos[pCount * 3 + 1] = y; pPos[pCount * 3 + 2] = 0;
+                        pCol[pCount * 3] = r1/255; pCol[pCount * 3 + 1] = g1/255; pCol[pCount * 3 + 2] = b1/255;
+                        pCount++;
+                    }
+                }
+            } else { // Default point cloud
+                for (let pIdx = 0; pIdx < frameData.length / 4; pIdx++) {
+                    const cIdx = pIdx * 4;
+                    pPos[pCount * 3] = (pIdx % width) - width / 2;
+                    pPos[pCount * 3 + 1] = -(Math.floor(pIdx / width)) + height / 2;
+                    pPos[pCount * 3 + 2] = 0;
+                    pCol[pCount * 3] = frameData[cIdx]/255;
+                    pCol[pCount * 3 + 1] = frameData[cIdx+1]/255;
+                    pCol[pCount * 3 + 2] = frameData[cIdx+2]/255;
+                    pCount++;
+                }
             }
-            mainPointsRef.current.geometry.attributes.color.needsUpdate = true;
-        }
 
-        trailPointsRef.current.forEach((trailPoints, index) => {
-            const frameIndex = (currentFrame - (index + 1) + videoFrames.length) % videoFrames.length;
-            if (!videoFrames[frameIndex]) return;
-            const frameData = videoFrames[frameIndex].data;
-            const colors = trailPoints.geometry.attributes.color.array;
+            points.geometry.setDrawRange(0, pCount);
+            points.material.opacity = isMainFrame ? 1.0 : 0.5 - (i * (0.5 / trailLength));
+            points.geometry.attributes.position.needsUpdate = true;
+            points.geometry.attributes.color.needsUpdate = true;
 
-            for (let i = 0; i < frameData.length / 4; i++) {
-                const colorIndex = i * 3;
-                const dataIndex = i * 4;
-                colors[colorIndex] = frameData[dataIndex] / 255;
-                colors[colorIndex + 1] = frameData[dataIndex + 1] / 255;
-                colors[colorIndex + 2] = frameData[dataIndex + 2] / 255;
-            }
-            trailPoints.geometry.attributes.color.needsUpdate = true;
+            lines.geometry.setDrawRange(0, lCount * 2);
+            lines.material.opacity = 1 - (linkOpacity / 100);
+            lines.geometry.attributes.position.needsUpdate = true;
+            lines.geometry.attributes.color.needsUpdate = true;
         });
 
-    }, [currentFrame, videoFrames]);
+    }, [currentFrame, videoFrames, trailLength, dimensions, isTemporalLinkingEnabled, similarityTolerance, linkOpacity]);
 
     return <div ref={mountRef} className="w-full h-full bg-purple-950 rounded-lg" />;
 };
@@ -264,6 +294,9 @@ export default function App() {
     const [activeView, setActiveView] = useState('inspector');
     const [trailLength, setTrailLength] = useState(12);
     const [isLive, setIsLive] = useState(false);
+    const [isTemporalLinkingEnabled, setIsTemporalLinkingEnabled] = useState(false);
+    const [similarityTolerance, setSimilarityTolerance] = useState(5);
+    const [linkOpacity, setLinkOpacity] = useState(90);
 
     const videoRef = useRef(null);
     const hiddenCanvasRef = useRef(null);
@@ -285,7 +318,6 @@ export default function App() {
 
     const handleReset = () => {
         stopLiveFeed();
-        
         setVideoSrc(null);
         setVideoFrames([]);
         setCurrentFrame(0);
@@ -295,7 +327,6 @@ export default function App() {
         setIsPlaying(false);
         setDimensions({ width: 0, height: 0 });
         setActiveView('inspector');
-
         if(videoRef.current) {
             videoRef.current.srcObject = null;
             videoRef.current.src = "";
@@ -308,7 +339,7 @@ export default function App() {
     const handleFileUpload = (event) => {
         const file = event.target.files[0];
         if (file) {
-            handleReset(); // Reset state before loading new file
+            handleReset();
             const url = URL.createObjectURL(file);
             setVideoSrc(url);
         }
@@ -316,22 +347,17 @@ export default function App() {
     
     const processVideo = useCallback((w, h) => {
         if (!videoRef.current || !hiddenCanvasRef.current) return;
-        
         const video = videoRef.current;
         const canvas = hiddenCanvasRef.current;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        
         setIsLoading(true);
         setLoadingProgress("Calculating frames...");
-
         const frameRate = 24;
         const duration = video.duration;
         const totalFrames = Math.floor(duration * frameRate);
         let framesProcessed = 0;
         const tempFrames = [];
-
         video.currentTime = 0;
-
         const onSeeked = () => {
             if (framesProcessed < totalFrames) {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -360,25 +386,17 @@ export default function App() {
                 liveStreamRef.current = stream;
                 videoRef.current.srcObject = stream;
                 videoRef.current.play();
-
                 videoRef.current.onloadedmetadata = () => {
                     const MAX_WIDTH = 480;
                     const scale = Math.min(1, MAX_WIDTH / videoRef.current.videoWidth);
                     const w = videoRef.current.videoWidth * scale;
                     const h = videoRef.current.videoHeight * scale;
                     setDimensions({ width: w, height: h });
-                    if (hiddenCanvasRef.current) {
-                        hiddenCanvasRef.current.width = w;
-                        hiddenCanvasRef.current.height = h;
-                    }
-                    if (displayCanvasRef.current) {
-                        displayCanvasRef.current.width = w;
-                        displayCanvasRef.current.height = h;
-                    }
+                    if (hiddenCanvasRef.current) { hiddenCanvasRef.current.width = w; hiddenCanvasRef.current.height = h; }
+                    if (displayCanvasRef.current) { displayCanvasRef.current.width = w; displayCanvasRef.current.height = h; }
                     setSelectedPixel({ x: Math.floor(w / 2), y: Math.floor(h / 2) });
                     captureLiveFrame();
                 };
-
             } catch (err) {
                 console.error("Error accessing webcam: ", err);
             }
@@ -387,25 +405,18 @@ export default function App() {
 
     const captureLiveFrame = useCallback(() => {
         if (!videoRef.current || !hiddenCanvasRef.current || !liveStreamRef.current) return;
-        
         const video = videoRef.current;
         const canvas = hiddenCanvasRef.current;
         const ctx = canvas.getContext('2d');
-
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        setVideoFrames(prevFrames => {
-            const newFrames = [...prevFrames, imageData];
-            if (newFrames.length > trailLength + 20) {
-                return newFrames.slice(newFrames.length - (trailLength + 20));
-            }
-            return newFrames;
+        
+        setVideoFrames(prev => {
+            const newFrames = [...prev, imageData];
+            return newFrames.length > trailLength + 20 ? newFrames.slice(1) : newFrames;
         });
         setCurrentFrame(prev => prev + 1);
-
         liveAnimationRef.current = requestAnimationFrame(captureLiveFrame);
-
     }, [trailLength]);
 
     useEffect(() => {
@@ -418,7 +429,6 @@ export default function App() {
             }
         };
     }, [isLive, captureLiveFrame]);
-
 
     useEffect(() => {
         if (videoSrc) {
@@ -438,14 +448,15 @@ export default function App() {
         }
     }, [videoSrc, processVideo]);
 
+    const displayFrameIndex = isLive ? videoFrames.length - 1 : currentFrame;
+
     useEffect(() => {
         if (videoFrames.length > 0 && displayCanvasRef.current && activeView === 'inspector') {
-            const frameIndex = isLive ? videoFrames.length - 1 : currentFrame;
-            if (!videoFrames[frameIndex]) return;
+            if (!videoFrames[displayFrameIndex]) return;
             const ctx = displayCanvasRef.current.getContext('2d');
-            ctx.putImageData(videoFrames[frameIndex], 0, 0);
+            ctx.putImageData(videoFrames[displayFrameIndex], 0, 0);
         }
-    }, [currentFrame, videoFrames, activeView, isLive]);
+    }, [currentFrame, videoFrames, activeView, isLive, displayFrameIndex]);
 
     useEffect(() => {
         let intervalId = null;
@@ -468,9 +479,8 @@ export default function App() {
     
     const getPixelData = (pixel) => {
         if (!pixel || videoFrames.length === 0) return null;
-        const frameIndex = isLive ? videoFrames.length - 1 : currentFrame;
-        if (!videoFrames[frameIndex]) return null;
-        const imageData = videoFrames[frameIndex].data;
+        if (!videoFrames[displayFrameIndex]) return null;
+        const imageData = videoFrames[displayFrameIndex].data;
         const i = (pixel.y * dimensions.width + pixel.x) * 4;
         return { r: imageData[i], g: imageData[i+1], b: imageData[i+2], a: imageData[i+3] };
     };
@@ -485,11 +495,9 @@ export default function App() {
     };
 
     const pixelData = getPixelData(selectedPixel);
-    const packet = useMemo(() => pixelData ? createShdCcpPacket(pixelData.r, pixelData.g, pixelData.b, pixelData.a) : null, [pixelData]);
+    const packet = useMemo(() => pixelData ? createShdCcpPacket(pixelData) : null, [pixelData]);
     const pixelHistory = useMemo(() => getPixelHistory(selectedPixel), [selectedPixel, videoFrames]);
     
-    const displayFrameIndex = isLive ? videoFrames.length -1 : currentFrame;
-
     return (
         <div className="bg-gray-900 text-gray-200 min-h-screen font-sans p-4 sm:p-8 flex flex-col">
             <header className="text-center mb-6">
@@ -498,17 +506,18 @@ export default function App() {
             </header>
 
             <main className="flex-grow flex flex-col lg:flex-row gap-8">
-                {/* Left Panel: Video and Controls */}
-                <div className="lg:w-1/2 flex flex-col items-center justify-center gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
-                    <div className="w-full flex-grow flex items-center justify-center relative bg-purple-950 rounded-lg">
+                <div className="lg:w-1/2 flex flex-col gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
+                    <div className="w-full flex-grow relative bg-purple-950 rounded-lg">
                         {(videoFrames.length > 0 || isLive) ? (
                             activeView === 'inspector' ? (
-                                <canvas ref={displayCanvasRef} onMouseMove={handleCanvasMouseMove} className="max-w-full max-h-full cursor-crosshair rounded-md" />
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <canvas ref={displayCanvasRef} onMouseMove={handleCanvasMouseMove} className="max-w-full max-h-full cursor-crosshair rounded-md" />
+                                </div>
                             ) : (
-                                <HolographicViewer videoFrames={videoFrames} currentFrame={displayFrameIndex} dimensions={dimensions} trailLength={trailLength} isLive={isLive} />
+                                <HolographicViewer videoFrames={videoFrames} currentFrame={displayFrameIndex} dimensions={dimensions} trailLength={trailLength} isTemporalLinkingEnabled={isTemporalLinkingEnabled} similarityTolerance={similarityTolerance} linkOpacity={linkOpacity} />
                             )
                         ) : (
-                            <div className="flex flex-col gap-4 text-gray-400">
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-gray-400">
                                 <label htmlFor="video-upload" className="cursor-pointer hover:text-cyan-400 transition-colors flex flex-col items-center gap-2">
                                     <Upload className="mx-auto h-12 w-12" />
                                     <span>Upload a Video File</span>
@@ -541,11 +550,25 @@ export default function App() {
                                 </div>
                             )}
                             {activeView === 'holographic' && (
+                                <>
                                 <div className="flex items-center gap-2 px-2">
                                     <Layers size={16} className="text-cyan-400" />
                                     <span className="text-sm font-mono w-28 text-center">Trail: {trailLength}</span>
                                     <input id="trail-slider" type="range" min="0" max="30" value={trailLength} onChange={(e) => setTrailLength(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
                                 </div>
+                                {isTemporalLinkingEnabled && (
+                                    <>
+                                    <div className="flex items-center gap-2 px-2">
+                                        <span className="text-sm font-mono w-28 text-center">Similarity: {similarityTolerance}%</span>
+                                        <input type="range" min="0" max="25" value={similarityTolerance} onChange={(e) => setSimilarityTolerance(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                    </div>
+                                    <div className="flex items-center gap-2 px-2">
+                                        <span className="text-sm font-mono w-28 text-center">Link Opacity: {100 - linkOpacity}%</span>
+                                        <input type="range" min="0" max="100" value={linkOpacity} onChange={(e) => setLinkOpacity(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                    </div>
+                                    </>
+                                )}
+                                </>
                             )}
                              <div className="flex justify-center gap-2 flex-wrap">
                                 <button onClick={() => setActiveView('inspector')} className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${activeView === 'inspector' ? 'bg-cyan-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
@@ -554,6 +577,15 @@ export default function App() {
                                 <button onClick={() => setActiveView('holographic')} className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${activeView === 'holographic' ? 'bg-cyan-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
                                     <Eye size={16} /> Holographic Viewer
                                 </button>
+                                {activeView === 'holographic' && (
+                                    <div className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-gray-700">
+                                        <span className="text-gray-300">Depth Link</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={isTemporalLinkingEnabled} onChange={() => setIsTemporalLinkingEnabled(!isTemporalLinkingEnabled)} className="sr-only peer" />
+                                            <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                                        </label>
+                                    </div>
+                                )}
                                 {isLive && (
                                      <button onClick={stopLiveFeed} className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors bg-red-600 hover:bg-red-500 text-white">
                                         <StopCircle size={16} /> Stop Feed
@@ -567,7 +599,6 @@ export default function App() {
                     )}
                 </div>
 
-                {/* Right Panel: Data Visualization */}
                 <div className="lg:w-1/2 flex flex-col gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
                     {(videoFrames.length > 0 || isLive) && selectedPixel ? (
                         <div className="space-y-4">
@@ -590,7 +621,7 @@ export default function App() {
             </main>
             <video ref={videoRef} src={videoSrc} className="hidden" muted playsInline />
             <canvas ref={hiddenCanvasRef} className="hidden" />
-            <style>{`.range-thumb::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;background:#22d3ee;cursor:pointer;border-radius:50%;box-shadow:0 0 5px #22d3ee;}.range-thumb::-moz-range-thumb{width:16px;height:16px;background:#22d3ee;cursor:pointer;border-radius:50%;border:none;box-shadow:0 0 5px #22d3ee;}`}</style>
+            <style>{`.range-thumb::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;background:#22d3ee;cursor:pointer;border-radius:50%;box-shadow:0 0 5px #22d3ee;}.range-thumb::-moz-range-thumb{width:16px;height:16px;background:#22d3ee;cursor:pointer;border:none;border-radius:50%;box-shadow:0 0 5px #22d3ee;}`}</style>
         </div>
     );
 }
