@@ -62,7 +62,8 @@
     <script type="text/babel">
         // --- Globals from UMD scripts ---
         const { useState, useRef, useEffect, useCallback, useMemo } = React;
-        const { Upload, Info, Play, Pause, Eye, Code, Layers, Camera, StopCircle, RefreshCw } = lucide;
+        // Correctly reference the LucideReact global object for icons
+        const { Upload, Info, Play, Pause, Eye, Code, Layers, Camera, StopCircle, RefreshCw } = LucideReact;
         // THREE and OrbitControls are available globally via their script tags.
 
         // --- Helper Functions for SHD-CCP Packet ---
