@@ -1,627 +1,692 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Upload, Info, Play, Pause, Eye, Code, Layers, Camera, StopCircle, RefreshCw } from 'lucide-react';
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-
-// --- Helper Functions for SHD-CCP Packet ---
-
-const toBinary = (num, length) => {
-    if (typeof num !== 'number' || isNaN(num)) {
-        return '0'.padStart(length, '0');
-    }
-    return Math.floor(num).toString(2).padStart(length, '0');
-};
-
-const createShdCcpPacket = (pixel) => {
-    const { r, g, b, a } = pixel;
-    const quatW = toBinary(r, 8);
-    const quatX = toBinary(g, 8);
-    const quatY = toBinary(b, 8);
-    const quatZ = toBinary(a, 8);
-    const compressedQuaternion = `${quatW}${quatX}${quatY}${quatZ}`;
-    const structuralFormId = toBinary(r % 16, 4);
-    const amplitudeId = toBinary(g % 8, 3);
-    const reserved = toBinary(0, 1); // Always 0 in this version
-    const frequencyId = toBinary(b % 32, 5);
-    const spinClassId = toBinary(a % 8, 3);
-    const payloadScalingFactor = toBinary(Math.floor(((r + g + b) / 3) * (65535 / 255)), 16);
-
-    return {
-        compressedQuaternion,
-        structuralFormId,
-        amplitudeId,
-        reserved,
-        frequencyId,
-        spinClassId,
-        payloadScalingFactor,
-        isCompressed: false, // Always false
-        runLength: 1,
-        pixel,
-    };
-};
-
-// --- React Components ---
-
-const Tooltip = ({ text, children }) => (
-    <div className="relative flex items-center group">
-        {children}
-        <div className="absolute left-full ml-4 w-48 px-2 py-1 bg-gray-800 border border-cyan-400/50 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-            {text}
-        </div>
-    </div>
-);
-
-const PacketVisualizer = ({ packet }) => {
-    if (!packet) return null;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporal SHD-CCP Stream Visualizer</title>
     
-    const fields = [
-        { name: 'Quaternion (RGBA)', value: packet.compressedQuaternion, color: 'text-green-400', bits: 32, desc: 'W(R), X(G), Y(B), Z(A) components, 8 bits each.' },
-        { name: 'Struct ID', value: packet.structuralFormId, color: 'text-cyan-400', bits: 4, desc: 'Maps to a pre-compiled computational kernel.' },
-        { name: 'Amplitude ID', value: packet.amplitudeId, color: 'text-yellow-400', bits: 3, desc: 'Represents concept magnitude or importance.' },
-        { name: 'Reserved', value: packet.reserved, color: 'text-gray-500', bits: 1, desc: 'Compression Flag: OFF' },
-        { name: 'Frequency ID', value: packet.frequencyId, color: 'text-purple-400', bits: 5, desc: 'Maps to GPU operational states.' },
-        { name: 'Spin Class ID', value: packet.spinClassId, color: 'text-orange-400', bits: 3, desc: 'Maps to a rotational behavior or state update rule.' },
-        { name: 'Payload Scale', value: packet.payloadScalingFactor, color: 'text-red-400', bits: 16, desc: 'A universal scaling factor for the payload.' },
-    ];
-    return (
-        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 font-mono text-xs">
-            <h3 className="text-lg font-sans text-cyan-300 mb-3">SHD-CCP Packet (64-bit)</h3>
-            <div className="break-all leading-relaxed">{fields.map(f => <span key={f.name} className={f.color}>{f.value}</span>)}</div>
-            <div className="mt-4 space-y-2 font-sans">
-                {fields.map(field => (
-                    <div key={field.name} className="flex items-center justify-between">
-                        <Tooltip text={field.desc}>
-                            <div className="flex items-center">
-                                <div className={`w-3 h-3 rounded-full mr-2 ${field.color.replace('text-', 'bg-').replace('-400', '-500')}`}></div>
-                                <span className="text-gray-300">{field.name} ({field.bits}b)</span>
-                            </div>
-                        </Tooltip>
-                        <span className={`${field.color} font-mono`}>{parseInt(field.value, 2)}</span>
-                    </div>
-                ))}
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons for React -->
+    <script src="https://unpkg.com/lucide-react/dist/lucide-react.js"></script>
+
+    <!-- three.js and OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a101d; /* A dark blue-gray background */
+        }
+        /* Custom styles for the range input thumb */
+        .range-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #22d3ee;
+            cursor: pointer;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #22d3ee;
+        }
+        .range-thumb::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #22d3ee;
+            cursor: pointer;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #22d3ee;
+        }
+    </style>
+</head>
+<body>
+    <!-- The root element for the React app -->
+    <div id="root"></div>
+
+    <!-- The React application code -->
+    <script type="text/babel">
+        // --- Globals from UMD scripts ---
+        const { useState, useRef, useEffect, useCallback, useMemo } = React;
+        const { Upload, Info, Play, Pause, Eye, Code, Layers, Camera, StopCircle, RefreshCw } = lucide;
+        // THREE and OrbitControls are available globally via their script tags.
+
+        // --- Helper Functions for SHD-CCP Packet ---
+        const toBinary = (num, length) => {
+            if (typeof num !== 'number' || isNaN(num)) {
+                return '0'.padStart(length, '0');
+            }
+            return Math.floor(num).toString(2).padStart(length, '0');
+        };
+
+        const createShdCcpPacket = (pixel) => {
+            const { r, g, b, a } = pixel;
+            const quatW = toBinary(r, 8);
+            const quatX = toBinary(g, 8);
+            const quatY = toBinary(b, 8);
+            const quatZ = toBinary(a, 8);
+            const compressedQuaternion = `${quatW}${quatX}${quatY}${quatZ}`;
+            const structuralFormId = toBinary(r % 16, 4);
+            const amplitudeId = toBinary(g % 8, 3);
+            const reserved = toBinary(0, 1); // Always 0 in this version
+            const frequencyId = toBinary(b % 32, 5);
+            const spinClassId = toBinary(a % 8, 3);
+            const payloadScalingFactor = toBinary(Math.floor(((r + g + b) / 3) * (65535 / 255)), 16);
+
+            return {
+                compressedQuaternion,
+                structuralFormId,
+                amplitudeId,
+                reserved,
+                frequencyId,
+                spinClassId,
+                payloadScalingFactor,
+                isCompressed: false, // Always false
+                runLength: 1,
+                pixel,
+            };
+        };
+
+        // --- React Components ---
+
+        const Tooltip = ({ text, children }) => (
+            <div className="relative flex items-center group">
+                {children}
+                <div className="absolute left-full ml-4 w-48 px-2 py-1 bg-gray-800 border border-cyan-400/50 text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
+                    {text}
+                </div>
             </div>
-        </div>
-    );
-};
+        );
 
-const QFTSimulator = ({ pixelHistory, currentFrame }) => {
-    const canvasRef = useRef(null);
-    useEffect(() => {
-        if (!pixelHistory || pixelHistory.length === 0 || !canvasRef.current) return;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        const { width, height } = canvas;
-        const signal = pixelHistory.map(p => (Math.sin(p.r / 255 * Math.PI * 2) + Math.cos(p.g / 255 * Math.PI) - Math.sin(p.b / 255 * Math.PI)) / 3);
-        ctx.clearRect(0, 0, width, height);
-        const gradient = ctx.createLinearGradient(0, 0, width, 0);
-        gradient.addColorStop(0, '#00ffff');
-        gradient.addColorStop(0.5, '#ff00ff');
-        gradient.addColorStop(1, '#ffff00');
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 2;
-        ctx.shadowColor = 'rgba(0, 255, 255, 0.7)';
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.moveTo(0, height / 2);
-        signal.forEach((val, i) => {
-            const x = (i / (signal.length - 1)) * width;
-            const y = height / 2 + val * (height / 2.5);
-            ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-        ctx.shadowColor = 'transparent';
-        if (currentFrame >= 0 && currentFrame < signal.length) {
-            const markerX = (currentFrame / (signal.length - 1)) * width;
-            ctx.beginPath();
-            ctx.moveTo(markerX, 0);
-            ctx.lineTo(markerX, height);
-            ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-        }
-    }, [pixelHistory, currentFrame]);
-    return (
-        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-            <h3 className="text-lg text-cyan-300 mb-3">Simulated QFT Waveform</h3>
-            <canvas ref={canvasRef} width="400" height="150" className="bg-black rounded-md w-full"></canvas>
-            <p className="text-xs text-gray-400 mt-2">Visual representation of the selected pixel's data over time.</p>
-        </div>
-    );
-};
-
-const HolographicViewer = ({ videoFrames, currentFrame, dimensions, trailLength, isTemporalLinkingEnabled, similarityTolerance, linkOpacity }) => {
-    const mountRef = useRef(null);
-    const rendererRef = useRef(null);
-    const frameGroupsRef = useRef([]);
-
-    useEffect(() => {
-        if (!mountRef.current || !videoFrames.length) return;
-
-        const { width, height } = dimensions;
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        rendererRef.current = renderer;
-        
-        renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        mountRef.current.appendChild(renderer.domElement);
-
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-
-        frameGroupsRef.current.forEach(group => scene.remove(group));
-        frameGroupsRef.current = [];
-
-        for (let i = 0; i < trailLength + 1; i++) {
-            const group = new THREE.Group();
-            const pointsGeometry = new THREE.BufferGeometry();
-            pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3), 3));
-            pointsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3), 3));
-            const pointsMaterial = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, transparent: true });
-            const points = new THREE.Points(pointsGeometry, pointsMaterial);
+        const PacketVisualizer = ({ packet }) => {
+            if (!packet) return null;
             
-            const linesGeometry = new THREE.BufferGeometry();
-            linesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3 * 2), 3));
-            linesGeometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3 * 2), 3));
-            const linesMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true });
-            const lines = new THREE.LineSegments(linesGeometry, linesMaterial);
-
-            group.add(points);
-            group.add(lines);
-            scene.add(group);
-            frameGroupsRef.current.push(group);
-        }
-
-        camera.position.z = Math.max(width, height) / 1.5;
-
-        let animationFrameId;
-        const animate = () => {
-            animationFrameId = requestAnimationFrame(animate);
-            controls.update();
-            renderer.render(scene, camera);
+            const fields = [
+                { name: 'Quaternion (RGBA)', value: packet.compressedQuaternion, color: 'text-green-400', bits: 32, desc: 'W(R), X(G), Y(B), Z(A) components, 8 bits each.' },
+                { name: 'Struct ID', value: packet.structuralFormId, color: 'text-cyan-400', bits: 4, desc: 'Maps to a pre-compiled computational kernel.' },
+                { name: 'Amplitude ID', value: packet.amplitudeId, color: 'text-yellow-400', bits: 3, desc: 'Represents concept magnitude or importance.' },
+                { name: 'Reserved', value: packet.reserved, color: 'text-gray-500', bits: 1, desc: 'Compression Flag: OFF' },
+                { name: 'Frequency ID', value: packet.frequencyId, color: 'text-purple-400', bits: 5, desc: 'Maps to GPU operational states.' },
+                { name: 'Spin Class ID', value: packet.spinClassId, color: 'text-orange-400', bits: 3, desc: 'Maps to a rotational behavior or state update rule.' },
+                { name: 'Payload Scale', value: packet.payloadScalingFactor, color: 'text-red-400', bits: 16, desc: 'A universal scaling factor for the payload.' },
+            ];
+            return (
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 font-mono text-xs">
+                    <h3 className="text-lg font-sans text-cyan-300 mb-3">SHD-CCP Packet (64-bit)</h3>
+                    <div className="break-all leading-relaxed">{fields.map(f => <span key={f.name} className={f.color}>{f.value}</span>)}</div>
+                    <div className="mt-4 space-y-2 font-sans">
+                        {fields.map(field => (
+                            <div key={field.name} className="flex items-center justify-between">
+                                <Tooltip text={field.desc}>
+                                    <div className="flex items-center">
+                                        <div className={`w-3 h-3 rounded-full mr-2 ${field.color.replace('text-', 'bg-').replace('-400', '-500')}`}></div>
+                                        <span className="text-gray-300">{field.name} ({field.bits}b)</span>
+                                    </div>
+                                </Tooltip>
+                                <span className={`${field.color} font-mono`}>{parseInt(field.value, 2)}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
         };
-        animate();
 
-        const handleResize = () => {
-            if (!mountRef.current || !rendererRef.current) return;
-            camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
-            camera.updateProjectionMatrix();
-            rendererRef.current.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+        const QFTSimulator = ({ pixelHistory, currentFrame }) => {
+            const canvasRef = useRef(null);
+            useEffect(() => {
+                if (!pixelHistory || pixelHistory.length === 0 || !canvasRef.current) return;
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const { width, height } = canvas;
+                const signal = pixelHistory.map(p => (Math.sin(p.r / 255 * Math.PI * 2) + Math.cos(p.g / 255 * Math.PI) - Math.sin(p.b / 255 * Math.PI)) / 3);
+                ctx.clearRect(0, 0, width, height);
+                const gradient = ctx.createLinearGradient(0, 0, width, 0);
+                gradient.addColorStop(0, '#00ffff');
+                gradient.addColorStop(0.5, '#ff00ff');
+                gradient.addColorStop(1, '#ffff00');
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = 'rgba(0, 255, 255, 0.7)';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(0, height / 2);
+                signal.forEach((val, i) => {
+                    const x = (i / (signal.length - 1)) * width;
+                    const y = height / 2 + val * (height / 2.5);
+                    ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+                ctx.shadowColor = 'transparent';
+                if (currentFrame >= 0 && currentFrame < signal.length) {
+                    const markerX = (currentFrame / (signal.length - 1)) * width;
+                    ctx.beginPath();
+                    ctx.moveTo(markerX, 0);
+                    ctx.lineTo(markerX, height);
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.8)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }, [pixelHistory, currentFrame]);
+            return (
+                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                    <h3 className="text-lg text-cyan-300 mb-3">Simulated QFT Waveform</h3>
+                    <canvas ref={canvasRef} width="400" height="150" className="bg-black rounded-md w-full"></canvas>
+                    <p className="text-xs text-gray-400 mt-2">Visual representation of the selected pixel's data over time.</p>
+                </div>
+            );
         };
-        window.addEventListener('resize', handleResize);
 
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-            window.removeEventListener('resize', handleResize);
-            if (mountRef.current && rendererRef.current && rendererRef.current.domElement) {
-                mountRef.current.removeChild(rendererRef.current.domElement);
-            }
-        };
-    }, [dimensions, videoFrames.length, trailLength]);
+        const HolographicViewer = ({ videoFrames, currentFrame, dimensions, trailLength, isTemporalLinkingEnabled, similarityTolerance, linkOpacity }) => {
+            const mountRef = useRef(null);
+            const rendererRef = useRef(null);
+            const frameGroupsRef = useRef([]);
 
-    useEffect(() => {
-        if (!videoFrames.length || !frameGroupsRef.current.length) return;
+            useEffect(() => {
+                if (!mountRef.current || !videoFrames.length) return;
 
-        const { width, height } = dimensions;
-        const COLOR_TOLERANCE = (similarityTolerance / 100) * 255;
+                const { width, height } = dimensions;
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, mountRef.current.clientWidth / mountRef.current.clientHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                rendererRef.current = renderer;
+                
+                renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                mountRef.current.appendChild(renderer.domElement);
 
-        frameGroupsRef.current.forEach((group, i) => {
-            const frameIndex = (currentFrame - i + videoFrames.length) % videoFrames.length;
-            const frameData = videoFrames[frameIndex]?.data;
-            if (!frameData) return;
+                const controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
 
-            const isMainFrame = i === 0;
-            group.position.z = -i * 5;
+                frameGroupsRef.current.forEach(group => scene.remove(group));
+                frameGroupsRef.current = [];
 
-            const points = group.children[0];
-            const lines = group.children[1];
-
-            const pPos = points.geometry.attributes.position.array;
-            const pCol = points.geometry.attributes.color.array;
-            const lPos = lines.geometry.attributes.position.array;
-            const lCol = lines.geometry.attributes.color.array;
-            
-            let pCount = 0;
-            let lCount = 0;
-
-            if (isTemporalLinkingEnabled && !isMainFrame) {
-                const prevFrameIndex = (frameIndex - 1 + videoFrames.length) % videoFrames.length;
-                const prevFrameData = videoFrames[prevFrameIndex]?.data;
-                if (!prevFrameData) return;
-
-                for (let pIdx = 0; pIdx < frameData.length / 4; pIdx++) {
-                    const cIdx = pIdx * 4;
-                    const r1 = frameData[cIdx], g1 = frameData[cIdx+1], b1 = frameData[cIdx+2];
-                    const r2 = prevFrameData[cIdx], g2 = prevFrameData[cIdx+1], b2 = prevFrameData[cIdx+2];
+                for (let i = 0; i < trailLength + 1; i++) {
+                    const group = new THREE.Group();
+                    const pointsGeometry = new THREE.BufferGeometry();
+                    pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3), 3));
+                    pointsGeometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3), 3));
+                    const pointsMaterial = new THREE.PointsMaterial({ size: 1.5, vertexColors: true, transparent: true });
+                    const points = new THREE.Points(pointsGeometry, pointsMaterial);
                     
-                    const isSimilar = Math.abs(r1 - r2) < COLOR_TOLERANCE && Math.abs(g1 - g2) < COLOR_TOLERANCE && Math.abs(b1 - b2) < COLOR_TOLERANCE;
-                    
-                    const x = (pIdx % width) - width / 2;
-                    const y = -(Math.floor(pIdx / width)) + height / 2;
+                    const linesGeometry = new THREE.BufferGeometry();
+                    linesGeometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3 * 2), 3));
+                    linesGeometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(width * height * 3 * 2), 3));
+                    const linesMaterial = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true });
+                    const lines = new THREE.LineSegments(linesGeometry, linesMaterial);
 
-                    if (isSimilar) {
-                        lPos[lCount * 6] = x; lPos[lCount * 6 + 1] = y; lPos[lCount * 6 + 2] = 5;
-                        lPos[lCount * 6 + 3] = x; lPos[lCount * 6 + 4] = y; lPos[lCount * 6 + 5] = 0;
-                        lCol[lCount * 6] = r1/255; lCol[lCount * 6 + 1] = g1/255; lCol[lCount * 6 + 2] = b1/255;
-                        lCol[lCount * 6 + 3] = r1/255; lCol[lCount * 6 + 4] = g1/255; lCol[lCount * 6 + 5] = b1/255;
-                        lCount++;
-                    } else {
-                        pPos[pCount * 3] = x; pPos[pCount * 3 + 1] = y; pPos[pCount * 3 + 2] = 0;
-                        pCol[pCount * 3] = r1/255; pCol[pCount * 3 + 1] = g1/255; pCol[pCount * 3 + 2] = b1/255;
-                        pCount++;
+                    group.add(points);
+                    group.add(lines);
+                    scene.add(group);
+                    frameGroupsRef.current.push(group);
+                }
+
+                camera.position.z = Math.max(width, height) / 1.5;
+
+                let animationFrameId;
+                const animate = () => {
+                    animationFrameId = requestAnimationFrame(animate);
+                    controls.update();
+                    renderer.render(scene, camera);
+                };
+                animate();
+
+                const handleResize = () => {
+                    if (!mountRef.current || !rendererRef.current) return;
+                    camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
+                    camera.updateProjectionMatrix();
+                    rendererRef.current.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+                };
+                window.addEventListener('resize', handleResize);
+
+                return () => {
+                    cancelAnimationFrame(animationFrameId);
+                    window.removeEventListener('resize', handleResize);
+                    if (mountRef.current && rendererRef.current && rendererRef.current.domElement) {
+                        mountRef.current.removeChild(rendererRef.current.domElement);
                     }
+                };
+            }, [dimensions, videoFrames.length, trailLength]);
+
+            useEffect(() => {
+                if (!videoFrames.length || !frameGroupsRef.current.length) return;
+
+                const { width, height } = dimensions;
+                const COLOR_TOLERANCE = (similarityTolerance / 100) * 255;
+
+                frameGroupsRef.current.forEach((group, i) => {
+                    const frameIndex = (currentFrame - i + videoFrames.length) % videoFrames.length;
+                    const frameData = videoFrames[frameIndex]?.data;
+                    if (!frameData) return;
+
+                    const isMainFrame = i === 0;
+                    group.position.z = -i * 5;
+
+                    const points = group.children[0];
+                    const lines = group.children[1];
+
+                    const pPos = points.geometry.attributes.position.array;
+                    const pCol = points.geometry.attributes.color.array;
+                    const lPos = lines.geometry.attributes.position.array;
+                    const lCol = lines.geometry.attributes.color.array;
+                    
+                    let pCount = 0;
+                    let lCount = 0;
+
+                    if (isTemporalLinkingEnabled && !isMainFrame) {
+                        const prevFrameIndex = (frameIndex - 1 + videoFrames.length) % videoFrames.length;
+                        const prevFrameData = videoFrames[prevFrameIndex]?.data;
+                        if (!prevFrameData) return;
+
+                        for (let pIdx = 0; pIdx < frameData.length / 4; pIdx++) {
+                            const cIdx = pIdx * 4;
+                            const r1 = frameData[cIdx], g1 = frameData[cIdx+1], b1 = frameData[cIdx+2];
+                            const r2 = prevFrameData[cIdx], g2 = prevFrameData[cIdx+1], b2 = prevFrameData[cIdx+2];
+                            
+                            const isSimilar = Math.abs(r1 - r2) < COLOR_TOLERANCE && Math.abs(g1 - g2) < COLOR_TOLERANCE && Math.abs(b1 - b2) < COLOR_TOLERANCE;
+                            
+                            const x = (pIdx % width) - width / 2;
+                            const y = -(Math.floor(pIdx / width)) + height / 2;
+
+                            if (isSimilar) {
+                                lPos[lCount * 6] = x; lPos[lCount * 6 + 1] = y; lPos[lCount * 6 + 2] = 5;
+                                lPos[lCount * 6 + 3] = x; lPos[lCount * 6 + 4] = y; lPos[lCount * 6 + 5] = 0;
+                                lCol[lCount * 6] = r1/255; lCol[lCount * 6 + 1] = g1/255; lCol[lCount * 6 + 2] = b1/255;
+                                lCol[lCount * 6 + 3] = r1/255; lCol[lCount * 6 + 4] = g1/255; lCol[lCount * 6 + 5] = b1/255;
+                                lCount++;
+                            } else {
+                                pPos[pCount * 3] = x; pPos[pCount * 3 + 1] = y; pPos[pCount * 3 + 2] = 0;
+                                pCol[pCount * 3] = r1/255; pCol[pCount * 3 + 1] = g1/255; pCol[pCount * 3 + 2] = b1/255;
+                                pCount++;
+                            }
+                        }
+                    } else { // Default point cloud
+                        for (let pIdx = 0; pIdx < frameData.length / 4; pIdx++) {
+                            const cIdx = pIdx * 4;
+                            pPos[pCount * 3] = (pIdx % width) - width / 2;
+                            pPos[pCount * 3 + 1] = -(Math.floor(pIdx / width)) + height / 2;
+                            pPos[pCount * 3 + 2] = 0;
+                            pCol[pCount * 3] = frameData[cIdx]/255;
+                            pCol[pCount * 3 + 1] = frameData[cIdx+1]/255;
+                            pCol[pCount * 3 + 2] = frameData[cIdx+2]/255;
+                            pCount++;
+                        }
+                    }
+
+                    points.geometry.setDrawRange(0, pCount);
+                    points.material.opacity = isMainFrame ? 1.0 : 0.5 - (i * (0.5 / trailLength));
+                    points.geometry.attributes.position.needsUpdate = true;
+                    points.geometry.attributes.color.needsUpdate = true;
+
+                    lines.geometry.setDrawRange(0, lCount * 2);
+                    lines.material.opacity = 1 - (linkOpacity / 100);
+                    lines.geometry.attributes.position.needsUpdate = true;
+                    lines.geometry.attributes.color.needsUpdate = true;
+                });
+
+            }, [currentFrame, videoFrames, trailLength, dimensions, isTemporalLinkingEnabled, similarityTolerance, linkOpacity]);
+
+            return <div ref={mountRef} className="w-full h-full bg-purple-950 rounded-lg" />;
+        };
+
+        function App() {
+            const [videoSrc, setVideoSrc] = useState(null);
+            const [videoFrames, setVideoFrames] = useState([]);
+            const [currentFrame, setCurrentFrame] = useState(0);
+            const [selectedPixel, setSelectedPixel] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const [loadingProgress, setLoadingProgress] = useState("");
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+            const [activeView, setActiveView] = useState('inspector');
+            const [trailLength, setTrailLength] = useState(12);
+            const [isLive, setIsLive] = useState(false);
+            const [isTemporalLinkingEnabled, setIsTemporalLinkingEnabled] = useState(false);
+            const [similarityTolerance, setSimilarityTolerance] = useState(5);
+            const [linkOpacity, setLinkOpacity] = useState(90);
+
+            const videoRef = useRef(null);
+            const hiddenCanvasRef = useRef(null);
+            const displayCanvasRef = useRef(null);
+            const liveStreamRef = useRef(null);
+            const liveAnimationRef = useRef(null);
+            const fileInputRef = useRef(null);
+
+            const stopLiveFeed = () => {
+                if (liveStreamRef.current) {
+                    liveStreamRef.current.getTracks().forEach(track => track.stop());
                 }
-            } else { // Default point cloud
-                for (let pIdx = 0; pIdx < frameData.length / 4; pIdx++) {
-                    const cIdx = pIdx * 4;
-                    pPos[pCount * 3] = (pIdx % width) - width / 2;
-                    pPos[pCount * 3 + 1] = -(Math.floor(pIdx / width)) + height / 2;
-                    pPos[pCount * 3 + 2] = 0;
-                    pCol[pCount * 3] = frameData[cIdx]/255;
-                    pCol[pCount * 3 + 1] = frameData[cIdx+1]/255;
-                    pCol[pCount * 3 + 2] = frameData[cIdx+2]/255;
-                    pCount++;
+                if (liveAnimationRef.current) {
+                    cancelAnimationFrame(liveAnimationRef.current);
                 }
-            }
+                setIsLive(false);
+                liveStreamRef.current = null;
+            };
 
-            points.geometry.setDrawRange(0, pCount);
-            points.material.opacity = isMainFrame ? 1.0 : 0.5 - (i * (0.5 / trailLength));
-            points.geometry.attributes.position.needsUpdate = true;
-            points.geometry.attributes.color.needsUpdate = true;
-
-            lines.geometry.setDrawRange(0, lCount * 2);
-            lines.material.opacity = 1 - (linkOpacity / 100);
-            lines.geometry.attributes.position.needsUpdate = true;
-            lines.geometry.attributes.color.needsUpdate = true;
-        });
-
-    }, [currentFrame, videoFrames, trailLength, dimensions, isTemporalLinkingEnabled, similarityTolerance, linkOpacity]);
-
-    return <div ref={mountRef} className="w-full h-full bg-purple-950 rounded-lg" />;
-};
-
-
-export default function App() {
-    const [videoSrc, setVideoSrc] = useState(null);
-    const [videoFrames, setVideoFrames] = useState([]);
-    const [currentFrame, setCurrentFrame] = useState(0);
-    const [selectedPixel, setSelectedPixel] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [loadingProgress, setLoadingProgress] = useState("");
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-    const [activeView, setActiveView] = useState('inspector');
-    const [trailLength, setTrailLength] = useState(12);
-    const [isLive, setIsLive] = useState(false);
-    const [isTemporalLinkingEnabled, setIsTemporalLinkingEnabled] = useState(false);
-    const [similarityTolerance, setSimilarityTolerance] = useState(5);
-    const [linkOpacity, setLinkOpacity] = useState(90);
-
-    const videoRef = useRef(null);
-    const hiddenCanvasRef = useRef(null);
-    const displayCanvasRef = useRef(null);
-    const liveStreamRef = useRef(null);
-    const liveAnimationRef = useRef(null);
-    const fileInputRef = useRef(null);
-
-    const stopLiveFeed = () => {
-        if (liveStreamRef.current) {
-            liveStreamRef.current.getTracks().forEach(track => track.stop());
-        }
-        if (liveAnimationRef.current) {
-            cancelAnimationFrame(liveAnimationRef.current);
-        }
-        setIsLive(false);
-        liveStreamRef.current = null;
-    };
-
-    const handleReset = () => {
-        stopLiveFeed();
-        setVideoSrc(null);
-        setVideoFrames([]);
-        setCurrentFrame(0);
-        setSelectedPixel(null);
-        setIsLoading(false);
-        setLoadingProgress("");
-        setIsPlaying(false);
-        setDimensions({ width: 0, height: 0 });
-        setActiveView('inspector');
-        if(videoRef.current) {
-            videoRef.current.srcObject = null;
-            videoRef.current.src = "";
-        }
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
-    };
-
-    const handleFileUpload = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            handleReset();
-            const url = URL.createObjectURL(file);
-            setVideoSrc(url);
-        }
-    };
-    
-    const processVideo = useCallback((w, h) => {
-        if (!videoRef.current || !hiddenCanvasRef.current) return;
-        const video = videoRef.current;
-        const canvas = hiddenCanvasRef.current;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        setIsLoading(true);
-        setLoadingProgress("Calculating frames...");
-        const frameRate = 24;
-        const duration = video.duration;
-        const totalFrames = Math.floor(duration * frameRate);
-        let framesProcessed = 0;
-        const tempFrames = [];
-        video.currentTime = 0;
-        const onSeeked = () => {
-            if (framesProcessed < totalFrames) {
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                tempFrames.push(imageData);
-                framesProcessed++;
-                setLoadingProgress(`Processing video: Frame ${framesProcessed} of ${totalFrames}`);
-                video.currentTime += 1 / frameRate;
-            } else {
-                setVideoFrames(tempFrames);
-                setSelectedPixel({ x: Math.floor(w / 2), y: Math.floor(h / 2) });
+            const handleReset = () => {
+                stopLiveFeed();
+                setVideoSrc(null);
+                setVideoFrames([]);
+                setCurrentFrame(0);
+                setSelectedPixel(null);
                 setIsLoading(false);
                 setLoadingProgress("");
-                video.removeEventListener('seeked', onSeeked);
-            }
-        };
-        video.addEventListener('seeked', onSeeked);
-    }, []);
-
-    const startLiveFeed = async () => {
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            handleReset();
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                setIsLive(true);
-                liveStreamRef.current = stream;
-                videoRef.current.srcObject = stream;
-                videoRef.current.play();
-                videoRef.current.onloadedmetadata = () => {
-                    const MAX_WIDTH = 480;
-                    const scale = Math.min(1, MAX_WIDTH / videoRef.current.videoWidth);
-                    const w = videoRef.current.videoWidth * scale;
-                    const h = videoRef.current.videoHeight * scale;
-                    setDimensions({ width: w, height: h });
-                    if (hiddenCanvasRef.current) { hiddenCanvasRef.current.width = w; hiddenCanvasRef.current.height = h; }
-                    if (displayCanvasRef.current) { displayCanvasRef.current.width = w; displayCanvasRef.current.height = h; }
-                    setSelectedPixel({ x: Math.floor(w / 2), y: Math.floor(h / 2) });
-                    captureLiveFrame();
-                };
-            } catch (err) {
-                console.error("Error accessing webcam: ", err);
-            }
-        }
-    };
-
-    const captureLiveFrame = useCallback(() => {
-        if (!videoRef.current || !hiddenCanvasRef.current || !liveStreamRef.current) return;
-        const video = videoRef.current;
-        const canvas = hiddenCanvasRef.current;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
-        setVideoFrames(prev => {
-            const newFrames = [...prev, imageData];
-            return newFrames.length > trailLength + 20 ? newFrames.slice(1) : newFrames;
-        });
-        setCurrentFrame(prev => prev + 1);
-        liveAnimationRef.current = requestAnimationFrame(captureLiveFrame);
-    }, [trailLength]);
-
-    useEffect(() => {
-        if (isLive) {
-            liveAnimationRef.current = requestAnimationFrame(captureLiveFrame);
-        }
-        return () => {
-            if (liveAnimationRef.current) {
-                cancelAnimationFrame(liveAnimationRef.current);
-            }
-        };
-    }, [isLive, captureLiveFrame]);
-
-    useEffect(() => {
-        if (videoSrc) {
-            const video = videoRef.current;
-            const onLoadedMetadata = () => {
-                const MAX_WIDTH = 480;
-                const scale = Math.min(1, MAX_WIDTH / video.videoWidth);
-                const w = video.videoWidth * scale;
-                const h = video.videoHeight * scale;
-                setDimensions({ width: w, height: h });
-                if (hiddenCanvasRef.current) { hiddenCanvasRef.current.width = w; hiddenCanvasRef.current.height = h; }
-                if (displayCanvasRef.current) { displayCanvasRef.current.width = w; displayCanvasRef.current.height = h; }
-                processVideo(w, h);
+                setIsPlaying(false);
+                setDimensions({ width: 0, height: 0 });
+                setActiveView('inspector');
+                if(videoRef.current) {
+                    videoRef.current.srcObject = null;
+                    videoRef.current.src = "";
+                }
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
             };
-            video.addEventListener('loadedmetadata', onLoadedMetadata);
-            return () => { if (video) video.removeEventListener('loadedmetadata', onLoadedMetadata); };
-        }
-    }, [videoSrc, processVideo]);
 
-    const displayFrameIndex = isLive ? videoFrames.length - 1 : currentFrame;
+            const handleFileUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    handleReset();
+                    const url = URL.createObjectURL(file);
+                    setVideoSrc(url);
+                }
+            };
+            
+            const processVideo = useCallback((w, h) => {
+                if (!videoRef.current || !hiddenCanvasRef.current) return;
+                const video = videoRef.current;
+                const canvas = hiddenCanvasRef.current;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                setIsLoading(true);
+                setLoadingProgress("Calculating frames...");
+                const frameRate = 24;
+                const duration = video.duration;
+                const totalFrames = Math.floor(duration * frameRate);
+                let framesProcessed = 0;
+                const tempFrames = [];
+                video.currentTime = 0;
+                const onSeeked = () => {
+                    if (framesProcessed < totalFrames) {
+                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        tempFrames.push(imageData);
+                        framesProcessed++;
+                        setLoadingProgress(`Processing video: Frame ${framesProcessed} of ${totalFrames}`);
+                        video.currentTime += 1 / frameRate;
+                    } else {
+                        setVideoFrames(tempFrames);
+                        setSelectedPixel({ x: Math.floor(w / 2), y: Math.floor(h / 2) });
+                        setIsLoading(false);
+                        setLoadingProgress("");
+                        video.removeEventListener('seeked', onSeeked);
+                    }
+                };
+                video.addEventListener('seeked', onSeeked);
+            }, []);
 
-    useEffect(() => {
-        if (videoFrames.length > 0 && displayCanvasRef.current && activeView === 'inspector') {
-            if (!videoFrames[displayFrameIndex]) return;
-            const ctx = displayCanvasRef.current.getContext('2d');
-            ctx.putImageData(videoFrames[displayFrameIndex], 0, 0);
-        }
-    }, [currentFrame, videoFrames, activeView, isLive, displayFrameIndex]);
+            const startLiveFeed = async () => {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    handleReset();
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                        setIsLive(true);
+                        liveStreamRef.current = stream;
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.play();
+                        videoRef.current.onloadedmetadata = () => {
+                            const MAX_WIDTH = 480;
+                            const scale = Math.min(1, MAX_WIDTH / videoRef.current.videoWidth);
+                            const w = videoRef.current.videoWidth * scale;
+                            const h = videoRef.current.videoHeight * scale;
+                            setDimensions({ width: w, height: h });
+                            if (hiddenCanvasRef.current) { hiddenCanvasRef.current.width = w; hiddenCanvasRef.current.height = h; }
+                            if (displayCanvasRef.current) { displayCanvasRef.current.width = w; displayCanvasRef.current.height = h; }
+                            setSelectedPixel({ x: Math.floor(w / 2), y: Math.floor(h / 2) });
+                            captureLiveFrame();
+                        };
+                    } catch (err) {
+                        console.error("Error accessing webcam: ", err);
+                    }
+                }
+            };
 
-    useEffect(() => {
-        let intervalId = null;
-        if (isPlaying && !isLive && videoFrames.length > 0) {
-            intervalId = setInterval(() => setCurrentFrame(prev => (prev + 1) % videoFrames.length), 1000 / 24);
-        }
-        return () => { if (intervalId) clearInterval(intervalId); };
-    }, [isPlaying, videoFrames.length, isLive]);
+            const captureLiveFrame = useCallback(() => {
+                if (!videoRef.current || !hiddenCanvasRef.current || !liveStreamRef.current) return;
+                const video = videoRef.current;
+                const canvas = hiddenCanvasRef.current;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                setVideoFrames(prev => {
+                    const newFrames = [...prev, imageData];
+                    return newFrames.length > trailLength + 20 ? newFrames.slice(1) : newFrames;
+                });
+                setCurrentFrame(prev => prev + 1);
+                liveAnimationRef.current = requestAnimationFrame(captureLiveFrame);
+            }, [trailLength]);
 
-    const handleCanvasMouseMove = (event) => {
-        if (videoFrames.length === 0) return;
-        const canvas = displayCanvasRef.current;
-        const rect = canvas.getBoundingClientRect();
-        const x = Math.floor(event.clientX - rect.left);
-        const y = Math.floor(event.clientY - rect.top);
-        if (x >= 0 && x < dimensions.width && y >= 0 && y < dimensions.height) {
-            setSelectedPixel({ x, y });
-        }
-    };
-    
-    const getPixelData = (pixel) => {
-        if (!pixel || videoFrames.length === 0) return null;
-        if (!videoFrames[displayFrameIndex]) return null;
-        const imageData = videoFrames[displayFrameIndex].data;
-        const i = (pixel.y * dimensions.width + pixel.x) * 4;
-        return { r: imageData[i], g: imageData[i+1], b: imageData[i+2], a: imageData[i+3] };
-    };
+            useEffect(() => {
+                if (isLive) {
+                    liveAnimationRef.current = requestAnimationFrame(captureLiveFrame);
+                }
+                return () => {
+                    if (liveAnimationRef.current) {
+                        cancelAnimationFrame(liveAnimationRef.current);
+                    }
+                };
+            }, [isLive, captureLiveFrame]);
 
-    const getPixelHistory = (pixel) => {
-        if (!pixel || videoFrames.length === 0) return [];
-        return videoFrames.map(frame => {
-            const imageData = frame.data;
-            const i = (pixel.y * dimensions.width + pixel.x) * 4;
-            return { r: imageData[i], g: imageData[i+1], b: imageData[i+2], a: imageData[i+3] };
-        });
-    };
+            useEffect(() => {
+                if (videoSrc) {
+                    const video = videoRef.current;
+                    const onLoadedMetadata = () => {
+                        const MAX_WIDTH = 480;
+                        const scale = Math.min(1, MAX_WIDTH / video.videoWidth);
+                        const w = video.videoWidth * scale;
+                        const h = video.videoHeight * scale;
+                        setDimensions({ width: w, height: h });
+                        if (hiddenCanvasRef.current) { hiddenCanvasRef.current.width = w; hiddenCanvasRef.current.height = h; }
+                        if (displayCanvasRef.current) { displayCanvasRef.current.width = w; displayCanvasRef.current.height = h; }
+                        processVideo(w, h);
+                    };
+                    video.addEventListener('loadedmetadata', onLoadedMetadata);
+                    return () => { if (video) video.removeEventListener('loadedmetadata', onLoadedMetadata); };
+                }
+            }, [videoSrc, processVideo]);
 
-    const pixelData = getPixelData(selectedPixel);
-    const packet = useMemo(() => pixelData ? createShdCcpPacket(pixelData) : null, [pixelData]);
-    const pixelHistory = useMemo(() => getPixelHistory(selectedPixel), [selectedPixel, videoFrames]);
-    
-    return (
-        <div className="bg-gray-900 text-gray-200 min-h-screen font-sans p-4 sm:p-8 flex flex-col">
-            <header className="text-center mb-6">
-                <h1 className="text-3xl sm:text-4xl font-bold text-cyan-300 tracking-wider">Temporal SHD-CCP Stream Visualizer</h1>
-                <p className="text-gray-400 mt-2 max-w-3xl mx-auto">Upload a video or start a live feed to visualize pixels as holographic data streams.</p>
-            </header>
+            const displayFrameIndex = isLive ? videoFrames.length - 1 : currentFrame;
 
-            <main className="flex-grow flex flex-col lg:flex-row gap-8">
-                <div className="lg:w-1/2 flex flex-col gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
-                    <div className="w-full flex-grow relative bg-purple-950 rounded-lg">
-                        {(videoFrames.length > 0 || isLive) ? (
-                            activeView === 'inspector' ? (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <canvas ref={displayCanvasRef} onMouseMove={handleCanvasMouseMove} className="max-w-full max-h-full cursor-crosshair rounded-md" />
+            useEffect(() => {
+                if (videoFrames.length > 0 && displayCanvasRef.current && activeView === 'inspector') {
+                    if (!videoFrames[displayFrameIndex]) return;
+                    const ctx = displayCanvasRef.current.getContext('2d');
+                    ctx.putImageData(videoFrames[displayFrameIndex], 0, 0);
+                }
+            }, [currentFrame, videoFrames, activeView, isLive, displayFrameIndex]);
+
+            useEffect(() => {
+                let intervalId = null;
+                if (isPlaying && !isLive && videoFrames.length > 0) {
+                    intervalId = setInterval(() => setCurrentFrame(prev => (prev + 1) % videoFrames.length), 1000 / 24);
+                }
+                return () => { if (intervalId) clearInterval(intervalId); };
+            }, [isPlaying, videoFrames.length, isLive]);
+
+            const handleCanvasMouseMove = (event) => {
+                if (videoFrames.length === 0) return;
+                const canvas = displayCanvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const x = Math.floor(event.clientX - rect.left);
+                const y = Math.floor(event.clientY - rect.top);
+                if (x >= 0 && x < dimensions.width && y >= 0 && y < dimensions.height) {
+                    setSelectedPixel({ x, y });
+                }
+            };
+            
+            const getPixelData = (pixel) => {
+                if (!pixel || videoFrames.length === 0) return null;
+                if (!videoFrames[displayFrameIndex]) return null;
+                const imageData = videoFrames[displayFrameIndex].data;
+                const i = (pixel.y * dimensions.width + pixel.x) * 4;
+                return { r: imageData[i], g: imageData[i+1], b: imageData[i+2], a: imageData[i+3] };
+            };
+
+            const getPixelHistory = (pixel) => {
+                if (!pixel || videoFrames.length === 0) return [];
+                return videoFrames.map(frame => {
+                    if (!frame || !frame.data) return { r: 0, g: 0, b: 0, a: 0 };
+                    const imageData = frame.data;
+                    const i = (pixel.y * dimensions.width + pixel.x) * 4;
+                    return { r: imageData[i], g: imageData[i+1], b: imageData[i+2], a: imageData[i+3] };
+                });
+            };
+
+            const pixelData = getPixelData(selectedPixel);
+            const packet = useMemo(() => pixelData ? createShdCcpPacket(pixelData) : null, [pixelData]);
+            const pixelHistory = useMemo(() => getPixelHistory(selectedPixel), [selectedPixel, videoFrames]);
+            
+            return (
+                <div className="bg-gray-900 text-gray-200 min-h-screen font-sans p-4 sm:p-8 flex flex-col">
+                    <header className="text-center mb-6">
+                        <h1 className="text-3xl sm:text-4xl font-bold text-cyan-300 tracking-wider">Temporal SHD-CCP Stream Visualizer</h1>
+                        <p className="text-gray-400 mt-2 max-w-3xl mx-auto">Upload a video or start a live feed to visualize pixels as holographic data streams.</p>
+                    </header>
+
+                    <main className="flex-grow flex flex-col lg:flex-row gap-8">
+                        <div className="lg:w-1/2 flex flex-col gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
+                            <div className="w-full flex-grow relative bg-purple-950 rounded-lg min-h-[300px] sm:min-h-[400px]">
+                                {(videoFrames.length > 0 || isLive) ? (
+                                    activeView === 'inspector' ? (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <canvas ref={displayCanvasRef} onMouseMove={handleCanvasMouseMove} className="max-w-full max-h-full cursor-crosshair rounded-md" />
+                                        </div>
+                                    ) : (
+                                        <HolographicViewer videoFrames={videoFrames} currentFrame={displayFrameIndex} dimensions={dimensions} trailLength={trailLength} isTemporalLinkingEnabled={isTemporalLinkingEnabled} similarityTolerance={similarityTolerance} linkOpacity={linkOpacity} />
+                                    )
+                                ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-gray-400">
+                                        <label htmlFor="video-upload" className="cursor-pointer hover:text-cyan-400 transition-colors flex flex-col items-center gap-2">
+                                            <Upload className="mx-auto h-12 w-12" />
+                                            <span>Upload a Video File</span>
+                                        </label>
+                                        <input id="video-upload" ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
+                                        <span className="text-gray-600 self-center">OR</span>
+                                        <button onClick={startLiveFeed} className="cursor-pointer hover:text-cyan-400 transition-colors flex flex-col items-center gap-2">
+                                            <Camera className="mx-auto h-12 w-12" />
+                                            <span>Start Live Feed</span>
+                                        </button>
+                                    </div>
+                                )}
+                                {isLoading && (
+                                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center rounded-lg">
+                                        <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                                        <p className="mt-4 text-lg">{loadingProgress}</p>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {(videoFrames.length > 0 || isLive) && (
+                                <div className="w-full p-2 flex flex-col gap-4">
+                                    {!isLive && videoFrames.length > 0 && (
+                                        <div className="flex items-center gap-4">
+                                            <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 bg-gray-700 hover:bg-cyan-600 rounded-full transition-colors">
+                                                {isPlaying ? <Pause size={20}/> : <Play size={20}/>}
+                                            </button>
+                                            <span className="text-sm font-mono w-28 text-center">F: {currentFrame} / {videoFrames.length - 1}</span>
+                                            <input type="range" min="0" max={videoFrames.length - 1} value={currentFrame} onChange={(e) => setCurrentFrame(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                        </div>
+                                    )}
+                                    {activeView === 'holographic' && (
+                                        <>
+                                        <div className="flex items-center gap-2 px-2">
+                                            <Layers size={16} className="text-cyan-400" />
+                                            <span className="text-sm font-mono w-28 text-center">Trail: {trailLength}</span>
+                                            <input id="trail-slider" type="range" min="0" max="30" value={trailLength} onChange={(e) => setTrailLength(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                        </div>
+                                        {isTemporalLinkingEnabled && (
+                                            <>
+                                            <div className="flex items-center gap-2 px-2">
+                                                <span className="text-sm font-mono w-28 text-center">Similarity: {similarityTolerance}%</span>
+                                                <input type="range" min="0" max="25" value={similarityTolerance} onChange={(e) => setSimilarityTolerance(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                            </div>
+                                            <div className="flex items-center gap-2 px-2">
+                                                <span className="text-sm font-mono w-28 text-center">Link Opacity: {100 - linkOpacity}%</span>
+                                                <input type="range" min="0" max="100" value={linkOpacity} onChange={(e) => setLinkOpacity(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                            </div>
+                                            </>
+                                        )}
+                                        </>
+                                    )}
+                                    <div className="flex justify-center gap-2 flex-wrap">
+                                        <button onClick={() => setActiveView('inspector')} className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${activeView === 'inspector' ? 'bg-cyan-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                            <Code size={16} /> Inspector
+                                        </button>
+                                        <button onClick={() => setActiveView('holographic')} className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${activeView === 'holographic' ? 'bg-cyan-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                            <Eye size={16} /> Holographic Viewer
+                                        </button>
+                                        {activeView === 'holographic' && (
+                                            <div className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-gray-700">
+                                                <span className="text-gray-300">Depth Link</span>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input type="checkbox" checked={isTemporalLinkingEnabled} onChange={() => setIsTemporalLinkingEnabled(!isTemporalLinkingEnabled)} className="sr-only peer" />
+                                                    <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                                                </label>
+                                            </div>
+                                        )}
+                                        {isLive && (
+                                                <button onClick={stopLiveFeed} className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors bg-red-600 hover:bg-red-500 text-white">
+                                                    <StopCircle size={16} /> Stop Feed
+                                                </button>
+                                        )}
+                                        <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors bg-amber-600 hover:bg-amber-500 text-white">
+                                            <RefreshCw size={16} /> Reset
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="lg:w-1/2 flex flex-col gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
+                            {(videoFrames.length > 0 || isLive) && selectedPixel ? (
+                                <div className="space-y-4">
+                                    <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-700">
+                                        <h2 className="text-xl text-yellow-300">Pixel Data @ ({selectedPixel.x}, {selectedPixel.y})</h2>
+                                        {pixelData && <p className="font-mono text-lg mt-1"><span className="text-red-500">R:{pixelData.r}</span> <span className="text-green-500">G:{pixelData.g}</span> <span className="text-blue-500">B:{pixelData.b}</span> <span className="text-gray-400">A:{pixelData.a}</span></p>}
+                                    </div>
+                                    <PacketVisualizer packet={packet} />
+                                    <QFTSimulator pixelHistory={pixelHistory} currentFrame={displayFrameIndex} />
                                 </div>
                             ) : (
-                                <HolographicViewer videoFrames={videoFrames} currentFrame={displayFrameIndex} dimensions={dimensions} trailLength={trailLength} isTemporalLinkingEnabled={isTemporalLinkingEnabled} similarityTolerance={similarityTolerance} linkOpacity={linkOpacity} />
-                            )
-                        ) : (
-                            <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-gray-400">
-                                <label htmlFor="video-upload" className="cursor-pointer hover:text-cyan-400 transition-colors flex flex-col items-center gap-2">
-                                    <Upload className="mx-auto h-12 w-12" />
-                                    <span>Upload a Video File</span>
-                                </label>
-                                <input id="video-upload" ref={fileInputRef} type="file" accept="video/*" className="hidden" onChange={handleFileUpload} />
-                                <span className="text-gray-600 self-center">OR</span>
-                                 <button onClick={startLiveFeed} className="cursor-pointer hover:text-cyan-400 transition-colors flex flex-col items-center gap-2">
-                                    <Camera className="mx-auto h-12 w-12" />
-                                    <span>Start Live Feed</span>
-                                </button>
-                            </div>
-                        )}
-                        {isLoading && (
-                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center rounded-lg">
-                                <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-                                <p className="mt-4 text-lg">{loadingProgress}</p>
-                            </div>
-                        )}
-                    </div>
-                    
-                    {(videoFrames.length > 0 || isLive) && (
-                        <div className="w-full p-2 flex flex-col gap-4">
-                            {!isLive && videoFrames.length > 0 && (
-                                <div className="flex items-center gap-4">
-                                    <button onClick={() => setIsPlaying(!isPlaying)} className="p-2 bg-gray-700 hover:bg-cyan-600 rounded-full transition-colors">
-                                        {isPlaying ? <Pause size={20}/> : <Play size={20}/>}
-                                    </button>
-                                    <span className="text-sm font-mono w-28 text-center">F: {currentFrame} / {videoFrames.length - 1}</span>
-                                    <input type="range" min="0" max={videoFrames.length - 1} value={currentFrame} onChange={(e) => setCurrentFrame(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
+                                <div className="flex-grow flex items-center justify-center text-center text-gray-500">
+                                    <div>
+                                        <Info className="mx-auto h-12 w-12" />
+                                        <p className="mt-2">Upload a video or start a live feed.</p>
+                                    </div>
                                 </div>
                             )}
-                            {activeView === 'holographic' && (
-                                <>
-                                <div className="flex items-center gap-2 px-2">
-                                    <Layers size={16} className="text-cyan-400" />
-                                    <span className="text-sm font-mono w-28 text-center">Trail: {trailLength}</span>
-                                    <input id="trail-slider" type="range" min="0" max="30" value={trailLength} onChange={(e) => setTrailLength(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
-                                </div>
-                                {isTemporalLinkingEnabled && (
-                                    <>
-                                    <div className="flex items-center gap-2 px-2">
-                                        <span className="text-sm font-mono w-28 text-center">Similarity: {similarityTolerance}%</span>
-                                        <input type="range" min="0" max="25" value={similarityTolerance} onChange={(e) => setSimilarityTolerance(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
-                                    </div>
-                                    <div className="flex items-center gap-2 px-2">
-                                        <span className="text-sm font-mono w-28 text-center">Link Opacity: {100 - linkOpacity}%</span>
-                                        <input type="range" min="0" max="100" value={linkOpacity} onChange={(e) => setLinkOpacity(Number(e.target.value))} className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-thumb" />
-                                    </div>
-                                    </>
-                                )}
-                                </>
-                            )}
-                             <div className="flex justify-center gap-2 flex-wrap">
-                                <button onClick={() => setActiveView('inspector')} className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${activeView === 'inspector' ? 'bg-cyan-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
-                                    <Code size={16} /> Inspector
-                                </button>
-                                <button onClick={() => setActiveView('holographic')} className={`flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors ${activeView === 'holographic' ? 'bg-cyan-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}`}>
-                                    <Eye size={16} /> Holographic Viewer
-                                </button>
-                                {activeView === 'holographic' && (
-                                    <div className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-gray-700">
-                                        <span className="text-gray-300">Depth Link</span>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" checked={isTemporalLinkingEnabled} onChange={() => setIsTemporalLinkingEnabled(!isTemporalLinkingEnabled)} className="sr-only peer" />
-                                            <div className="w-11 h-6 bg-gray-600 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-                                        </label>
-                                    </div>
-                                )}
-                                {isLive && (
-                                     <button onClick={stopLiveFeed} className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors bg-red-600 hover:bg-red-500 text-white">
-                                        <StopCircle size={16} /> Stop Feed
-                                    </button>
-                                )}
-                                <button onClick={handleReset} className="flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors bg-amber-600 hover:bg-amber-500 text-white">
-                                    <RefreshCw size={16} /> Reset
-                                </button>
-                            </div>
                         </div>
-                    )}
+                    </main>
+                    <video ref={videoRef} src={videoSrc} className="hidden" muted playsInline />
+                    <canvas ref={hiddenCanvasRef} className="hidden" />
                 </div>
+            );
+        }
 
-                <div className="lg:w-1/2 flex flex-col gap-4 p-4 bg-black/30 rounded-xl border border-gray-700/50">
-                    {(videoFrames.length > 0 || isLive) && selectedPixel ? (
-                        <div className="space-y-4">
-                            <div className="text-center bg-gray-900/50 p-3 rounded-lg border border-gray-700">
-                                <h2 className="text-xl text-yellow-300">Pixel Data @ ({selectedPixel.x}, {selectedPixel.y})</h2>
-                                {pixelData && <p className="font-mono text-lg mt-1"><span className="text-red-500">R:{pixelData.r}</span> <span className="text-green-500">G:{pixelData.g}</span> <span className="text-blue-500">B:{pixelData.b}</span> <span className="text-gray-400">A:{pixelData.a}</span></p>}
-                            </div>
-                            <PacketVisualizer packet={packet} />
-                            <QFTSimulator pixelHistory={pixelHistory} currentFrame={displayFrameIndex} />
-                        </div>
-                    ) : (
-                        <div className="flex-grow flex items-center justify-center text-center text-gray-500">
-                            <div>
-                                <Info className="mx-auto h-12 w-12" />
-                                <p className="mt-2">Upload a video or start a live feed.</p>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
-            <video ref={videoRef} src={videoSrc} className="hidden" muted playsInline />
-            <canvas ref={hiddenCanvasRef} className="hidden" />
-            <style>{`.range-thumb::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;background:#22d3ee;cursor:pointer;border-radius:50%;box-shadow:0 0 5px #22d3ee;}.range-thumb::-moz-range-thumb{width:16px;height:16px;background:#22d3ee;cursor:pointer;border:none;border-radius:50%;box-shadow:0 0 5px #22d3ee;}`}</style>
-        </div>
-    );
-}
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
