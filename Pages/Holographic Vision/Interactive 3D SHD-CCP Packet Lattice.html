@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D SHD-CCP Packet Lattice</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Inter', sans-serif; }
+        canvas { display: block; }
+        #info { position: absolute; top: 10px; left: 10px; padding: 10px; background: rgba(0,0,0,0.7); border-radius: 8px; font-size: 14px; max-width: 250px; cursor: pointer; }
+        #info em.highlight { color: #00aaff; font-style: normal; }
+        #packet-details {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            padding: 12px;
+            background: rgba(20, 20, 30, 0.85);
+            border: 1px solid rgba(100, 150, 255, 0.5);
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 280px;
+            display: none; /* Hidden by default */
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        #packet-details h4 { margin-top: 0; margin-bottom: 10px; color: #00aaff; border-bottom: 1px solid #00aaff; padding-bottom: 5px; }
+        #packet-details p { margin: 4px 0; display: flex; justify-content: space-between; }
+        #packet-details span { color: #ddd; }
+        #packet-details strong { color: #fff; font-weight: normal; }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="info">
+        <strong>SHD-CCP Lattice Simulation</strong><br>
+        <span id="packet-count">Packets: ...</span><br>
+        <em class="highlight">Click to Explore (FPS mode).</em><br>
+        Use <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to move.<br>
+        <kbd>Z</kbd> to ascend, <kbd>C</kbd> to descend.<br>
+        <kbd>Space</kbd> to Play/Pause Flow.<br>
+        <kbd>ESC</kbd> to use Orbit controls.
+    </div>
+    <div id="packet-details">
+        <h4>SHD-CCP Packet Details</h4>
+        <p><span>Node Index:</span> <strong id="pd-index"></strong></p>
+        <p><span>Color (Quaternion):</span> <strong id="pd-quat"></strong></p>
+        <p><span>Structural Form ID:</span> <strong id="pd-form"></strong></p>
+        <p><span>Amplitude ID:</span> <strong id="pd-amp"></strong></p>
+        <p><span>Frequency ID:</span> <strong id="pd-freq"></strong></p>
+        <p><span>Spin Class ID:</span> <strong id="pd-spin"></strong></p>
+        <p><span>Payload Scaling Factor:</span> <strong id="pd-scale"></strong></p>
+        <p><span>Reserved/Parity:</span> <strong id="pd-parity"></strong></p>
+    </div>
+    <canvas id="c"></canvas>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import GUI from 'lil-gui';
+
+        // --- GLOBAL VARIABLES ---
+        let scene, camera, renderer, pointerLockControls, orbitControls, gui, selectionHighlight;
+        let particleSystem, wireframe, particleParams;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const PHI = 1.61803398875; // The Golden Ratio
+        
+        const packetData = new Map();
+        const activeNodes = new Map();
+        const selectedNodes = new Set();
+        let shiftPressed = false;
+
+        // --- MOVEMENT & TIMING ---
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, moveUp = false, moveDown = false;
+        let prevTime = performance.now();
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+
+        // --- STATE OBJECTS ---
+        let editorGUI, dataStreamFolder, generationFolder, environmentFolder;
+        const editorState = { color: '#ffffff', formId: -1, amplitudeId: 0, frequencyId: 0, spinClassId: 0, scalingFactor: 0.0, parity: 0, isWireframe: true };
+        const dataStreamState = { startIndex: 0, streamData: '1 255 0 0 255 1 0 0 0 0 0', injectStream: () => injectDataStream() };
+        const environmentState = { isPlaying: false, nullNodeOpacity: 0.4, nullNodeColor: '#005588' };
+        const state = {
+            latticeShape: 'Box',
+            particleCount: 80000,
+            boxSize: { x: 100, y: 100, z: 100 },
+            toroidMajorRadius: 60,
+            toroidTubeRadius: 20,
+            cylinderRadius: 40,
+            cylinderHeight: 150,
+            lissajousScale: 50,
+            lissajousNx: 3,
+            lissajousNy: 5,
+            lissajousNz: 7,
+            lissajousTubeRadius: 10,
+            trefoilScale: 40,
+            trefoilTubeRadius: 15,
+            regenerate: () => regenerateLattice()
+        };
+
+        // --- SHAPE DEFINITIONS ---
+        const SHAPE_DATA = {
+            '-1': { name: 'Null', getGeometry: () => null },
+             0: { name: 'Tetrahedron', getGeometry: () => new THREE.TetrahedronGeometry(0.5) },
+             1: { name: 'Cube', getGeometry: () => new THREE.BoxGeometry(0.7, 0.7, 0.7) },
+             2: { name: 'Octahedron', getGeometry: () => new THREE.OctahedronGeometry(0.6) },
+             3: { name: 'Icosahedron', getGeometry: () => new THREE.IcosahedronGeometry(0.7) },
+             4: { name: 'Dodecahedron', getGeometry: () => new THREE.DodecahedronGeometry(0.7) }
+        };
+
+        // --- INITIALIZATION ---
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 20000);
+            camera.position.set(0, 10, 120);
+            
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            pointerLockControls = new PointerLockControls(camera, renderer.domElement);
+            scene.add(pointerLockControls.getObject());
+            
+            orbitControls = new OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+            orbitControls.dampingFactor = 0.1;
+            orbitControls.enabled = true;
+            orbitControls.minDistance = 1;
+            orbitControls.maxDistance = 5000;
+            orbitControls.enableZoom = false;
+            orbitControls.panSpeed = 0.5;
+
+            raycaster.params.Points.threshold = 0.5;
+
+            const highlightGeom = new THREE.SphereGeometry(0.4, 16, 8);
+            const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true, depthTest: false });
+            selectionHighlight = new THREE.Mesh(highlightGeom, highlightMat);
+            selectionHighlight.renderOrder = 1; // Ensure it renders on top
+            selectionHighlight.visible = false;
+            scene.add(selectionHighlight);
+
+            setupGUI();
+            regenerateLattice();
+            setupEventListeners();
+            
+            animate();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('info').addEventListener('click', () => {
+                pointerLockControls.lock();
+            });
+
+            pointerLockControls.addEventListener('lock', () => {
+                document.getElementById('info').style.display = 'none';
+                orbitControls.enabled = false;
+            });
+
+            pointerLockControls.addEventListener('unlock', () => {
+                document.getElementById('info').style.display = 'block';
+                orbitControls.enabled = true;
+                
+                if (selectedNodes.size > 0) {
+                    const lastSelected = Array.from(selectedNodes).pop();
+                    const position = particleSystem.geometry.attributes.position;
+                    orbitControls.target.set(
+                        position.getX(lastSelected),
+                        position.getY(lastSelected),
+                        position.getZ(lastSelected)
+                    );
+                } else {
+                    const direction = new THREE.Vector3();
+                    camera.getWorldDirection(direction);
+                    orbitControls.target.copy(camera.position).add(direction.multiplyScalar(50));
+                }
+                orbitControls.update();
+            });
+            
+            window.addEventListener('resize', onWindowResize, false);
+            renderer.domElement.addEventListener('click', onCanvasClick, false);
+            window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('keyup', onKeyUp);
+            renderer.domElement.addEventListener('wheel', onCanvasWheel, { passive: false });
+        }
+
+        // --- LATTICE & NODE MANAGEMENT ---
+        function regenerateLattice() {
+            if (particleSystem) scene.remove(particleSystem);
+            if (wireframe) scene.remove(wireframe);
+            activeNodes.forEach(node => scene.remove(node));
+            
+            packetData.clear();
+            activeNodes.clear();
+            selectedNodes.clear();
+            updateEditorGUI();
+
+            let positions;
+            switch (state.latticeShape) {
+                case 'Toroid': positions = generateOrderedToroidPositions(state.particleCount, state.toroidMajorRadius, state.toroidTubeRadius); break;
+                case 'Cylinder': positions = generateOrderedCylinderPositions(state.particleCount, state.cylinderRadius, state.cylinderHeight); break;
+                case 'Lissajous Knot': positions = generateOrderedLissajousPositions(state.particleCount); break;
+                case 'Trefoil Knot': positions = generateOrderedTrefoilPositions(state.particleCount); break;
+                default: positions = generateOrderedBoxPositions(state.particleCount, state.boxSize); break;
+            }
+            
+            const actualParticleCount = positions.length / 3;
+            document.getElementById('packet-count').innerText = `Packets: ${actualParticleCount.toLocaleString()}`;
+            
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const colors = new Float32Array(actualParticleCount * 3);
+            const baseColor = new THREE.Color(environmentState.nullNodeColor);
+            for (let i = 0; i < actualParticleCount; i++) {
+                baseColor.toArray(colors, i * 3);
+            }
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({ 
+                size: 0.2, 
+                transparent: true, 
+                opacity: environmentState.nullNodeOpacity,
+                vertexColors: true
+            });
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+            
+            createWireframe();
+
+            packetData.clear();
+            for (let i = 0; i < actualParticleCount; i++) {
+                packetData.set(i, createDefaultPacketData());
+            }
+
+            if (dataStreamFolder) {
+                 const startIndexCtrl = dataStreamFolder.controllers.find(c => c.property === 'startIndex');
+                 if(startIndexCtrl) {
+                    startIndexCtrl.max(actualParticleCount - 1);
+                    if(dataStreamState.startIndex >= actualParticleCount) dataStreamState.startIndex = 0;
+                    startIndexCtrl.updateDisplay();
+                 }
+            }
+        }
+
+        // --- PARAMETRIC EQUATION HELPERS ---
+        const lissajousPoint = (t, s, nx, ny, nz) => new THREE.Vector3(s * Math.cos(nx * t), s * Math.sin(ny * t), s * Math.cos(nz * t));
+        const lissajousDerivative = (t, s, nx, ny, nz) => new THREE.Vector3(-s * nx * Math.sin(nx * t), s * ny * Math.cos(ny * t), -s * nz * Math.sin(nz * t));
+        const lissajousSecondDerivative = (t, s, nx, ny, nz) => new THREE.Vector3(-s * nx * nx * Math.cos(nx * t), -s * ny * ny * Math.sin(ny * t), -s * nz * nz * Math.cos(nz * t));
+        const trefoilPoint = (t, s) => new THREE.Vector3(s * (Math.sin(t) + 2 * Math.sin(2 * t)), s * (Math.cos(t) - 2 * Math.cos(2 * t)), s * (-Math.sin(3 * t)));
+        const trefoilDerivative = (t, s) => new THREE.Vector3(s * (Math.cos(t) + 4 * Math.cos(2 * t)), s * (-Math.sin(t) + 4 * Math.sin(2 * t)), s * (-3 * Math.cos(3 * t)));
+        const trefoilSecondDerivative = (t, s) => new THREE.Vector3(s * (-Math.sin(t) - 8 * Math.sin(2 * t)), s * (-Math.cos(t) + 8 * Math.cos(2 * t)), s * (9 * Math.sin(3 * t)));
+
+        // --- ORDERED POSITION GENERATION ---
+        function getSpacing(volume, count) { return Math.cbrt(volume / count); }
+        function generateOrderedBoxPositions(count, size) {
+            const volume = size.x * size.y * size.z;
+            const spacing = getSpacing(volume, count);
+            const positions = [];
+            for (let y = -size.y / 2; y < size.y / 2; y += spacing) {
+                for (let z = -size.z / 2; z < size.z / 2; z += spacing) {
+                    for (let x = -size.x / 2; x < size.x / 2; x += spacing) {
+                        positions.push(x, y, z);
+                    }
+                }
+            }
+            return new Float32Array(positions);
+        }
+        function generateOrderedToroidPositions(count, majorRadius, tubeRadius) {
+            const volume = (2 * Math.PI * majorRadius) * (Math.PI * tubeRadius * tubeRadius);
+            const spacing = getSpacing(volume, count);
+            const positions = [];
+            const tubeRadiusSq = tubeRadius * tubeRadius;
+            const boundingBox = majorRadius + tubeRadius;
+
+            for (let y = -tubeRadius; y < tubeRadius; y += spacing) {
+                for (let z = -boundingBox; z < boundingBox; z += spacing) {
+                    for (let x = -boundingBox; x < boundingBox; x += spacing) {
+                        const distToCenter = Math.sqrt(x*x + z*z);
+                        if (distToCenter > 0) {
+                            const projectedCenterX = (x / distToCenter) * majorRadius;
+                            const projectedCenterZ = (z / distToCenter) * majorRadius;
+                            const dx = x - projectedCenterX;
+                            const dz = z - projectedCenterZ;
+                            if (dx*dx + dz*dz + y*y < tubeRadiusSq) {
+                                positions.push(x, y, z);
+                            }
+                        }
+                    }
+                }
+            }
+            return new Float32Array(positions);
+        }
+        function generateOrderedCylinderPositions(count, radius, height) {
+            const volume = Math.PI * radius * radius * height;
+            const spacing = getSpacing(volume, count);
+            const positions = [];
+            const radiusSq = radius * radius;
+            const halfHeight = height / 2;
+            for (let y = -halfHeight; y < halfHeight; y += spacing) {
+                for (let z = -radius; z < radius; z += spacing) {
+                    for (let x = -radius; x < radius; x += spacing) {
+                        if (x*x + z*z < radiusSq) positions.push(x, y, z);
+                    }
+                }
+            }
+            return new Float32Array(positions);
+        }
+        function generateOrderedLissajousPositions(count) {
+            const positions = [];
+            particleParams = [];
+            const { lissajousScale: s, lissajousNx: nx, lissajousNy: ny, lissajousNz: nz, lissajousTubeRadius: tubeRadius } = state;
+
+            for (let i = 0; i < count; i++) {
+                const u = Math.random() * 2 * Math.PI; // Main curve parameter
+                const v = Math.random() * 2 * Math.PI; // Angle around the tube
+                const r = Math.random() * tubeRadius;  // Radius from the tube center
+
+                const p = lissajousPoint(u, s, nx, ny, nz);
+                const p_prime = lissajousDerivative(u, s, nx, ny, nz);
+                const p_double_prime = lissajousSecondDerivative(u, s, nx, ny, nz);
+
+                const T = p_prime.clone().normalize();
+                const N = p_double_prime.clone().projectOnPlane(T).normalize();
+                const B = new THREE.Vector3().crossVectors(T, N);
+
+                const offset = N.clone().multiplyScalar(r * Math.cos(v)).add(B.clone().multiplyScalar(r * Math.sin(v)));
+                const finalPos = p.add(offset);
+                
+                positions.push(finalPos.x, finalPos.y, finalPos.z);
+                particleParams.push({ u, v, r });
+            }
+            return new Float32Array(positions);
+        }
+        function generateOrderedTrefoilPositions(count) {
+            const positions = [];
+            particleParams = [];
+            const { trefoilScale: s, trefoilTubeRadius: tubeRadius } = state;
+
+            for (let i = 0; i < count; i++) {
+                const u = Math.random() * 2 * Math.PI;
+                const v = Math.random() * 2 * Math.PI;
+                const r = Math.random() * tubeRadius;
+
+                const p = trefoilPoint(u, s);
+                const p_prime = trefoilDerivative(u, s);
+                const p_double_prime = trefoilSecondDerivative(u, s);
+
+                const T = p_prime.clone().normalize();
+                const N = p_double_prime.clone().projectOnPlane(T).normalize();
+                const B = new THREE.Vector3().crossVectors(T, N);
+
+                const offset = N.clone().multiplyScalar(r * Math.cos(v)).add(B.clone().multiplyScalar(r * Math.sin(v)));
+                const finalPos = p.add(offset);
+                
+                positions.push(finalPos.x, finalPos.y, finalPos.z);
+                particleParams.push({ u, v, r });
+            }
+            return new Float32Array(positions);
+        }
+        
+        function createWireframe() {
+            if (wireframe) scene.remove(wireframe);
+            let geom;
+            switch (state.latticeShape) {
+                case 'Toroid': geom = new THREE.TorusGeometry(state.toroidMajorRadius, state.toroidTubeRadius, 16, 100); break;
+                case 'Cylinder': geom = new THREE.CylinderGeometry(state.cylinderRadius, state.cylinderRadius, state.cylinderHeight, 32); break;
+                case 'Lissajous Knot': {
+                    const points = [];
+                    const { lissajousScale: s, lissajousNx: nx, lissajousNy: ny, lissajousNz: nz } = state;
+                    for (let i = 0; i <= 200; i++) {
+                        const t = (i / 200) * 2 * Math.PI;
+                        points.push(lissajousPoint(t, s, nx, ny, nz));
+                    }
+                    geom = new THREE.BufferGeometry().setFromPoints(points);
+                    break;
+                }
+                case 'Trefoil Knot': {
+                    const points = [];
+                    const { trefoilScale: s } = state;
+                    for (let i = 0; i <= 200; i++) {
+                        const t = (i / 200) * 2 * Math.PI;
+                        points.push(trefoilPoint(t, s));
+                    }
+                    geom = new THREE.BufferGeometry().setFromPoints(points);
+                    break;
+                }
+                default: geom = new THREE.BoxGeometry(state.boxSize.x, state.boxSize.y, state.boxSize.z); break;
+            }
+
+            if (state.latticeShape === 'Lissajous Knot' || state.latticeShape === 'Trefoil Knot') {
+                wireframe = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.5 }));
+            } else {
+                const material = new THREE.MeshBasicMaterial({ color: 0x00aaff, wireframe: true, transparent: true, opacity: 0.2 });
+                wireframe = new THREE.Mesh(geom, material);
+                if (state.latticeShape === 'Toroid') {
+                    wireframe.rotation.x = Math.PI / 2;
+                }
+            }
+            scene.add(wireframe);
+        }
+
+        function setPointVisibility(index, visible) {
+            const colors = particleSystem.geometry.attributes.color;
+            const baseColor = new THREE.Color(environmentState.nullNodeColor);
+            if (visible) {
+                colors.setXYZ(index, baseColor.r, baseColor.g, baseColor.b);
+            } else {
+                colors.setXYZ(index, 0, 0, 0);
+            }
+            colors.needsUpdate = true;
+        }
+
+        function activateNode(index) {
+            const data = packetData.get(index);
+            if (!data || activeNodes.has(index) || data.formId === -1) return;
+
+            const nodeGroup = new THREE.Group();
+            const shapeDef = SHAPE_DATA[data.formId];
+            if (!shapeDef) return;
+            const geometry = shapeDef.getGeometry();
+            if (!geometry) return;
+            const color = quaternionToColor(data.quaternion);
+            const material = new THREE.MeshBasicMaterial({ color, wireframe: data.isWireframe });
+            const mesh = new THREE.Mesh(geometry, material);
+            nodeGroup.add(mesh);
+            const positions = particleSystem.geometry.attributes.position;
+            nodeGroup.position.set(positions.getX(index), positions.getY(index), positions.getZ(index));
+            
+            const scale = Math.pow(PHI, data.amplitudeId);
+            nodeGroup.scale.set(scale, scale, scale);
+            
+            const rotationAngle = data.spinClassId * (Math.PI / 4); // 360/8 = 45 degrees
+            nodeGroup.rotation.y = rotationAngle;
+
+            activeNodes.set(index, nodeGroup);
+            scene.add(nodeGroup);
+            setPointVisibility(index, false);
+        }
+        
+        function deactivateNode(index) {
+            if (activeNodes.has(index)) {
+                const node = activeNodes.get(index);
+                scene.remove(node);
+                node.traverse(child => {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                });
+                activeNodes.delete(index);
+            }
+            packetData.set(index, createDefaultPacketData());
+            setPointVisibility(index, true);
+        }
+
+        function updateNodeVisuals(index) {
+            const data = packetData.get(index);
+            if (!data || data.formId === -1) {
+                deactivateNode(index);
+                return;
+            }
+            if (!activeNodes.has(index)) {
+                activateNode(index);
+            } else {
+                const nodeGroup = activeNodes.get(index);
+                if (!nodeGroup) return;
+                const mesh = nodeGroup.children[0];
+                mesh.material.color = quaternionToColor(data.quaternion);
+                mesh.material.wireframe = data.isWireframe;
+                
+                const scale = Math.pow(PHI, data.amplitudeId);
+                nodeGroup.scale.set(scale, scale, scale);
+
+                const rotationAngle = data.spinClassId * (Math.PI / 4);
+                nodeGroup.rotation.y = rotationAngle;
+
+                const newShapeDef = SHAPE_DATA[data.formId];
+                if (!newShapeDef) return;
+                const newGeometry = newShapeDef.getGeometry();
+                if (!newGeometry) {
+                    deactivateNode(index);
+                    return;
+                }
+                mesh.geometry.dispose();
+                mesh.geometry = newGeometry;
+            }
+        }
+
+        // --- DATA CONVERSION & INJECTION ---
+        function createDefaultPacketData() { return { quaternion: rgbaToQuaternion(100, 150, 255, 242), formId: -1, amplitudeId: 0, reserved: 0, frequencyId: 0, spinClassId: 0, payloadScalingFactor: 0.0, isWireframe: true }; }
+        function rgbaToQuaternion(r, g, b, a) { return (r << 24) | (g << 16) | (b << 8) | a; }
+        function quaternionToRgba(quat) { return { r: (quat >> 24) & 0xFF, g: (quat >> 16) & 0xFF, b: (quat >> 8) & 0xFF, a: quat & 0xFF }; }
+        function quaternionToColor(quat) { const { r, g, b } = quaternionToRgba(quat); return new THREE.Color(r / 255, g / 255, b / 255); }
+
+        function injectDataStream() {
+            const numbers = dataStreamState.streamData.trim().split(/\s+/).map(Number);
+            const packetSize = 11;
+            let currentIndex = dataStreamState.startIndex;
+            for (let i = 0; i < numbers.length; i += packetSize) {
+                if (i + packetSize > numbers.length || !packetData.has(currentIndex)) break;
+                const chunk = numbers.slice(i, i + packetSize);
+                const newPacket = {
+                    formId: chunk[0], quaternion: rgbaToQuaternion(chunk[1], chunk[2], chunk[3], chunk[4]),
+                    amplitudeId: chunk[5], frequencyId: chunk[6], spinClassId: chunk[7],
+                    payloadScalingFactor: chunk[8], reserved: chunk[9], isWireframe: true
+                };
+                packetData.set(currentIndex, newPacket);
+                updateNodeVisuals(currentIndex);
+                currentIndex++;
+            }
+        }
+
+        // --- UI AND INTERACTION ---
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'KeyZ': moveUp = true; break;
+                case 'KeyC': moveDown = true; break;
+                case 'ShiftLeft': shiftPressed = true; break;
+                case 'Space':
+                    if (pointerLockControls.isLocked) {
+                        environmentState.isPlaying = !environmentState.isPlaying;
+                        if (environmentFolder) {
+                            environmentFolder.controllers.find(c => c.property === 'isPlaying').updateDisplay();
+                        }
+                    }
+                    break;
+            }
+        }
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyD': moveRight = false; break;
+                case 'KeyZ': moveUp = false; break;
+                case 'KeyC': moveDown = false; break;
+                case 'ShiftLeft': shiftPressed = false; break;
+            }
+        }
+
+        function onCanvasClick(event) {
+            if (pointerLockControls.isLocked) {
+                raycaster.setFromCamera({x: 0, y: 0}, camera);
+            } else {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+            }
+
+            const intersects = raycaster.intersectObject(particleSystem);
+            if (intersects.length > 0) {
+                const index = intersects[0].index;
+                if (shiftPressed) {
+                    selectedNodes.has(index) ? selectedNodes.delete(index) : selectedNodes.add(index);
+                } else {
+                    selectedNodes.clear();
+                    selectedNodes.add(index);
+                    dataStreamState.startIndex = index;
+                    if(dataStreamFolder) dataStreamFolder.controllers.find(c => c.property === 'startIndex').updateDisplay();
+                }
+
+                if (selectedNodes.size > 0) {
+                    updateSelectionHighlight();
+                    updatePacketInfoPanel(Array.from(selectedNodes).pop());
+                } else {
+                    selectionHighlight.visible = false;
+                }
+                
+                selectedNodes.forEach(idx => updateNodeVisuals(idx));
+                updateEditorGUI();
+            }
+        }
+
+        function onCanvasWheel(event) {
+            if (pointerLockControls.isLocked) return;
+            event.preventDefault();
+            const zoomFactor = 0.05;
+            const direction = new THREE.Vector3();
+            direction.subVectors(camera.position, orbitControls.target);
+            const distance = direction.length();
+            const moveDistance = distance * zoomFactor;
+            if (event.deltaY > 0) {
+                if (distance + moveDistance < orbitControls.maxDistance) {
+                    camera.position.addScaledVector(direction.normalize(), moveDistance);
+                }
+            } else {
+                if (distance - moveDistance > orbitControls.minDistance) {
+                    camera.position.addScaledVector(direction.normalize(), -moveDistance);
+                }
+            }
+        }
+        
+        function updateSelectionHighlight() {
+            if (selectedNodes.size === 0) {
+                selectionHighlight.visible = false;
+                return;
+            }
+
+            const lastSelected = Array.from(selectedNodes).pop();
+            const data = packetData.get(lastSelected);
+            const position = particleSystem.geometry.attributes.position;
+            
+            selectionHighlight.position.set(position.getX(lastSelected), position.getY(lastSelected), position.getZ(lastSelected));
+
+            if (data && data.formId !== -1) {
+                const shapeDef = SHAPE_DATA[data.formId];
+                if (shapeDef) {
+                    const geometry = shapeDef.getGeometry();
+                    if (geometry) {
+                        selectionHighlight.geometry.dispose();
+                        selectionHighlight.geometry = geometry;
+                        const scale = Math.pow(PHI, data.amplitudeId) * 1.05; // Slightly larger
+                        selectionHighlight.scale.set(scale, scale, scale);
+                        const rotationAngle = data.spinClassId * (Math.PI / 4);
+                        selectionHighlight.rotation.y = rotationAngle;
+                    }
+                }
+            } else {
+                // Default to sphere if no formId
+                selectionHighlight.geometry.dispose();
+                selectionHighlight.geometry = new THREE.SphereGeometry(0.4, 16, 8);
+                selectionHighlight.scale.set(1, 1, 1);
+                selectionHighlight.rotation.y = 0;
+            }
+            selectionHighlight.visible = true;
+        }
+
+        function updatePacketInfoPanel(index) {
+            const data = packetData.get(index);
+            if (!data) return;
+            const shapeName = (SHAPE_DATA[data.formId] || SHAPE_DATA[-1]).name;
+            document.getElementById('pd-index').textContent = index.toLocaleString();
+            document.getElementById('pd-quat').textContent = `0x${data.quaternion.toString(16).toUpperCase()}`;
+            document.getElementById('pd-form').textContent = `${data.formId} (${shapeName})`;
+            document.getElementById('pd-amp').textContent = data.amplitudeId;
+            document.getElementById('pd-freq').textContent = data.frequencyId;
+            document.getElementById('pd-spin').textContent = data.spinClassId;
+            document.getElementById('pd-scale').textContent = data.payloadScalingFactor;
+            document.getElementById('pd-parity').textContent = data.reserved;
+            document.getElementById('packet-details').style.display = 'block';
+        }
+
+        // --- GUI SETUP ---
+        function setupGUI() {
+            if (gui) gui.destroy();
+            gui = new GUI();
+            gui.title("SHD-CCP Controls");
+            setupGenerationGUI();
+            setupEnvironmentGUI();
+            setupDataStreamGUI();
+        }
+
+        function setupGenerationGUI() {
+            if (generationFolder) generationFolder.destroy();
+            generationFolder = gui.addFolder('Lattice Shape & Generation');
+            const shapeCtrl = generationFolder.add(state, 'latticeShape', ['Box', 'Toroid', 'Cylinder', 'Lissajous Knot', 'Trefoil Knot']).name('Shape');
+            const boxFolder = generationFolder.addFolder('Box Settings');
+            boxFolder.add(state.boxSize, 'x', 10, 500, 1).name('Width');
+            boxFolder.add(state.boxSize, 'y', 10, 500, 1).name('Height');
+            boxFolder.add(state.boxSize, 'z', 10, 500, 1).name('Depth');
+            const toroidFolder = generationFolder.addFolder('Toroid Settings');
+            toroidFolder.add(state, 'toroidMajorRadius', 10, 250, 1).name('Major Radius');
+            toroidFolder.add(state, 'toroidTubeRadius', 1, 100, 1).name('Tube Radius');
+            const cylinderFolder = generationFolder.addFolder('Cylinder Settings');
+            cylinderFolder.add(state, 'cylinderRadius', 10, 250, 1).name('Radius');
+            cylinderFolder.add(state, 'cylinderHeight', 10, 500, 1).name('Height');
+            const lissajousFolder = generationFolder.addFolder('Lissajous Knot Settings');
+            lissajousFolder.add(state, 'lissajousScale', 10, 100, 1).name('Scale');
+            lissajousFolder.add(state, 'lissajousNx', 1, 10, 1).name('Nx');
+            lissajousFolder.add(state, 'lissajousNy', 1, 10, 1).name('Ny');
+            lissajousFolder.add(state, 'lissajousNz', 1, 10, 1).name('Nz');
+            lissajousFolder.add(state, 'lissajousTubeRadius', 1, 20, 1).name('Tube Radius');
+            const trefoilFolder = generationFolder.addFolder('Trefoil Knot Settings');
+            trefoilFolder.add(state, 'trefoilScale', 10, 100, 1).name('Scale');
+            trefoilFolder.add(state, 'trefoilTubeRadius', 1, 20, 1).name('Tube Radius');
+
+            const updateFolders = (shape) => {
+                boxFolder.domElement.style.display = shape === 'Box' ? '' : 'none';
+                toroidFolder.domElement.style.display = shape === 'Toroid' ? '' : 'none';
+                cylinderFolder.domElement.style.display = shape === 'Cylinder' ? '' : 'none';
+                lissajousFolder.domElement.style.display = shape === 'Lissajous Knot' ? '' : 'none';
+                trefoilFolder.domElement.style.display = shape === 'Trefoil Knot' ? '' : 'none';
+            };
+            shapeCtrl.onChange(updateFolders);
+            updateFolders(state.latticeShape);
+            generationFolder.add(state, 'particleCount', 1000, 200000, 1000).name('Approx. Packet Count');
+            generationFolder.add(state, 'regenerate').name('Generate New Lattice');
+            generationFolder.open();
+        }
+
+        function setupEnvironmentGUI() {
+            if (environmentFolder) environmentFolder.destroy();
+            environmentFolder = gui.addFolder('Virtual Environment');
+            environmentFolder.add(environmentState, 'isPlaying').name('Play/Pause Flow').listen();
+            const opacityCtrl = environmentFolder.add(environmentState, 'nullNodeOpacity', 0, 1, 0.01).name('Null Node Opacity');
+            opacityCtrl.onChange(value => { if (particleSystem) particleSystem.material.opacity = value; });
+            const colorCtrl = environmentFolder.addColor(environmentState, 'nullNodeColor').name('Null Node Color');
+            colorCtrl.onChange(value => {
+                if (!particleSystem) return;
+                const colors = particleSystem.geometry.attributes.color;
+                const baseColor = new THREE.Color(value);
+                for (let i = 0; i < colors.count; i++) {
+                    if (!activeNodes.has(i)) {
+                        colors.setXYZ(i, baseColor.r, baseColor.g, baseColor.b);
+                    }
+                }
+                colors.needsUpdate = true;
+            });
+            environmentFolder.open();
+        }
+        
+        function setupDataStreamGUI() {
+            if (dataStreamFolder) dataStreamFolder.destroy();
+            dataStreamFolder = gui.addFolder('Data Stream Injection');
+            const maxParticles = particleSystem ? particleSystem.geometry.attributes.position.count - 1 : 99999;
+            dataStreamFolder.add(dataStreamState, 'startIndex', 0, maxParticles, 1).name('Start Index').listen();
+            dataStreamFolder.add(dataStreamState, 'streamData').name('Packet Data');
+            dataStreamFolder.add(dataStreamState, 'injectStream').name('Inject Stream');
+            dataStreamFolder.open();
+        }
+        
+        function updateEditorGUI() {
+            if (editorGUI) { editorGUI.destroy(); editorGUI = null; }
+            if (selectedNodes.size === 0) {
+                document.getElementById('packet-details').style.display = 'none';
+                if (selectionHighlight) selectionHighlight.visible = false;
+                return;
+            }
+            const firstNodeIndex = selectedNodes.values().next().value;
+            const firstNodeData = packetData.get(firstNodeIndex);
+            if (!firstNodeData) return;
+            const {r,g,b} = quaternionToRgba(firstNodeData.quaternion);
+            editorState.color = new THREE.Color(r/255, g/255, b/255).getStyle();
+            Object.assign(editorState, firstNodeData);
+            editorGUI = gui.addFolder(`Node Editor (${selectedNodes.size} selected)`);
+            const shapeNames = {};
+            for (const id in SHAPE_DATA) { shapeNames[SHAPE_DATA[id].name] = parseInt(id); }
+            editorGUI.add(editorState, 'formId', shapeNames).name('Structural Form').onChange(applyEditorChanges);
+            editorGUI.addColor(editorState, 'color').name('Color').onChange(applyEditorChanges);
+            editorGUI.add(editorState, 'amplitudeId', 0, 7, 1).name('Amplitude ID').onChange(applyEditorChanges);
+            editorGUI.add(editorState, 'isWireframe').name('Wireframe').onChange(applyEditorChanges);
+            editorGUI.add(editorState, 'frequencyId', 0, 31, 1).name('Frequency ID').onChange(applyEditorChanges);
+            editorGUI.add(editorState, 'spinClassId', 0, 7, 1).name('Spin Class ID').onChange(applyEditorChanges);
+            editorGUI.open();
+        }
+
+        function applyEditorChanges() {
+            selectedNodes.forEach(index => {
+                const data = packetData.get(index);
+                if (!data) return;
+                const color = new THREE.Color(editorState.color);
+                const {a} = quaternionToRgba(data.quaternion);
+                data.quaternion = rgbaToQuaternion(color.r * 255, color.g * 255, color.b * 255, a);
+                data.formId = parseInt(editorState.formId);
+                data.amplitudeId = editorState.amplitudeId;
+                data.isWireframe = editorState.isWireframe;
+                data.frequencyId = editorState.frequencyId;
+                data.spinClassId = editorState.spinClassId;
+                packetData.set(index, data);
+                updateNodeVisuals(index);
+            });
+            if(selectedNodes.size > 0) {
+                updateSelectionHighlight();
+                updatePacketInfoPanel(Array.from(selectedNodes).pop());
+            }
+        }
+        
+        // --- RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+
+            if (pointerLockControls.isLocked) {
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.y -= velocity.y * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize(); 
+                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+                if (moveUp || moveDown) velocity.y -= (Number(moveDown) - Number(moveUp)) * 400.0 * delta;
+                pointerLockControls.moveRight(-velocity.x * delta);
+                pointerLockControls.moveForward(-velocity.z * delta);
+                pointerLockControls.getObject().position.y -= velocity.y * delta;
+            } else {
+                orbitControls.update();
+            }
+
+            if (environmentState.isPlaying && particleSystem) {
+                const positions = particleSystem.geometry.attributes.position;
+                
+                if (state.latticeShape === 'Toroid') {
+                    const flowSpeed = 0.5; // Radians per second
+                    const rotationAngle = flowSpeed * delta;
+                    const cosAngle = Math.cos(rotationAngle);
+                    const sinAngle = Math.sin(rotationAngle);
+
+                    for (let i = 0; i < positions.count; i++) {
+                        const x = positions.getX(i);
+                        const z = positions.getZ(i);
+                        const newX = x * cosAngle - z * sinAngle;
+                        const newZ = x * sinAngle + z * cosAngle;
+                        positions.setX(i, newX);
+                        positions.setZ(i, newZ);
+
+                        if (activeNodes.has(i)) {
+                            const node = activeNodes.get(i);
+                            node.position.set(newX, node.position.y, newZ);
+                            node.rotation.y += rotationAngle;
+                        }
+                        if (selectedNodes.has(i)) {
+                            selectionHighlight.position.set(newX, selectionHighlight.position.y, newZ);
+                            selectionHighlight.rotation.y += rotationAngle;
+                        }
+                    }
+
+                } else if (state.latticeShape === 'Lissajous Knot' || state.latticeShape === 'Trefoil Knot') {
+                    const flowSpeed = 0.2;
+                    const isLissajous = state.latticeShape === 'Lissajous Knot';
+                    const { lissajousScale: ls, lissajousNx: nx, lissajousNy: ny, lissajousNz: nz, trefoilScale: ts } = state;
+
+                    for (let i = 0; i < positions.count; i++) {
+                        const params = particleParams[i];
+                        params.u += flowSpeed * delta;
+                        if (params.u > 2 * Math.PI) params.u -= 2 * Math.PI;
+
+                        const p = isLissajous ? lissajousPoint(params.u, ls, nx, ny, nz) : trefoilPoint(params.u, ts);
+                        const p_prime = isLissajous ? lissajousDerivative(params.u, ls, nx, ny, nz) : trefoilDerivative(params.u, ts);
+                        const p_double_prime = isLissajous ? lissajousSecondDerivative(params.u, ls, nx, ny, nz) : trefoilSecondDerivative(params.u, ts);
+                        
+                        const T = p_prime.clone().normalize();
+                        const N = p_double_prime.clone().projectOnPlane(T).normalize();
+                        const B = new THREE.Vector3().crossVectors(T, N);
+                        const offset = N.clone().multiplyScalar(params.r * Math.cos(params.v)).add(B.clone().multiplyScalar(params.r * Math.sin(params.v)));
+                        const finalPos = p.add(offset);
+                        
+                        positions.setXYZ(i, finalPos.x, finalPos.y, finalPos.z);
+                        if (activeNodes.has(i)) activeNodes.get(i).position.copy(finalPos);
+                        if (selectedNodes.has(i)) selectionHighlight.position.copy(finalPos);
+                    }
+
+                } else { // Box and Cylinder flow
+                    const flowSpeed = 10.0;
+                    let bounds;
+                    if (state.latticeShape === 'Cylinder') bounds = state.cylinderHeight;
+                    else bounds = state.boxSize.y;
+                    const halfBounds = bounds / 2;
+
+                    for (let i = 0; i < positions.count; i++) {
+                        let y = positions.getY(i);
+                        y += flowSpeed * delta;
+                        if (y > halfBounds) y = -halfBounds;
+                        positions.setY(i, y);
+                        if (activeNodes.has(i)) activeNodes.get(i).position.y = y;
+                        if (selectedNodes.has(i)) selectionHighlight.position.y = y;
+                    }
+                }
+                positions.needsUpdate = true;
+            }
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>
