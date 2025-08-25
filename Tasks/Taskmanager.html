@@ -1,1008 +1,1075 @@
-import React from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, query, serverTimestamp, orderBy } from 'firebase/firestore';
-import { Users, BrainCircuit, Plus, Trash2, Link as LinkIcon, UserPlus, Send, Mic, Video, MessageSquare, X, Eye, ArrowLeft, Palette, Ruler, HelpCircle, ChevronsRightLeft, Minus, Terminal as TerminalIcon, PanelLeft, Gamepad2, LogOut } from 'lucide-react';
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { DragControls } from 'three/examples/jsm/controls/DragControls.js';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
-
-// --- App Configuration ---
-const appConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-schism-labs-app';
-
-// --- Helper Functions ---
-const snapToGrid = (value, gridSize = 2) => Math.round(value / gridSize) * gridSize;
-
-// --- Authentication Component ---
-const Login = ({ auth }) => {
-    const [error, setError] = React.useState('');
-
-    const handleGoogleSignIn = async () => {
-        setError('');
-        const provider = new GoogleAuthProvider();
-        try {
-            await signInWithPopup(auth, provider);
-        } catch (err) {
-            setError(err.message);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schism Labs - Nodal Think Tank</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
         }
-    };
+        /* Custom scrollbar for a better aesthetic */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00ffff;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00cccc;
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-black">
+    <div id="root"></div>
 
-    return (
-        <div className="h-screen w-screen flex items-center justify-center bg-black text-white">
-            <div className="w-full max-w-md p-8 bg-black/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-cyan-500/50 shadow-cyan-500/20">
-                <div className="flex items-center justify-center mb-6">
-                    <BrainCircuit className="text-cyan-400 mr-3" size={40} />
-                    <h1 className="text-3xl font-bold text-cyan-400" style={{ textShadow: '0 0 8px #0ff' }}>Schism Labs</h1>
-                </div>
-                <p className="text-center text-gray-400 mb-8">Sign in to access the think tank.</p>
-                {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
-                <button onClick={handleGoogleSignIn} className="w-full bg-blue-600 hover:bg-blue-700 font-bold py-3 px-4 rounded-lg transition duration-200 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
-                    Sign In with Google
-                </button>
-            </div>
-        </div>
-    );
-};
+    <!-- React and Babel for in-browser JSX transformation -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide-react@0.292.0/dist/lucide-react.js"></script>
 
-// --- React Components ---
-
-const Tooltip = ({ text, children }) => {
-    return (
-        <div className="relative flex items-center group">
-            {children}
-            <div className="absolute left-full ml-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-50 border border-cyan-500/30">
-                {text}
-            </div>
-        </div>
-    );
-};
-
-// Draggable Window Hook
-const useDraggable = () => {
-    const [position, setPosition] = React.useState({ x: 100, y: 100 });
-    const isDragging = React.useRef(false);
-    const offset = React.useRef({ x: 0, y: 0 });
-
-    const handleMouseDown = (e) => {
-        isDragging.current = true;
-        offset.current = {
-            x: e.clientX - position.x,
-            y: e.clientY - position.y,
-        };
-    };
-
-    const handleMouseMove = React.useCallback((e) => {
-        if (!isDragging.current) return;
-        setPosition({
-            x: e.clientX - offset.current.x,
-            y: e.clientY - offset.current.y,
-        });
-    }, []);
-
-    const handleMouseUp = React.useCallback(() => {
-        isDragging.current = false;
-    }, []);
-
-    React.useEffect(() => {
-        window.addEventListener('mousemove', handleMouseMove);
-        window.addEventListener('mouseup', handleMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [handleMouseMove, handleMouseUp]);
-
-    return { position, handleMouseDown };
-};
-
-
-// Draggable and Collapsible Packet Editor Window
-const PacketEditorWindow = ({ node, onClose, team, onUpdateNode }) => {
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
-    const { position, handleMouseDown } = useDraggable();
-    const previewRef = React.useRef(null);
-
-    const geometries = React.useMemo(() => ({
-        sphere: new THREE.SphereGeometry(1, 16, 16),
-        box: new THREE.BoxGeometry(1.5, 1.5, 1.5),
-        cone: new THREE.ConeGeometry(1, 2, 16),
-        pyramid: new THREE.CylinderGeometry(0, 1.5, 2, 4),
-        torus: new THREE.TorusGeometry(1, 0.4, 16, 32),
-        dodecahedron: new THREE.DodecahedronGeometry(1.5),
-    }), []);
-
-    React.useEffect(() => {
-        if (!node || !previewRef.current) return;
-
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-        camera.position.z = 5;
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setSize(128, 128);
-        previewRef.current.innerHTML = '';
-        previewRef.current.appendChild(renderer.domElement);
-
-        const material = new THREE.MeshBasicMaterial({ color: node.color || '#00ffff', wireframe: true });
-        const geometry = geometries[node.formId] || geometries.sphere;
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-
-        const animate = () => {
-            if (!mount) return;
-            requestAnimationFrame(animate);
-            mesh.rotation.y += 0.01;
-            renderer.render(scene, camera);
-        };
-        
-        let mount = true;
-        animate();
-
-        return () => {
-            mount = false;
-        };
-    }, [node, geometries]);
+    <!-- Three.js and add-ons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <script type="module">
+        import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+        import { DragControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/DragControls.js';
+        import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
+        window.THREE.OrbitControls = OrbitControls;
+        window.THREE.DragControls = DragControls;
+        window.THREE.PointerLockControls = PointerLockControls;
+    </script>
     
-    if (!node) return null;
-    const assignedMember = team.find(m => m.id === node.assignedTo);
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-auth.js";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, query, serverTimestamp, orderBy } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore.js";
+        
+        window.firebase = {
+            initializeApp,
+            getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut,
+            getFirestore, collection, doc, onSnapshot, addDoc, setDoc, deleteDoc, query, serverTimestamp, orderBy
+        };
+    </script>
 
-    return (
-        <div
-            className="absolute bg-black/70 backdrop-blur-md border border-cyan-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(0,255,255,0.3)] z-30"
-            style={{ left: `${position.x}px`, top: `${position.y}px`, width: '500px' }}
-        >
-            <div
-                className="flex justify-between items-center p-2 bg-black/50 cursor-move"
-                onMouseDown={handleMouseDown}
-            >
-                <h1 className="text-lg font-bold text-cyan-400">{node.label}</h1>
-                <div className="flex items-center">
-                    <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1 hover:bg-gray-700 rounded">
-                        {isCollapsed ? <ChevronsRightLeft size={16} /> : <Minus size={16} />}
+    <script type="text/babel">
+        // --- App Configuration ---
+        const appConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-schism-labs-app';
+
+        // --- Helper Functions ---
+        const snapToGrid = (value, gridSize = 2) => Math.round(value / gridSize) * gridSize;
+
+        // --- Authentication Component ---
+        const Login = ({ auth }) => {
+            const [error, setError] = React.useState('');
+            const { BrainCircuit } = lucide;
+
+            const handleGoogleSignIn = async () => {
+                setError('');
+                const provider = new window.firebase.GoogleAuthProvider();
+                try {
+                    await window.firebase.signInWithPopup(auth, provider);
+                } catch (err) {
+                    setError(err.message);
+                }
+            };
+
+            return (
+                <div className="h-screen w-screen flex items-center justify-center bg-black text-white">
+                    <div className="w-full max-w-md p-8 bg-black/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-cyan-500/50 shadow-cyan-500/20">
+                        <div className="flex items-center justify-center mb-6">
+                            <BrainCircuit className="text-cyan-400 mr-3" size={40} />
+                            <h1 className="text-3xl font-bold text-cyan-400" style={{ textShadow: '0 0 8px #0ff' }}>Schism Labs</h1>
+                        </div>
+                        <p className="text-center text-gray-400 mb-8">Sign in to access the think tank.</p>
+                        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+                        <button onClick={handleGoogleSignIn} className="w-full bg-blue-600 hover:bg-blue-700 font-bold py-3 px-4 rounded-lg transition duration-200 shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                            Sign In with Google
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- React Components ---
+
+        const Tooltip = ({ text, children }) => {
+            return (
+                <div className="relative flex items-center group">
+                    {children}
+                    <div className="absolute left-full ml-2 w-48 p-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-50 border border-cyan-500/30">
+                        {text}
+                    </div>
+                </div>
+            );
+        };
+
+        // Draggable Window Hook
+        const useDraggable = () => {
+            const [position, setPosition] = React.useState({ x: 100, y: 100 });
+            const isDragging = React.useRef(false);
+            const offset = React.useRef({ x: 0, y: 0 });
+
+            const handleMouseDown = (e) => {
+                isDragging.current = true;
+                offset.current = {
+                    x: e.clientX - position.x,
+                    y: e.clientY - position.y,
+                };
+            };
+
+            const handleMouseMove = React.useCallback((e) => {
+                if (!isDragging.current) return;
+                setPosition({
+                    x: e.clientX - offset.current.x,
+                    y: e.clientY - offset.current.y,
+                });
+            }, []);
+
+            const handleMouseUp = React.useCallback(() => {
+                isDragging.current = false;
+            }, []);
+
+            React.useEffect(() => {
+                window.addEventListener('mousemove', handleMouseMove);
+                window.addEventListener('mouseup', handleMouseUp);
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    window.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [handleMouseMove, handleMouseUp]);
+
+            return { position, handleMouseDown };
+        };
+
+
+        // Draggable and Collapsible Packet Editor Window
+        const PacketEditorWindow = ({ node, onClose, team, onUpdateNode }) => {
+            const [isCollapsed, setIsCollapsed] = React.useState(false);
+            const { position, handleMouseDown } = useDraggable();
+            const previewRef = React.useRef(null);
+            const { ChevronsRightLeft, Minus, X } = lucide;
+
+            const geometries = React.useMemo(() => ({
+                sphere: new THREE.SphereGeometry(1, 16, 16),
+                box: new THREE.BoxGeometry(1.5, 1.5, 1.5),
+                cone: new THREE.ConeGeometry(1, 2, 16),
+                pyramid: new THREE.CylinderGeometry(0, 1.5, 2, 4),
+                torus: new THREE.TorusGeometry(1, 0.4, 16, 32),
+                dodecahedron: new THREE.DodecahedronGeometry(1.5),
+            }), []);
+
+            React.useEffect(() => {
+                if (!node || !previewRef.current) return;
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+                camera.position.z = 5;
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setSize(128, 128);
+                previewRef.current.innerHTML = '';
+                previewRef.current.appendChild(renderer.domElement);
+
+                const material = new THREE.MeshBasicMaterial({ color: node.color || '#00ffff', wireframe: true });
+                const geometry = geometries[node.formId] || geometries.sphere;
+                const mesh = new THREE.Mesh(geometry, material);
+                scene.add(mesh);
+
+                const animate = () => {
+                    if (!mount) return;
+                    requestAnimationFrame(animate);
+                    mesh.rotation.y += 0.01;
+                    renderer.render(scene, camera);
+                };
+                
+                let mount = true;
+                animate();
+
+                return () => {
+                    mount = false;
+                };
+            }, [node, geometries]);
+            
+            if (!node) return null;
+
+            return (
+                <div
+                    className="absolute bg-black/70 backdrop-blur-md border border-cyan-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(0,255,255,0.3)] z-30"
+                    style={{ left: `${position.x}px`, top: `${position.y}px`, width: '500px' }}
+                >
+                    <div
+                        className="flex justify-between items-center p-2 bg-black/50 cursor-move"
+                        onMouseDown={handleMouseDown}
+                    >
+                        <h1 className="text-lg font-bold text-cyan-400">{node.label}</h1>
+                        <div className="flex items-center">
+                            <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1 hover:bg-gray-700 rounded">
+                                {isCollapsed ? <ChevronsRightLeft size={16} /> : <Minus size={16} />}
+                            </button>
+                            <button onClick={onClose} className="p-1 hover:bg-red-700 rounded ml-2">
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                    {!isCollapsed && (
+                        <div className="p-4 flex space-x-4">
+                            <div className="w-1/3 flex flex-col items-center">
+                                <div ref={previewRef} className="w-32 h-32 mb-4"></div>
+                                <input type="color" value={node.color || '#00ffff'} onChange={(e) => onUpdateNode(node.id, { color: e.target.value })} className="w-full h-8 p-0 border-none cursor-pointer bg-transparent" />
+                            </div>
+                            <div className="w-2/3 space-y-3">
+                                <input type="text" value={node.label} onChange={(e) => onUpdateNode(node.id, { label: e.target.value })} placeholder="Packet Label" className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500" />
+                                <select value={node.type} onChange={(e) => onUpdateNode(node.id, { type: e.target.value })} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500">
+                                    <option value="idea">Idea</option><option value="task">Task</option><option value="question">Question</option>
+                                </select>
+                                <select value={node.assignedTo || ''} onChange={(e) => onUpdateNode(node.id, { assignedTo: e.target.value || null })} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500">
+                                    <option value="">Unassigned</option>
+                                    {team.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Terminal Window Component
+        const TerminalWindow = ({ onClose }) => {
+            const [isCollapsed, setIsCollapsed] = React.useState(false);
+            const { position, handleMouseDown } = useDraggable();
+            const [history, setHistory] = React.useState([]);
+            const [input, setInput] = React.useState('');
+            const { ChevronsRightLeft, Minus, X } = lucide;
+
+            const handleCommand = (e) => {
+                e.preventDefault();
+                setHistory(prev => [...prev, `> ${input}`]);
+                if (input.toLowerCase() === 'clear') {
+                    setHistory([]);
+                } else {
+                    setHistory(prev => [...prev, `Unrecognized command: ${input}`]);
+                }
+                setInput('');
+            };
+
+            return (
+                <div
+                    className="absolute bg-black/80 backdrop-blur-md border border-fuchsia-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(217,70,239,0.3)] z-30 font-mono"
+                    style={{ left: `${position.x}px`, top: `${position.y}px`, width: '600px', height: '400px' }}
+                >
+                    <div className="flex justify-between items-center p-2 bg-black/50 cursor-move" onMouseDown={handleMouseDown}>
+                        <h1 className="text-lg font-bold text-fuchsia-400">PCL Terminal</h1>
+                        <div className="flex items-center">
+                            <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1 hover:bg-gray-700 rounded">{isCollapsed ? <ChevronsRightLeft size={16} /> : <Minus size={16} />}</button>
+                            <button onClick={onClose} className="p-1 hover:bg-red-700 rounded ml-2"><X size={16} /></button>
+                        </div>
+                    </div>
+                    {!isCollapsed && (
+                        <div className="p-4 h-[calc(100%-40px)] flex flex-col">
+                            <div className="flex-grow overflow-y-auto text-sm">
+                                <p className="text-fuchsia-400">Packet Command Language (PCL) v1.0</p>
+                                <p className="text-gray-400">Type 'help' for a list of commands.</p>
+                                {history.map((line, i) => <p key={i}>{line}</p>)}
+                            </div>
+                            <form onSubmit={handleCommand} className="flex items-center mt-2">
+                                <span className="text-cyan-400 mr-2">&gt;</span>
+                                <input 
+                                    type="text" 
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    className="w-full bg-transparent focus:outline-none"
+                                    autoFocus
+                                />
+                            </form>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+
+        // Main Toolbar Component
+        const MainToolbar = ({ onToggleControlPanel, onToggleChat, onToggleTerminal, onToggleFPSMode }) => {
+            const { PanelLeft, MessageSquare, Terminal, Gamepad2 } = lucide;
+            return (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md border border-cyan-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(0,255,255,0.3)] z-40">
+                    <div className="flex items-center p-2 space-x-2">
+                        <button onClick={onToggleControlPanel} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><PanelLeft size={18} className="mr-2"/> Panel</button>
+                        <button onClick={onToggleChat} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><MessageSquare size={18} className="mr-2"/> Chat</button>
+                        <button onClick={onToggleTerminal} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><Terminal size={18} className="mr-2"/> Terminal</button>
+                        <button onClick={onToggleFPSMode} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><Gamepad2 size={18} className="mr-2"/> FPS Mode</button>
+                    </div>
+                </div>
+            );
+        };
+
+
+        // Sidebar Control Panel component
+        const ControlPanel = ({ userId, team, nodes, selectedNodeId, onSetUserName, onAddNode, onSelectNode, onUpdateNode, onDeleteNode, onLinkNodes, onJoinNode, linkingState, setLinkType, setLinkFrequency, onSignOut }) => {
+            const [userName, setUserName] = React.useState('');
+            const [nodeLabel, setNodeLabel] = React.useState('');
+            const currentUser = team.find(m => m.id === userId);
+            const selectedNode = nodes.find(n => n.id === selectedNodeId);
+            const { BrainCircuit, Plus, Eye, Link, Trash2, HelpCircle, Palette, Ruler, UserPlus, LogOut } = lucide;
+
+            React.useEffect(() => {
+                if (selectedNode) setNodeLabel(selectedNode.label);
+                else setNodeLabel('');
+            }, [selectedNode]);
+            
+            React.useEffect(() => {
+                if (currentUser) setUserName(currentUser.name);
+                else setUserName('');
+            }, [currentUser]);
+
+            const handleSetUserName = (e) => {
+                e.preventDefault();
+                if (userName.trim()) onSetUserName(userName.trim());
+            };
+
+            const handleUpdateLabel = (e) => {
+                setNodeLabel(e.target.value);
+                if (selectedNode) onUpdateNode(selectedNode.id, { label: e.target.value });
+            };
+
+            return (
+                <div className="w-80 bg-black/70 backdrop-blur-md text-white p-4 flex flex-col h-full overflow-y-auto z-10 border-r border-cyan-500/30">
+                    <div className="flex items-center mb-6">
+                        <BrainCircuit className="text-cyan-400 mr-3" size={32} />
+                        <h1 className="text-2xl font-bold text-cyan-400" style={{ textShadow: '0 0 5px #0ff' }}>Schism Labs</h1>
+                    </div>
+                    <div className="mb-4 p-2 bg-gray-900/70 rounded-lg border border-cyan-500/20">
+                        <p className="text-xs text-cyan-300 mb-1">Your User ID</p>
+                        <p className="text-sm font-mono break-all">{userId}</p>
+                    </div>
+
+                    <div className="mb-6">
+                        <h2 className="text-lg font-semibold mb-3 text-cyan-400">Controls</h2>
+                        <button onClick={() => onAddNode('New Packet')} className="w-full flex items-center justify-center bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(0,255,255,0.4)]">
+                            <Plus className="mr-2" size={20} /> Add Packet
+                        </button>
+                    </div>
+                    
+                    {selectedNode && (
+                        <div className="mb-6 p-3 bg-gray-900/70 rounded-lg border border-cyan-500/20">
+                            <h3 className="text-md font-semibold mb-3 text-cyan-400">Edit Selected Packet</h3>
+                            <button onClick={() => onJoinNode(selectedNode.id)} className="w-full mb-3 flex items-center justify-center bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(34,197,94,0.4)]">
+                                <Eye className="mr-2" size={20} /> View Packet
+                            </button>
+                            <input type="text" value={nodeLabel} onChange={handleUpdateLabel} placeholder="Packet Label" className="w-full bg-gray-800 text-white p-2 rounded-md mb-3 ring-1 ring-cyan-500/30 focus:ring-cyan-500" />
+                            <select value={selectedNode.type} onChange={(e) => onUpdateNode(selectedNode.id, { type: e.target.value })} className="w-full bg-gray-800 text-white p-2 rounded-md mb-3 ring-1 ring-cyan-500/30 focus:ring-cyan-500">
+                                <option value="idea">Idea</option><option value="task">Task</option><option value="question">Question</option>
+                            </select>
+                            <div className="flex items-center my-3">
+                                <select value={selectedNode.formId || 'sphere'} onChange={(e) => onUpdateNode(selectedNode.id, { formId: e.target.value })} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500">
+                                    <option value="sphere">Sphere</option>
+                                    <option value="pyramid">Pyramid</option>
+                                    <option value="box">Cube</option>
+                                    <option value="cone">Cone</option>
+                                    <option value="torus">Torus</option>
+                                    <option value="dodecahedron">Dodecahedron</option>
+                                </select>
+                                <Tooltip text="Defines the base geometric structure of the packet.">
+                                    <HelpCircle className="ml-2 text-cyan-400 cursor-help" size={20} />
+                                </Tooltip>
+                            </div>
+                            <select value={selectedNode.assignedTo || ''} onChange={(e) => onUpdateNode(selectedNode.id, { assignedTo: e.target.value || null })} className="w-full bg-gray-800 text-white p-2 rounded-md mb-3 ring-1 ring-cyan-500/30 focus:ring-cyan-500">
+                                <option value="">Unassigned</option>
+                                {team.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
+                            </select>
+                            <div className="space-y-3 mt-3">
+                                <div className="flex items-center">
+                                    <Palette className="mr-3 text-cyan-400" size={20} />
+                                    <input type="color" value={selectedNode.color || '#00ffff'} onChange={(e) => onUpdateNode(selectedNode.id, { color: e.target.value })} className="w-full h-8 p-0 border-none cursor-pointer bg-transparent" />
+                                </div>
+                                <div className="flex items-center">
+                                    <Ruler className="mr-3 text-cyan-400" size={20} />
+                                    <input type="range" min="1" max="5" step="0.1" value={selectedNode.size || 2} onChange={(e) => onUpdateNode(selectedNode.id, { size: parseFloat(e.target.value) })} className="w-full" />
+                                </div>
+                            </div>
+                            <div className="mt-4">
+                                <button onClick={onLinkNodes} className="w-full flex items-center justify-center bg-fuchsia-500 hover:bg-fuchsia-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(217,70,239,0.4)]">
+                                    <Link className="mr-2" size={20} /> Link Packets
+                                </button>
+                                {linkingState && (
+                                    <div className="mt-2 space-y-2">
+                                        <select onChange={(e) => setLinkType(e.target.value)} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-fuchsia-500/30 focus:ring-fuchsia-500">
+                                            <option value="RELATES_TO">Relates To</option>
+                                            <option value="DEPENDS_ON">Depends On</option>
+                                            <option value="LEADS_TO">Leads To</option>
+                                            <option value="ANSWERS">Answers</option>
+                                        </select>
+                                        <select onChange={(e) => setLinkFrequency(e.target.value)} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-fuchsia-500/30 focus:ring-fuchsia-500">
+                                            <option value="alpha">Alpha Channel</option>
+                                            <option value="beta">Beta Channel</option>
+                                            <option value="gamma">Gamma Channel</option>
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                            <button onClick={onDeleteNode} className="w-full mt-4 flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(220,38,38,0.4)]">
+                                <Trash2 className="mr-2" size={20} /> Delete Packet
+                            </button>
+                        </div>
+                    )}
+                    
+                    <div className="mb-6">
+                        <h2 className="text-lg font-semibold mb-3 text-cyan-400">Idea Explorer</h2>
+                        <ul className="space-y-2 max-h-48 overflow-y-auto p-2 bg-gray-900/70 rounded-lg border border-cyan-500/20">
+                            {nodes.map(node => (
+                                <li key={node.id} 
+                                    onClick={() => onSelectNode(node.id)}
+                                    className={`p-2 rounded-md cursor-pointer transition-colors ${selectedNodeId === node.id ? 'bg-cyan-500 text-black' : 'bg-gray-800 hover:bg-gray-700'}`}>
+                                    {node.label}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="flex-grow">
+                        <h2 className="text-lg font-semibold mb-3 flex items-center text-cyan-400"><Users className="mr-2" />Team</h2>
+                        <form onSubmit={handleSetUserName} className="flex mb-3">
+                            <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Set your display name" className="flex-grow bg-gray-800 text-white p-2 rounded-l-md ring-1 ring-cyan-500/30 focus:ring-cyan-500" />
+                            <button type="submit" className="bg-cyan-500 hover:bg-cyan-600 p-2 rounded-r-md"><UserPlus size={20} color="black"/></button>
+                        </form>
+                        <ul className="space-y-2">{team.map(member => (<li key={member.id} className="flex items-center p-2 bg-gray-900/70 rounded-md"><span className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: member.color, boxShadow: `0 0 8px ${member.color}` }}></span><span>{member.name}</span></li>))}</ul>
+                    </div>
+                    <button onClick={onSignOut} className="w-full mt-4 flex items-center justify-center bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                        <LogOut className="mr-2" size={20} /> Sign Out
                     </button>
-                    <button onClick={onClose} className="p-1 hover:bg-red-700 rounded ml-2">
-                        <X size={16} />
-                    </button>
                 </div>
-            </div>
-            {!isCollapsed && (
-                <div className="p-4 flex space-x-4">
-                    <div className="w-1/3 flex flex-col items-center">
-                        <div ref={previewRef} className="w-32 h-32 mb-4"></div>
-                        <input type="color" value={node.color || '#00ffff'} onChange={(e) => onUpdateNode(node.id, { color: e.target.value })} className="w-full h-8 p-0 border-none cursor-pointer bg-transparent" />
-                    </div>
-                    <div className="w-2/3 space-y-3">
-                         <input type="text" value={node.label} onChange={(e) => onUpdateNode(node.id, { label: e.target.value })} placeholder="Packet Label" className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500" />
-                         <select value={node.type} onChange={(e) => onUpdateNode(node.id, { type: e.target.value })} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500">
-                            <option value="idea">Idea</option><option value="task">Task</option><option value="question">Question</option>
-                        </select>
-                        <select value={node.assignedTo || ''} onChange={(e) => onUpdateNode(node.id, { assignedTo: e.target.value || null })} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500">
-                            <option value="">Unassigned</option>
-                            {team.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
-                        </select>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
+            );
+        };
 
-// Terminal Window Component
-const TerminalWindow = ({ onClose }) => {
-    const [isCollapsed, setIsCollapsed] = React.useState(false);
-    const { position, handleMouseDown } = useDraggable();
-    const [history, setHistory] = React.useState([]);
-    const [input, setInput] = React.useState('');
+        // Chat Panel component
+        const ChatPanel = ({ messages, team, onSendMessage }) => {
+            const [newMessage, setNewMessage] = React.useState('');
+            const messagesEndRef = React.useRef(null);
+            const { Send } = lucide;
 
-    const handleCommand = (e) => {
-        e.preventDefault();
-        setHistory(prev => [...prev, `> ${input}`]);
-        if (input.toLowerCase() === 'clear') {
-            setHistory([]);
-        } else {
-             setHistory(prev => [...prev, `Unrecognized command: ${input}`]);
-        }
-        setInput('');
-    };
+            React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-    return (
-         <div
-            className="absolute bg-black/80 backdrop-blur-md border border-fuchsia-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(217,70,239,0.3)] z-30 font-mono"
-            style={{ left: `${position.x}px`, top: `${position.y}px`, width: '600px', height: '400px' }}
-        >
-            <div className="flex justify-between items-center p-2 bg-black/50 cursor-move" onMouseDown={handleMouseDown}>
-                <h1 className="text-lg font-bold text-fuchsia-400">PCL Terminal</h1>
-                <div className="flex items-center">
-                    <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1 hover:bg-gray-700 rounded">{isCollapsed ? <ChevronsRightLeft size={16} /> : <Minus size={16} />}</button>
-                    <button onClick={onClose} className="p-1 hover:bg-red-700 rounded ml-2"><X size={16} /></button>
-                </div>
-            </div>
-            {!isCollapsed && (
-                <div className="p-4 h-[calc(100%-40px)] flex flex-col">
-                    <div className="flex-grow overflow-y-auto text-sm">
-                        <p className="text-fuchsia-400">Packet Command Language (PCL) v1.0</p>
-                        <p className="text-gray-400">Type 'help' for a list of commands.</p>
-                        {history.map((line, i) => <p key={i}>{line}</p>)}
+            const handleSendMessage = (e) => {
+                e.preventDefault();
+                if (newMessage.trim()) { onSendMessage(newMessage.trim()); setNewMessage(''); }
+            };
+
+            const getSender = (senderId) => team.find(m => m.id === senderId) || { name: 'Guest', color: '#ccc' };
+
+            return (
+                <div className="w-96 bg-black/70 backdrop-blur-md text-white p-4 flex flex-col h-full border-l border-cyan-500/30">
+                    <h2 className="text-xl font-semibold mb-4 text-cyan-400" style={{ textShadow: '0 0 5px #0ff' }}>Team Chat</h2>
+                    <div className="flex-grow overflow-y-auto mb-4 pr-2">
+                        {messages.map(msg => {
+                            const sender = getSender(msg.senderId);
+                            return (
+                                <div key={msg.id} className="mb-3">
+                                    <div className="flex items-center mb-1">
+                                        <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: sender.color, boxShadow: `0 0 6px ${sender.color}` }}></span>
+                                        <span className="font-bold text-sm" style={{ color: sender.color }}>{sender.name}</span>
+                                        <span className="text-xs text-gray-500 ml-2">{new Date(msg.timestamp).toLocaleTimeString()}</span>
+                                    </div>
+                                    <p className="text-gray-200 ml-5 break-words">{msg.text}</p>
+                                </div>
+                            );
+                        })}
+                        <div ref={messagesEndRef} />
                     </div>
-                    <form onSubmit={handleCommand} className="flex items-center mt-2">
-                        <span className="text-cyan-400 mr-2">&gt;</span>
-                        <input 
-                            type="text" 
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            className="w-full bg-transparent focus:outline-none"
-                            autoFocus
-                        />
+                    <form onSubmit={handleSendMessage} className="flex">
+                        <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." className="flex-grow bg-gray-800 text-white p-2 rounded-l-md focus:outline-none ring-1 ring-cyan-500/30 focus:ring-cyan-500"/>
+                        <button type="submit" className="bg-cyan-500 hover:bg-cyan-600 p-3 rounded-r-md"><Send size={20} color="black"/></button>
                     </form>
                 </div>
-            )}
-        </div>
-    );
-};
+            );
+        };
 
-
-// Main Toolbar Component
-const MainToolbar = ({ onToggleControlPanel, onToggleChat, onToggleTerminal, onToggleFPSMode }) => {
-    return (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md border border-cyan-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(0,255,255,0.3)] z-40">
-            <div className="flex items-center p-2 space-x-2">
-                <button onClick={onToggleControlPanel} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><PanelLeft size={18} className="mr-2"/> Panel</button>
-                <button onClick={onToggleChat} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><MessageSquare size={18} className="mr-2"/> Chat</button>
-                <button onClick={onToggleTerminal} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><TerminalIcon size={18} className="mr-2"/> Terminal</button>
-                <button onClick={onToggleFPSMode} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><Gamepad2 size={18} className="mr-2"/> FPS Mode</button>
-            </div>
-        </div>
-    );
-};
-
-
-// Sidebar Control Panel component
-const ControlPanel = ({ userId, team, nodes, selectedNodeId, onSetUserName, onAddNode, onSelectNode, onUpdateNode, onDeleteNode, onLinkNodes, onJoinNode, linkingState, setLinkType, setLinkFrequency, onSignOut }) => {
-    const [userName, setUserName] = React.useState('');
-    const [nodeLabel, setNodeLabel] = React.useState('');
-    const currentUser = team.find(m => m.id === userId);
-    const selectedNode = nodes.find(n => n.id === selectedNodeId);
-
-    React.useEffect(() => {
-        if (selectedNode) setNodeLabel(selectedNode.label);
-        else setNodeLabel('');
-    }, [selectedNode]);
-    
-    React.useEffect(() => {
-        if (currentUser) setUserName(currentUser.name);
-        else setUserName('');
-    }, [currentUser]);
-
-    const handleSetUserName = (e) => {
-        e.preventDefault();
-        if (userName.trim()) onSetUserName(userName.trim());
-    };
-
-    const handleUpdateLabel = (e) => {
-        setNodeLabel(e.target.value);
-        if (selectedNode) onUpdateNode(selectedNode.id, { label: e.target.value });
-    };
-
-    return (
-        <div className="w-80 bg-black/70 backdrop-blur-md text-white p-4 flex flex-col h-full overflow-y-auto z-10 border-r border-cyan-500/30">
-            <div className="flex items-center mb-6">
-                <BrainCircuit className="text-cyan-400 mr-3" size={32} />
-                <h1 className="text-2xl font-bold text-cyan-400" style={{ textShadow: '0 0 5px #0ff' }}>Schism Labs</h1>
-            </div>
-            <div className="mb-4 p-2 bg-gray-900/70 rounded-lg border border-cyan-500/20">
-                <p className="text-xs text-cyan-300 mb-1">Your User ID</p>
-                <p className="text-sm font-mono break-all">{userId}</p>
-            </div>
-
-            <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3 text-cyan-400">Controls</h2>
-                <button onClick={() => onAddNode('New Packet')} className="w-full flex items-center justify-center bg-cyan-500 hover:bg-cyan-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(0,255,255,0.4)]">
-                    <Plus className="mr-2" size={20} /> Add Packet
-                </button>
-            </div>
+        // 3D Network View component
+        const ThreeDNetworkView = ({ nodes, edges, teamColors, onNodeClick, onNodeDragEnd, selectedNodeId, onDeselectAll, isFPSMode, setFPSMode }) => {
+            const mountRef = React.useRef(null);
+            const sceneRef = React.useRef(new THREE.Scene());
+            const cameraRef = React.useRef();
+            const rendererRef = React.useRef();
+            const orbitControlsRef = React.useRef();
+            const pointerLockControlsRef = React.useRef();
+            const dragControlsRef = React.useRef();
+            const raycaster = React.useRef(new THREE.Raycaster());
+            const mouse = React.useRef(new THREE.Vector2());
+            const nodeMeshes = React.useRef(new Map());
+            const nodeLabelMeshes = React.useRef(new Map());
+            const subNodeMeshes = React.useRef(new Map());
+            const edgeMeshes = React.useRef(new Map());
+            const edgeLabelMeshes = React.useRef(new Map());
+            const moveState = React.useRef({ forward: 0, right: 0 });
             
-            {selectedNode && (
-                <div className="mb-6 p-3 bg-gray-900/70 rounded-lg border border-cyan-500/20">
-                    <h3 className="text-md font-semibold mb-3 text-cyan-400">Edit Selected Packet</h3>
-                     <button onClick={() => onJoinNode(selectedNode.id)} className="w-full mb-3 flex items-center justify-center bg-green-500 hover:bg-green-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(34,197,94,0.4)]">
-                        <Eye className="mr-2" size={20} /> View Packet
-                    </button>
-                    <input type="text" value={nodeLabel} onChange={handleUpdateLabel} placeholder="Packet Label" className="w-full bg-gray-800 text-white p-2 rounded-md mb-3 ring-1 ring-cyan-500/30 focus:ring-cyan-500" />
-                    <select value={selectedNode.type} onChange={(e) => onUpdateNode(selectedNode.id, { type: e.target.value })} className="w-full bg-gray-800 text-white p-2 rounded-md mb-3 ring-1 ring-cyan-500/30 focus:ring-cyan-500">
-                        <option value="idea">Idea</option><option value="task">Task</option><option value="question">Question</option>
-                    </select>
-                    <div className="flex items-center my-3">
-                        <select value={selectedNode.formId || 'sphere'} onChange={(e) => onUpdateNode(selectedNode.id, { formId: e.target.value })} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-cyan-500/30 focus:ring-cyan-500">
-                            <option value="sphere">Sphere</option>
-                            <option value="pyramid">Pyramid</option>
-                            <option value="box">Cube</option>
-                            <option value="cone">Cone</option>
-                            <option value="torus">Torus</option>
-                            <option value="dodecahedron">Dodecahedron</option>
-                        </select>
-                        <Tooltip text="Defines the base geometric structure of the packet.">
-                            <HelpCircle className="ml-2 text-cyan-400 cursor-help" size={20} />
-                        </Tooltip>
-                    </div>
-                    <select value={selectedNode.assignedTo || ''} onChange={(e) => onUpdateNode(selectedNode.id, { assignedTo: e.target.value || null })} className="w-full bg-gray-800 text-white p-2 rounded-md mb-3 ring-1 ring-cyan-500/30 focus:ring-cyan-500">
-                        <option value="">Unassigned</option>
-                        {team.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
-                    </select>
-                    <div className="space-y-3 mt-3">
-                        <div className="flex items-center">
-                            <Palette className="mr-3 text-cyan-400" size={20} />
-                            <input type="color" value={selectedNode.color || '#00ffff'} onChange={(e) => onUpdateNode(selectedNode.id, { color: e.target.value })} className="w-full h-8 p-0 border-none cursor-pointer bg-transparent" />
-                        </div>
-                        <div className="flex items-center">
-                             <Ruler className="mr-3 text-cyan-400" size={20} />
-                             <input type="range" min="1" max="5" step="0.1" value={selectedNode.size || 2} onChange={(e) => onUpdateNode(selectedNode.id, { size: parseFloat(e.target.value) })} className="w-full" />
-                        </div>
-                    </div>
-                    <div className="mt-4">
-                        <button onClick={onLinkNodes} className="w-full flex items-center justify-center bg-fuchsia-500 hover:bg-fuchsia-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(217,70,239,0.4)]">
-                            <LinkIcon className="mr-2" size={20} /> Link Packets
-                        </button>
-                        {linkingState && (
-                            <div className="mt-2 space-y-2">
-                                <select onChange={(e) => setLinkType(e.target.value)} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-fuchsia-500/30 focus:ring-fuchsia-500">
-                                    <option value="RELATES_TO">Relates To</option>
-                                    <option value="DEPENDS_ON">Depends On</option>
-                                    <option value="LEADS_TO">Leads To</option>
-                                    <option value="ANSWERS">Answers</option>
-                                </select>
-                                <select onChange={(e) => setLinkFrequency(e.target.value)} className="w-full bg-gray-800 text-white p-2 rounded-md ring-1 ring-fuchsia-500/30 focus:ring-fuchsia-500">
-                                    <option value="alpha">Alpha Channel</option>
-                                    <option value="beta">Beta Channel</option>
-                                    <option value="gamma">Gamma Channel</option>
-                                </select>
-                            </div>
-                        )}
-                    </div>
-                    <button onClick={onDeleteNode} className="w-full mt-4 flex items-center justify-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(220,38,38,0.4)]">
-                        <Trash2 className="mr-2" size={20} /> Delete Packet
-                    </button>
-                </div>
-            )}
-            
-            <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-3 text-cyan-400">Idea Explorer</h2>
-                <ul className="space-y-2 max-h-48 overflow-y-auto p-2 bg-gray-900/70 rounded-lg border border-cyan-500/20">
-                    {nodes.map(node => (
-                        <li key={node.id} 
-                            onClick={() => onSelectNode(node.id)}
-                            className={`p-2 rounded-md cursor-pointer transition-colors ${selectedNodeId === node.id ? 'bg-cyan-500 text-black' : 'bg-gray-800 hover:bg-gray-700'}`}>
-                            {node.label}
-                        </li>
-                    ))}
-                </ul>
-            </div>
+            const geometries = React.useMemo(() => ({
+                sphere: new THREE.SphereGeometry(1, 16, 16),
+                box: new THREE.BoxGeometry(1.5, 1.5, 1.5),
+                cone: new THREE.ConeGeometry(1, 2, 16),
+                pyramid: new THREE.CylinderGeometry(0, 1.5, 2, 4),
+                torus: new THREE.TorusGeometry(1, 0.4, 16, 32),
+                dodecahedron: new THREE.DodecahedronGeometry(1.5),
+            }), []);
 
-            <div className="flex-grow">
-                <h2 className="text-lg font-semibold mb-3 flex items-center text-cyan-400"><Users className="mr-2" />Team</h2>
-                <form onSubmit={handleSetUserName} className="flex mb-3">
-                    <input type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Set your display name" className="flex-grow bg-gray-800 text-white p-2 rounded-l-md ring-1 ring-cyan-500/30 focus:ring-cyan-500" />
-                    <button type="submit" className="bg-cyan-500 hover:bg-cyan-600 p-2 rounded-r-md"><UserPlus size={20} color="black"/></button>
-                </form>
-                <ul className="space-y-2">{team.map(member => (<li key={member.id} className="flex items-center p-2 bg-gray-900/70 rounded-md"><span className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: member.color, boxShadow: `0 0 8px ${member.color}` }}></span><span>{member.name}</span></li>))}</ul>
-            </div>
-            <button onClick={onSignOut} className="w-full mt-4 flex items-center justify-center bg-gray-700 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
-                <LogOut className="mr-2" size={20} /> Sign Out
-            </button>
-        </div>
-    );
-};
+            const frequencyColors = React.useMemo(() => ({
+                alpha: 0x00ffff, // Cyan
+                beta: 0xff00ff, // Magenta
+                gamma: 0xffff00, // Yellow
+            }), []);
 
-// Chat Panel component
-const ChatPanel = ({ messages, team, onSendMessage }) => {
-    const [newMessage, setNewMessage] = React.useState('');
-    const messagesEndRef = React.useRef(null);
-
-    React.useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-
-    const handleSendMessage = (e) => {
-        e.preventDefault();
-        if (newMessage.trim()) { onSendMessage(newMessage.trim()); setNewMessage(''); }
-    };
-
-    const getSender = (senderId) => team.find(m => m.id === senderId) || { name: 'Guest', color: '#ccc' };
-
-    return (
-        <div className="w-96 bg-black/70 backdrop-blur-md text-white p-4 flex flex-col h-full border-l border-cyan-500/30">
-            <h2 className="text-xl font-semibold mb-4 text-cyan-400" style={{ textShadow: '0 0 5px #0ff' }}>Team Chat</h2>
-            <div className="flex-grow overflow-y-auto mb-4 pr-2">
-                {messages.map(msg => {
-                    const sender = getSender(msg.senderId);
-                    return (
-                        <div key={msg.id} className="mb-3">
-                            <div className="flex items-center mb-1">
-                                <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: sender.color, boxShadow: `0 0 6px ${sender.color}` }}></span>
-                                <span className="font-bold text-sm" style={{ color: sender.color }}>{sender.name}</span>
-                                <span className="text-xs text-gray-500 ml-2">{new Date(msg.timestamp).toLocaleTimeString()}</span>
-                            </div>
-                            <p className="text-gray-200 ml-5 break-words">{msg.text}</p>
-                        </div>
-                    );
-                })}
-                <div ref={messagesEndRef} />
-            </div>
-            <form onSubmit={handleSendMessage} className="flex">
-                <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type a message..." className="flex-grow bg-gray-800 text-white p-2 rounded-l-md focus:outline-none ring-1 ring-cyan-500/30 focus:ring-cyan-500"/>
-                <button type="submit" className="bg-cyan-500 hover:bg-cyan-600 p-3 rounded-r-md"><Send size={20} color="black"/></button>
-            </form>
-        </div>
-    );
-};
-
-// 3D Network View component
-const ThreeDNetworkView = ({ nodes, edges, teamColors, onNodeClick, onNodeDragEnd, selectedNodeId, onDeselectAll, isFPSMode, setFPSMode }) => {
-    const mountRef = React.useRef(null);
-    const sceneRef = React.useRef(new THREE.Scene());
-    const cameraRef = React.useRef();
-    const rendererRef = React.useRef();
-    const orbitControlsRef = React.useRef();
-    const pointerLockControlsRef = React.useRef();
-    const dragControlsRef = React.useRef();
-    const raycaster = React.useRef(new THREE.Raycaster());
-    const mouse = React.useRef(new THREE.Vector2());
-    const nodeMeshes = React.useRef(new Map());
-    const nodeLabelMeshes = React.useRef(new Map());
-    const subNodeMeshes = React.useRef(new Map());
-    const edgeMeshes = React.useRef(new Map());
-    const edgeLabelMeshes = React.useRef(new Map());
-    const moveState = React.useRef({ forward: 0, right: 0 });
-    
-    const geometries = React.useMemo(() => ({
-        sphere: new THREE.SphereGeometry(1, 16, 16),
-        box: new THREE.BoxGeometry(1.5, 1.5, 1.5),
-        cone: new THREE.ConeGeometry(1, 2, 16),
-        pyramid: new THREE.CylinderGeometry(0, 1.5, 2, 4),
-        torus: new THREE.TorusGeometry(1, 0.4, 16, 32),
-        dodecahedron: new THREE.DodecahedronGeometry(1.5),
-    }), []);
-
-    const frequencyColors = React.useMemo(() => ({
-        alpha: 0x00ffff, // Cyan
-        beta: 0xff00ff, // Magenta
-        gamma: 0xffff00, // Yellow
-    }), []);
-
-    const createTextSprite = (text, color = 'rgba(255, 255, 255, 0.85)') => {
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        const fontSize = 48;
-        context.font = `Bold ${fontSize}px Arial`;
-        const textWidth = context.measureText(text).width;
-        canvas.width = textWidth;
-        canvas.height = fontSize;
-        context.font = `Bold ${fontSize}px Arial`;
-        context.fillStyle = color;
-        context.fillText(text, 0, fontSize - 10);
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
-        const sprite = new THREE.Sprite(spriteMaterial);
-        sprite.scale.set(textWidth / 10, fontSize / 10, 1.0);
-        return sprite;
-    };
-
-    React.useEffect(() => {
-        const mount = mountRef.current;
-        const scene = sceneRef.current;
-        
-        cameraRef.current = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.1, 1000);
-        cameraRef.current.position.y = 5;
-        cameraRef.current.position.z = 50;
-
-        rendererRef.current = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        rendererRef.current.setSize(mount.clientWidth, mount.clientHeight);
-        rendererRef.current.setClearColor(0x000000, 0);
-        mount.appendChild(rendererRef.current.domElement);
-        
-        orbitControlsRef.current = new OrbitControls(cameraRef.current, rendererRef.current.domElement);
-        orbitControlsRef.current.enableDamping = true;
-        
-        pointerLockControlsRef.current = new PointerLockControls(cameraRef.current, rendererRef.current.domElement);
-        pointerLockControlsRef.current.addEventListener('lock', () => setFPSMode(true));
-        pointerLockControlsRef.current.addEventListener('unlock', () => setFPSMode(false));
-        scene.add(pointerLockControlsRef.current.getObject());
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-        directionalLight.position.set(1, 1, 1);
-        scene.add(directionalLight);
-
-        const gridHelper = new THREE.GridHelper(200, 50, 0x00ffff, 0x4a5568);
-        gridHelper.material.transparent = true;
-        gridHelper.material.opacity = 0.2;
-        scene.add(gridHelper);
-
-        const clock = new THREE.Clock();
-        const animate = () => {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-
-            if(isFPSMode) {
-                const speed = 20.0 * delta;
-                const velocity = new THREE.Vector3(moveState.current.right, 0, moveState.current.forward);
-                velocity.normalize().multiplyScalar(speed);
-                pointerLockControlsRef.current.moveRight(velocity.x);
-                pointerLockControlsRef.current.moveForward(velocity.z);
-            } else {
-                orbitControlsRef.current.update();
-            }
-
-            subNodeMeshes.current.forEach((subNodes, parentId) => {
-                const parentNode = nodes.find(n => n.id === parentId);
-                if (parentNode) {
-                    const radius = (parentNode.size || 2) * 1.5;
-                    subNodes.forEach((subNode, i) => {
-                        const angle = (i / subNodes.length) * Math.PI * 2 + (clock.elapsedTime * 0.5);
-                        subNode.position.x = parentNode.position.x + radius * Math.cos(angle);
-                        subNode.position.y = parentNode.position.y + radius * Math.sin(angle);
-                        subNode.position.z = parentNode.position.z || 0;
-                    });
-                }
-            });
-
-            rendererRef.current.render(scene, cameraRef.current);
-        };
-        animate();
-
-        const handleResize = () => {
-            const width = mount.clientWidth;
-            const height = mount.clientHeight;
-            cameraRef.current.aspect = width / height;
-            cameraRef.current.updateProjectionMatrix();
-            rendererRef.current.setSize(width, height);
-        };
-        
-        const handleMouseClick = (event) => {
-            if (isFPSMode) return;
-            if (dragControlsRef.current && dragControlsRef.current.isDragging) return;
-            const rect = mount.getBoundingClientRect();
-            mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-            raycaster.current.setFromCamera(mouse.current, cameraRef.current);
-            const intersects = raycaster.current.intersectObjects(Array.from(nodeMeshes.current.values()));
-            if (intersects.length > 0) {
-                onNodeClick(intersects[0].object.userData.id);
-            } else {
-                onDeselectAll();
-            }
-        };
-        
-        const handleDoubleClick = () => {
-            if(!isFPSMode) orbitControlsRef.current.reset();
-        };
-
-        const onKeyDown = (event) => {
-            if(!isFPSMode) return;
-            switch (event.code) {
-                case 'KeyW': moveState.current.forward = -1; break;
-                case 'KeyS': moveState.current.forward = 1; break;
-                case 'KeyA': moveState.current.right = -1; break;
-                case 'KeyD': moveState.current.right = 1; break;
-            }
-        };
-
-        const onKeyUp = (event) => {
-            if(!isFPSMode) return;
-             switch (event.code) {
-                case 'KeyW': case 'KeyS': moveState.current.forward = 0; break;
-                case 'KeyA': case 'KeyD': moveState.current.right = 0; break;
-            }
-        };
-
-        mount.addEventListener('click', handleMouseClick);
-        mount.addEventListener('dblclick', handleDoubleClick);
-        window.addEventListener('resize', handleResize);
-        document.addEventListener('keydown', onKeyDown);
-        document.addEventListener('keyup', onKeyUp);
-
-        return () => {
-            mount.removeEventListener('click', handleMouseClick);
-            mount.removeEventListener('dblclick', handleDoubleClick);
-            window.removeEventListener('resize', handleResize);
-            document.removeEventListener('keydown', onKeyDown);
-            document.removeEventListener('keyup', onKeyUp);
-            if (rendererRef.current && rendererRef.current.domElement && mount.contains(rendererRef.current.domElement)) {
-                mount.removeChild(rendererRef.current.domElement);
-            }
-        };
-    }, [onNodeClick, onDeselectAll, nodes, isFPSMode, setFPSMode]);
-
-    React.useEffect(() => {
-        if(isFPSMode) {
-            pointerLockControlsRef.current.lock();
-            orbitControlsRef.current.enabled = false;
-            if(dragControlsRef.current) dragControlsRef.current.enabled = false;
-        } else {
-            pointerLockControlsRef.current.unlock();
-            orbitControlsRef.current.enabled = true;
-            if(dragControlsRef.current) dragControlsRef.current.enabled = true;
-        }
-    }, [isFPSMode]);
-
-
-    React.useEffect(() => {
-        const scene = sceneRef.current;
-        const currentMeshIds = new Set(nodeMeshes.current.keys());
-        const currentSubNodeParentIds = new Set(subNodeMeshes.current.keys());
-        
-        nodes.forEach(node => {
-            let mesh = nodeMeshes.current.get(node.id);
-            let label = nodeLabelMeshes.current.get(node.id);
-            const color = node.color || (node.assignedTo && teamColors[node.assignedTo] ? teamColors[node.assignedTo] : '#00ffff');
-            
-            if (!mesh) {
-                const geometry = geometries[node.formId] || geometries.sphere;
-                const material = new THREE.MeshBasicMaterial({ color, wireframe: true });
-                mesh = new THREE.Mesh(geometry, material);
-                mesh.userData.id = node.id;
-                scene.add(mesh);
-                nodeMeshes.current.set(node.id, mesh);
-
-                label = createTextSprite(node.label);
-                scene.add(label);
-                nodeLabelMeshes.current.set(node.id, label);
-            }
-            
-            const size = node.size || 2;
-            mesh.geometry = geometries[node.formId] || geometries.sphere;
-            mesh.position.set(node.position.x, node.position.y, node.position.z || 0);
-            mesh.material.color.set(color);
-            const scale = node.id === selectedNodeId ? size * 1.2 : size;
-            mesh.scale.set(scale, scale, scale);
-            
-            if (label.material.map.image.getContext('2d').measureText(node.label).width !== label.material.map.image.width) {
-                 scene.remove(label);
-                 label = createTextSprite(node.label);
-                 scene.add(label);
-                 nodeLabelMeshes.current.set(node.id, label);
-            }
-            label.position.set(node.position.x, node.position.y + size * 1.5, node.position.z || 0);
-
-            let subNodes = subNodeMeshes.current.get(node.id) || [];
-            if (node.assignedTo) {
-                if (subNodes.length === 0) {
-                    for (let i = 0; i < 3; i++) {
-                        const subGeom = new THREE.SphereGeometry(0.3, 8, 8);
-                        const subMat = new THREE.MeshBasicMaterial({ color, wireframe: true });
-                        const subMesh = new THREE.Mesh(subGeom, subMat);
-                        scene.add(subMesh);
-                        subNodes.push(subMesh);
-                    }
-                    subNodeMeshes.current.set(node.id, subNodes);
-                }
-                currentSubNodeParentIds.delete(node.id);
-            } else {
-                if (subNodes.length > 0) {
-                    subNodes.forEach(subMesh => scene.remove(subMesh));
-                    subNodeMeshes.current.delete(node.id);
-                }
-            }
-            
-            currentMeshIds.delete(node.id);
-        });
-
-        currentMeshIds.forEach(id => {
-            const mesh = nodeMeshes.current.get(id);
-            const label = nodeLabelMeshes.current.get(id);
-            if (mesh) { scene.remove(mesh); nodeMeshes.current.delete(id); }
-            if (label) { scene.remove(label); nodeLabelMeshes.current.delete(id); }
-        });
-
-        currentSubNodeParentIds.forEach(id => {
-            const subNodes = subNodeMeshes.current.get(id);
-            if (subNodes) {
-                subNodes.forEach(subMesh => scene.remove(subMesh));
-                subNodeMeshes.current.delete(id);
-            }
-        });
-
-        if (dragControlsRef.current) {
-            dragControlsRef.current.dispose();
-        }
-        dragControlsRef.current = new DragControls(Array.from(nodeMeshes.current.values()), cameraRef.current, rendererRef.current.domElement);
-        dragControlsRef.current.addEventListener('dragstart', (event) => { orbitControlsRef.current.enabled = false; });
-        dragControlsRef.current.addEventListener('dragend', (event) => {
-            orbitControlsRef.current.enabled = true;
-            const { id } = event.object.userData;
-            const newPos = {
-                x: snapToGrid(event.object.position.x),
-                y: snapToGrid(event.object.position.y),
-                z: snapToGrid(event.object.position.z),
+            const createTextSprite = (text, color = 'rgba(255, 255, 255, 0.85)') => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                const fontSize = 48;
+                context.font = `Bold ${fontSize}px Arial`;
+                const textWidth = context.measureText(text).width;
+                canvas.width = textWidth;
+                canvas.height = fontSize;
+                context.font = `Bold ${fontSize}px Arial`;
+                context.fillStyle = color;
+                context.fillText(text, 0, fontSize - 10);
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(textWidth / 10, fontSize / 10, 1.0);
+                return sprite;
             };
-            event.object.position.set(newPos.x, newPos.y, newPos.z);
-            onNodeDragEnd(id, newPos);
-        });
-        dragControlsRef.current.enabled = !isFPSMode;
 
-    }, [nodes, teamColors, selectedNodeId, onNodeDragEnd, geometries, isFPSMode]);
+            React.useEffect(() => {
+                const mount = mountRef.current;
+                const scene = sceneRef.current;
+                
+                cameraRef.current = new THREE.PerspectiveCamera(75, mount.clientWidth / mount.clientHeight, 0.1, 1000);
+                cameraRef.current.position.y = 5;
+                cameraRef.current.position.z = 50;
 
-    React.useEffect(() => {
-        const scene = sceneRef.current;
-        const currentEdgeIds = new Set(edgeMeshes.current.keys());
-        
-        edges.forEach(edge => {
-            let line = edgeMeshes.current.get(edge.id);
-            let label = edgeLabelMeshes.current.get(edge.id);
-            const sourceNode = nodes.find(n => n.id === edge.source);
-            const targetNode = nodes.find(n => n.id === edge.target);
+                rendererRef.current = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                rendererRef.current.setSize(mount.clientWidth, mount.clientHeight);
+                rendererRef.current.setClearColor(0x000000, 0);
+                mount.appendChild(rendererRef.current.domElement);
+                
+                orbitControlsRef.current = new THREE.OrbitControls(cameraRef.current, rendererRef.current.domElement);
+                orbitControlsRef.current.enableDamping = true;
+                
+                pointerLockControlsRef.current = new THREE.PointerLockControls(cameraRef.current, rendererRef.current.domElement);
+                pointerLockControlsRef.current.addEventListener('lock', () => setFPSMode(true));
+                pointerLockControlsRef.current.addEventListener('unlock', () => setFPSMode(false));
+                scene.add(pointerLockControlsRef.current.getObject());
 
-            if (sourceNode && targetNode) {
-                const start = new THREE.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z || 0);
-                const end = new THREE.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z || 0);
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+                scene.add(ambientLight);
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+                directionalLight.position.set(1, 1, 1);
+                scene.add(directionalLight);
+
+                const gridHelper = new THREE.GridHelper(200, 50, 0x00ffff, 0x4a5568);
+                gridHelper.material.transparent = true;
+                gridHelper.material.opacity = 0.2;
+                scene.add(gridHelper);
+
+                const clock = new THREE.Clock();
+                const animate = () => {
+                    requestAnimationFrame(animate);
+                    const delta = clock.getDelta();
+
+                    if(isFPSMode) {
+                        const speed = 20.0 * delta;
+                        const velocity = new THREE.Vector3(moveState.current.right, 0, moveState.current.forward);
+                        velocity.normalize().multiplyScalar(speed);
+                        pointerLockControlsRef.current.moveRight(velocity.x);
+                        pointerLockControlsRef.current.moveForward(velocity.z);
+                    } else {
+                        orbitControlsRef.current.update();
+                    }
+
+                    subNodeMeshes.current.forEach((subNodes, parentId) => {
+                        const parentNode = nodes.find(n => n.id === parentId);
+                        if (parentNode) {
+                            const radius = (parentNode.size || 2) * 1.5;
+                            subNodes.forEach((subNode, i) => {
+                                const angle = (i / subNodes.length) * Math.PI * 2 + (clock.elapsedTime * 0.5);
+                                subNode.position.x = parentNode.position.x + radius * Math.cos(angle);
+                                subNode.position.y = parentNode.position.y + radius * Math.sin(angle);
+                                subNode.position.z = parentNode.position.z || 0;
+                            });
+                        }
+                    });
+
+                    rendererRef.current.render(scene, cameraRef.current);
+                };
+                animate();
+
+                const handleResize = () => {
+                    const width = mount.clientWidth;
+                    const height = mount.clientHeight;
+                    cameraRef.current.aspect = width / height;
+                    cameraRef.current.updateProjectionMatrix();
+                    rendererRef.current.setSize(width, height);
+                };
                 
-                const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-                const controlPointOffset = new THREE.Vector3().subVectors(end, start).normalize();
-                controlPointOffset.applyAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2); // Rotate 90 degrees on Z axis
-                controlPointOffset.multiplyScalar(start.distanceTo(end) / 4);
-                const controlPoint = new THREE.Vector3().addVectors(midPoint, controlPointOffset);
+                const handleMouseClick = (event) => {
+                    if (isFPSMode) return;
+                    if (dragControlsRef.current && dragControlsRef.current.isDragging) return;
+                    const rect = mount.getBoundingClientRect();
+                    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                    raycaster.current.setFromCamera(mouse.current, cameraRef.current);
+                    const intersects = raycaster.current.intersectObjects(Array.from(nodeMeshes.current.values()));
+                    if (intersects.length > 0) {
+                        onNodeClick(intersects[0].object.userData.id);
+                    } else {
+                        onDeselectAll();
+                    }
+                };
                 
-                const curve = new THREE.QuadraticBezierCurve3(start, controlPoint, end);
-                const points = curve.getPoints(50);
-                const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                const color = frequencyColors[edge.frequency] || 0x00ffff;
-                
-                if (!line) {
-                    const material = new THREE.LineBasicMaterial({ color, linewidth: 2, transparent: true, opacity: 0.7 });
-                    line = new THREE.Line(geometry, material);
-                    scene.add(line);
-                    edgeMeshes.current.set(edge.id, line);
+                const handleDoubleClick = () => {
+                    if(!isFPSMode) orbitControlsRef.current.reset();
+                };
+
+                const onKeyDown = (event) => {
+                    if(!isFPSMode) return;
+                    switch (event.code) {
+                        case 'KeyW': moveState.current.forward = -1; break;
+                        case 'KeyS': moveState.current.forward = 1; break;
+                        case 'KeyA': moveState.current.right = -1; break;
+                        case 'KeyD': moveState.current.right = 1; break;
+                    }
+                };
+
+                const onKeyUp = (event) => {
+                    if(!isFPSMode) return;
+                    switch (event.code) {
+                        case 'KeyW': case 'KeyS': moveState.current.forward = 0; break;
+                        case 'KeyA': case 'KeyD': moveState.current.right = 0; break;
+                    }
+                };
+
+                mount.addEventListener('click', handleMouseClick);
+                mount.addEventListener('dblclick', handleDoubleClick);
+                window.addEventListener('resize', handleResize);
+                document.addEventListener('keydown', onKeyDown);
+                document.addEventListener('keyup', onKeyUp);
+
+                return () => {
+                    mount.removeEventListener('click', handleMouseClick);
+                    mount.removeEventListener('dblclick', handleDoubleClick);
+                    window.removeEventListener('resize', handleResize);
+                    document.removeEventListener('keydown', onKeyDown);
+                    document.removeEventListener('keyup', onKeyUp);
+                    if (rendererRef.current && rendererRef.current.domElement && mount.contains(rendererRef.current.domElement)) {
+                        mount.removeChild(rendererRef.current.domElement);
+                    }
+                };
+            }, [onNodeClick, onDeselectAll, nodes, isFPSMode, setFPSMode]);
+
+            React.useEffect(() => {
+                if(isFPSMode) {
+                    pointerLockControlsRef.current.lock();
+                    orbitControlsRef.current.enabled = false;
+                    if(dragControlsRef.current) dragControlsRef.current.enabled = false;
                 } else {
-                    line.geometry.dispose();
-                    line.geometry = geometry;
-                    line.material.color.set(color);
+                    pointerLockControlsRef.current.unlock();
+                    orbitControlsRef.current.enabled = true;
+                    if(dragControlsRef.current) dragControlsRef.current.enabled = true;
+                }
+            }, [isFPSMode]);
+
+
+            React.useEffect(() => {
+                const scene = sceneRef.current;
+                const currentMeshIds = new Set(nodeMeshes.current.keys());
+                const currentSubNodeParentIds = new Set(subNodeMeshes.current.keys());
+                
+                nodes.forEach(node => {
+                    let mesh = nodeMeshes.current.get(node.id);
+                    let label = nodeLabelMeshes.current.get(node.id);
+                    const color = node.color || (node.assignedTo && teamColors[node.assignedTo] ? teamColors[node.assignedTo] : '#00ffff');
+                    
+                    if (!mesh) {
+                        const geometry = geometries[node.formId] || geometries.sphere;
+                        const material = new THREE.MeshBasicMaterial({ color, wireframe: true });
+                        mesh = new THREE.Mesh(geometry, material);
+                        mesh.userData.id = node.id;
+                        scene.add(mesh);
+                        nodeMeshes.current.set(node.id, mesh);
+
+                        label = createTextSprite(node.label);
+                        scene.add(label);
+                        nodeLabelMeshes.current.set(node.id, label);
+                    }
+                    
+                    const size = node.size || 2;
+                    mesh.geometry = geometries[node.formId] || geometries.sphere;
+                    mesh.position.set(node.position.x, node.position.y, node.position.z || 0);
+                    mesh.material.color.set(color);
+                    const scale = node.id === selectedNodeId ? size * 1.2 : size;
+                    mesh.scale.set(scale, scale, scale);
+                    
+                    if (label.material.map.image.getContext('2d').measureText(node.label).width !== label.material.map.image.width) {
+                        scene.remove(label);
+                        label = createTextSprite(node.label);
+                        scene.add(label);
+                        nodeLabelMeshes.current.set(node.id, label);
+                    }
+                    label.position.set(node.position.x, node.position.y + size * 1.5, node.position.z || 0);
+
+                    let subNodes = subNodeMeshes.current.get(node.id) || [];
+                    if (node.assignedTo) {
+                        if (subNodes.length === 0) {
+                            for (let i = 0; i < 3; i++) {
+                                const subGeom = new THREE.SphereGeometry(0.3, 8, 8);
+                                const subMat = new THREE.MeshBasicMaterial({ color, wireframe: true });
+                                const subMesh = new THREE.Mesh(subGeom, subMat);
+                                scene.add(subMesh);
+                                subNodes.push(subMesh);
+                            }
+                            subNodeMeshes.current.set(node.id, subNodes);
+                        }
+                        currentSubNodeParentIds.delete(node.id);
+                    } else {
+                        if (subNodes.length > 0) {
+                            subNodes.forEach(subMesh => scene.remove(subMesh));
+                            subNodeMeshes.current.delete(node.id);
+                        }
+                    }
+                    
+                    currentMeshIds.delete(node.id);
+                });
+
+                currentMeshIds.forEach(id => {
+                    const mesh = nodeMeshes.current.get(id);
+                    const label = nodeLabelMeshes.current.get(id);
+                    if (mesh) { scene.remove(mesh); nodeMeshes.current.delete(id); }
+                    if (label) { scene.remove(label); nodeLabelMeshes.current.delete(id); }
+                });
+
+                currentSubNodeParentIds.forEach(id => {
+                    const subNodes = subNodeMeshes.current.get(id);
+                    if (subNodes) {
+                        subNodes.forEach(subMesh => scene.remove(subMesh));
+                        subNodeMeshes.current.delete(id);
+                    }
+                });
+
+                if (dragControlsRef.current) {
+                    dragControlsRef.current.dispose();
+                }
+                dragControlsRef.current = new THREE.DragControls(Array.from(nodeMeshes.current.values()), cameraRef.current, rendererRef.current.domElement);
+                dragControlsRef.current.addEventListener('dragstart', (event) => { orbitControlsRef.current.enabled = false; });
+                dragControlsRef.current.addEventListener('dragend', (event) => {
+                    orbitControlsRef.current.enabled = true;
+                    const { id } = event.object.userData;
+                    const newPos = {
+                        x: snapToGrid(event.object.position.x),
+                        y: snapToGrid(event.object.position.y),
+                        z: snapToGrid(event.object.position.z),
+                    };
+                    event.object.position.set(newPos.x, newPos.y, newPos.z);
+                    onNodeDragEnd(id, newPos);
+                });
+                dragControlsRef.current.enabled = !isFPSMode;
+
+            }, [nodes, teamColors, selectedNodeId, onNodeDragEnd, geometries, isFPSMode]);
+
+            React.useEffect(() => {
+                const scene = sceneRef.current;
+                const currentEdgeIds = new Set(edgeMeshes.current.keys());
+                
+                edges.forEach(edge => {
+                    let line = edgeMeshes.current.get(edge.id);
+                    let label = edgeLabelMeshes.current.get(edge.id);
+                    const sourceNode = nodes.find(n => n.id === edge.source);
+                    const targetNode = nodes.find(n => n.id === edge.target);
+
+                    if (sourceNode && targetNode) {
+                        const start = new THREE.Vector3(sourceNode.position.x, sourceNode.position.y, sourceNode.position.z || 0);
+                        const end = new THREE.Vector3(targetNode.position.x, targetNode.position.y, targetNode.position.z || 0);
+                        
+                        const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+                        const controlPointOffset = new THREE.Vector3().subVectors(end, start).normalize();
+                        controlPointOffset.applyAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2); // Rotate 90 degrees on Z axis
+                        controlPointOffset.multiplyScalar(start.distanceTo(end) / 4);
+                        const controlPoint = new THREE.Vector3().addVectors(midPoint, controlPointOffset);
+                        
+                        const curve = new THREE.QuadraticBezierCurve3(start, controlPoint, end);
+                        const points = curve.getPoints(50);
+                        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                        const color = frequencyColors[edge.frequency] || 0x00ffff;
+                        
+                        if (!line) {
+                            const material = new THREE.LineBasicMaterial({ color, linewidth: 2, transparent: true, opacity: 0.7 });
+                            line = new THREE.Line(geometry, material);
+                            scene.add(line);
+                            edgeMeshes.current.set(edge.id, line);
+                        } else {
+                            line.geometry.dispose();
+                            line.geometry = geometry;
+                            line.material.color.set(color);
+                        }
+
+                        if (!label) {
+                            label = createTextSprite(edge.type || '');
+                            scene.add(label);
+                            edgeLabelMeshes.current.set(edge.id, label);
+                        }
+                        label.position.copy(curve.getPoint(0.5));
+
+                    }
+                    currentEdgeIds.delete(edge.id);
+                });
+
+                currentEdgeIds.forEach(id => {
+                    const line = edgeMeshes.current.get(id);
+                    const label = edgeLabelMeshes.current.get(id);
+                    if(line) scene.remove(line);
+                    if(label) scene.remove(label);
+                    edgeMeshes.current.delete(id);
+                    edgeLabelMeshes.current.delete(id);
+                });
+            }, [edges, nodes, frequencyColors]);
+
+            return <div ref={mountRef} className="w-full h-full" />;
+        };
+
+        // Main App Component
+        const App = () => {
+            const [db, setDb] = React.useState(null);
+            const [auth, setAuth] = React.useState(null);
+            const [user, setUser] = React.useState(null);
+
+            const [nodes, setNodes] = React.useState([]);
+            const [edges, setEdges] = React.useState([]);
+            const [team, setTeam] = React.useState([]);
+            const [teamColors, setTeamColors] = React.useState({});
+            const [messages, setMessages] = React.useState([]);
+            const [selectedNodeId, setSelectedNodeId] = React.useState(null);
+            const [viewingNodeId, setViewingNodeId] = React.useState(null);
+            const [linkingState, setLinkingState] = React.useState(false);
+            const [linkType, setLinkType] = React.useState('RELATES_TO');
+            const [linkFrequency, setLinkFrequency] = React.useState('alpha');
+            const [isChatVisible, setIsChatVisible] = React.useState(false);
+            const [isTerminalVisible, setIsTerminalVisible] = React.useState(false);
+            const [isControlPanelVisible, setIsControlPanelVisible] = React.useState(true);
+            const [isFPSMode, setFPSMode] = React.useState(false);
+
+            React.useEffect(() => {
+                let authUnsubscribe = () => {};
+                try {
+                    const app = window.firebase.initializeApp(appConfig);
+                    const firestore = window.firebase.getFirestore(app);
+                    const authInstance = window.firebase.getAuth(app);
+                    setDb(firestore);
+                    setAuth(authInstance);
+
+                    authUnsubscribe = window.firebase.onAuthStateChanged(authInstance, (user) => {
+                        setUser(user);
+                    });
+                } catch (error) {
+                    console.error("Initialization error:", error);
+                }
+                return () => authUnsubscribe();
+            }, []);
+
+            React.useEffect(() => {
+                if (!db || !user) {
+                    return;
                 }
 
-                if (!label) {
-                    label = createTextSprite(edge.type || '');
-                    scene.add(label);
-                    edgeLabelMeshes.current.set(edge.id, label);
+                const dataPrefix = `artifacts/${appId}/public/data`;
+                
+                const unsubNodes = window.firebase.onSnapshot(window.firebase.query(window.firebase.collection(db, `${dataPrefix}/nodes`)), 
+                    (snapshot) => setNodes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => console.error("Nodes listener error:", error)
+                );
+
+                const unsubEdges = window.firebase.onSnapshot(window.firebase.query(window.firebase.collection(db, `${dataPrefix}/edges`)), 
+                    (snapshot) => setEdges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => console.error("Edges listener error:", error)
+                );
+
+                const unsubTeam = window.firebase.onSnapshot(window.firebase.query(window.firebase.collection(db, `${dataPrefix}/team`)), 
+                    (snapshot) => {
+                        const fetchedTeam = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setTeam(fetchedTeam);
+                        setTeamColors(fetchedTeam.reduce((acc, member) => ({ ...acc, [member.id]: member.color }), {}));
+                    },
+                    (error) => console.error("Team listener error:", error)
+                );
+
+                const unsubMessages = window.firebase.onSnapshot(window.firebase.query(window.firebase.collection(db, `${dataPrefix}/messages`), window.firebase.orderBy('timestamp', 'asc')), 
+                    (snapshot) => setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
+                    (error) => console.error("Messages listener error:", error)
+                );
+                
+                return () => { 
+                    unsubNodes(); 
+                    unsubEdges(); 
+                    unsubTeam(); 
+                    unsubMessages(); 
+                };
+            }, [db, user]);
+
+            const getCollectionRef = (collectionName) => window.firebase.collection(db, `artifacts/${appId}/public/data/${collectionName}`);
+            
+            const handleAddNode = async (label) => {
+                if (!db) return;
+                const newNode = {
+                    label,
+                    type: 'idea',
+                    assignedTo: null,
+                    position: { 
+                        x: snapToGrid(Math.random() * 40 - 20), 
+                        y: snapToGrid(Math.random() * 40 - 20), 
+                        z: 0 
+                    },
+                    size: 2,
+                    color: '#00ffff',
+                    formId: 'sphere',
+                };
+                await window.firebase.addDoc(getCollectionRef('nodes'), newNode);
+            };
+
+            const handleUpdateNode = async (nodeId, updates) => {
+                if (!db) return;
+                await window.firebase.setDoc(window.firebase.doc(db, `artifacts/${appId}/public/data/nodes`, nodeId), updates, { merge: true });
+            };
+
+            const handleDeleteNode = async () => {
+                if (!db || !selectedNodeId) return;
+                await window.firebase.deleteDoc(window.firebase.doc(db, `artifacts/${appId}/public/data/nodes`, selectedNodeId));
+                const connectedEdges = edges.filter(e => e.source === selectedNodeId || e.target === selectedNodeId);
+                for (const edge of connectedEdges) {
+                    await window.firebase.deleteDoc(window.firebase.doc(db, `artifacts/${appId}/public/data/edges`, edge.id));
                 }
-                label.position.copy(curve.getPoint(0.5));
+                setSelectedNodeId(null);
+            };
 
+            const handleAddEdge = async (sourceId, targetId, type, frequency) => {
+                if (!db || sourceId === targetId || edges.some(e => (e.source === sourceId && e.target === targetId))) return;
+                const newEdge = {
+                    source: sourceId,
+                    target: targetId,
+                    type,
+                    frequency,
+                };
+                await window.firebase.addDoc(getCollectionRef('edges'), newEdge);
+            };
+
+            const handleSetUserName = async (name) => {
+                if (!db || !user) return;
+                const colors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff8800', '#0088ff', '#8800ff'];
+                const existingUser = team.find(m => m.id === user.uid);
+                const userColor = existingUser?.color || colors[team.length % colors.length];
+                await window.firebase.setDoc(window.firebase.doc(db, `artifacts/${appId}/public/data/team`, user.uid), { name, color: userColor, uid: user.uid });
+            };
+
+            const handleSendMessage = async (text) => {
+                if (!db || !user) return;
+                await window.firebase.addDoc(getCollectionRef('messages'), { text, senderId: user.uid, timestamp: window.firebase.serverTimestamp() });
+            };
+            
+            const handleSignOut = () => {
+                window.firebase.signOut(auth);
+            };
+
+            const handleNodeClick = (nodeId) => {
+                if (linkingState && selectedNodeId && selectedNodeId !== nodeId) {
+                    handleAddEdge(selectedNodeId, nodeId, linkType, linkFrequency);
+                    setLinkingState(false);
+                } else {
+                    setSelectedNodeId(nodeId);
+                }
+            };
+            const handleLinkNodes = () => { setLinkingState(true); };
+            const handleNodeDragEnd = (nodeId, position) => {
+                handleUpdateNode(nodeId, { position });
+            };
+
+            if (!user) {
+                return auth ? <Login auth={auth} /> : <div className="bg-black text-white h-screen flex items-center justify-center">Initializing...</div>;
             }
-            currentEdgeIds.delete(edge.id);
-        });
 
-        currentEdgeIds.forEach(id => {
-            const line = edgeMeshes.current.get(id);
-            const label = edgeLabelMeshes.current.get(id);
-            if(line) scene.remove(line);
-            if(label) scene.remove(label);
-            edgeMeshes.current.delete(id);
-            edgeLabelMeshes.current.delete(id);
-        });
-    }, [edges, nodes, frequencyColors]);
+            return (
+                <main className="h-screen w-screen font-sans bg-black relative overflow-hidden">
+                    <div className="absolute inset-0 z-0">
+                        <ThreeDNetworkView 
+                            nodes={nodes} edges={edges} teamColors={teamColors}
+                            onNodeClick={handleNodeClick} 
+                            onNodeDragEnd={handleNodeDragEnd}
+                            selectedNodeId={selectedNodeId}
+                            onDeselectAll={() => {
+                                setSelectedNodeId(null);
+                                setLinkingState(false);
+                            }}
+                            isFPSMode={isFPSMode}
+                            setFPSMode={setFPSMode}
+                        />
+                    </div>
+                    
+                    <div className={`absolute top-0 left-0 h-full z-20 transition-transform duration-500 ease-in-out ${isControlPanelVisible ? 'translate-x-0' : '-translate-x-full'}`}>
+                        <ControlPanel
+                            userId={user.uid} team={team} nodes={nodes} selectedNodeId={selectedNodeId}
+                            onSetUserName={handleSetUserName} onAddNode={handleAddNode} onSelectNode={setSelectedNodeId}
+                            onUpdateNode={handleUpdateNode} onDeleteNode={handleDeleteNode} onLinkNodes={handleLinkNodes}
+                            onJoinNode={setViewingNodeId}
+                            linkingState={linkingState}
+                            setLinkType={setLinkType}
+                            setLinkFrequency={setLinkFrequency}
+                            onSignOut={handleSignOut}
+                        />
+                    </div>
 
-    return <div ref={mountRef} className="w-full h-full" />;
-};
+                    <div className={`absolute top-0 right-0 h-full z-20 transition-transform duration-500 ease-in-out ${isChatVisible ? 'translate-x-0' : 'translate-x-full'}`}>
+                        <ChatPanel messages={messages} team={team} onSendMessage={handleSendMessage} />
+                    </div>
 
-// Main App Component
-export default function App() {
-    const [db, setDb] = React.useState(null);
-    const [auth, setAuth] = React.useState(null);
-    const [user, setUser] = React.useState(null);
+                    {viewingNodeId && 
+                        <PacketEditorWindow 
+                            node={nodes.find(n => n.id === viewingNodeId)} 
+                            onClose={() => setViewingNodeId(null)}
+                            team={team}
+                            onUpdateNode={handleUpdateNode}
+                        />
+                    }
+                    
+                    {isTerminalVisible && <TerminalWindow onClose={() => setIsTerminalVisible(false)} />}
+                    
+                    <MainToolbar 
+                        onToggleControlPanel={() => setIsControlPanelVisible(v => !v)}
+                        onToggleChat={() => setIsChatVisible(v => !v)}
+                        onToggleTerminal={() => setIsTerminalVisible(v => !v)}
+                        onToggleFPSMode={() => setFPSMode(v => !v)}
+                    />
 
-    const [nodes, setNodes] = React.useState([]);
-    const [edges, setEdges] = React.useState([]);
-    const [team, setTeam] = React.useState([]);
-    const [teamColors, setTeamColors] = React.useState({});
-    const [messages, setMessages] = React.useState([]);
-    const [selectedNodeId, setSelectedNodeId] = React.useState(null);
-    const [viewingNodeId, setViewingNodeId] = React.useState(null);
-    const [linkingState, setLinkingState] = React.useState(false);
-    const [linkType, setLinkType] = React.useState('RELATES_TO');
-    const [linkFrequency, setLinkFrequency] = React.useState('alpha');
-    const [isChatVisible, setIsChatVisible] = React.useState(false);
-    const [isTerminalVisible, setIsTerminalVisible] = React.useState(false);
-    const [isControlPanelVisible, setIsControlPanelVisible] = React.useState(true);
-    const [isFPSMode, setFPSMode] = React.useState(false);
-
-    React.useEffect(() => {
-        let authUnsubscribe = () => {};
-        try {
-            const app = initializeApp(appConfig);
-            const firestore = getFirestore(app);
-            const authInstance = getAuth(app);
-            setDb(firestore);
-            setAuth(authInstance);
-
-            authUnsubscribe = onAuthStateChanged(authInstance, (user) => {
-                setUser(user);
-            });
-        } catch (error) {
-            console.error("Initialization error:", error);
+                    {linkingState && (
+                        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-fuchsia-500/80 text-black px-4 py-2 rounded-lg shadow-lg z-20 border border-fuchsia-300 shadow-[0_0_15px_rgba(217,70,239,0.5)]">
+                            Click another packet to create a link.
+                        </div>
+                    )}
+                    {isFPSMode && (
+                        <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
+                            <div className="text-white text-4xl opacity-50">+</div>
+                        </div>
+                    )}
+                </main>
+            );
         }
-        return () => authUnsubscribe();
-    }, []);
 
-    React.useEffect(() => {
-        if (!db || !user) {
-            return;
-        }
-
-        const dataPrefix = `artifacts/${appId}/public/data`;
-        
-        const unsubNodes = onSnapshot(query(collection(db, `${dataPrefix}/nodes`)), 
-            (snapshot) => setNodes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
-            (error) => console.error("Nodes listener error:", error)
-        );
-
-        const unsubEdges = onSnapshot(query(collection(db, `${dataPrefix}/edges`)), 
-            (snapshot) => setEdges(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
-            (error) => console.error("Edges listener error:", error)
-        );
-
-        const unsubTeam = onSnapshot(query(collection(db, `${dataPrefix}/team`)), 
-            (snapshot) => {
-                const fetchedTeam = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setTeam(fetchedTeam);
-                setTeamColors(fetchedTeam.reduce((acc, member) => ({ ...acc, [member.id]: member.color }), {}));
-            },
-            (error) => console.error("Team listener error:", error)
-        );
-
-        const unsubMessages = onSnapshot(query(collection(db, `${dataPrefix}/messages`), orderBy('timestamp', 'asc')), 
-            (snapshot) => setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))),
-            (error) => console.error("Messages listener error:", error)
-        );
-        
-        return () => { 
-            unsubNodes(); 
-            unsubEdges(); 
-            unsubTeam(); 
-            unsubMessages(); 
-        };
-    }, [db, user]);
-
-    const getCollectionRef = (collectionName) => collection(db, `artifacts/${appId}/public/data/${collectionName}`);
-    
-    const handleAddNode = async (label) => {
-        if (!db) return;
-        const newNode = {
-            label,
-            type: 'idea',
-            assignedTo: null,
-            position: { 
-                x: snapToGrid(Math.random() * 40 - 20), 
-                y: snapToGrid(Math.random() * 40 - 20), 
-                z: 0 
-            },
-            size: 2,
-            color: '#00ffff',
-            formId: 'sphere',
-        };
-        await addDoc(getCollectionRef('nodes'), newNode);
-    };
-
-    const handleUpdateNode = async (nodeId, updates) => {
-        if (!db) return;
-        await setDoc(doc(db, `artifacts/${appId}/public/data/nodes`, nodeId), updates, { merge: true });
-    };
-
-    const handleDeleteNode = async () => {
-        if (!db || !selectedNodeId) return;
-        await deleteDoc(doc(db, `artifacts/${appId}/public/data/nodes`, selectedNodeId));
-        const connectedEdges = edges.filter(e => e.source === selectedNodeId || e.target === selectedNodeId);
-        for (const edge of connectedEdges) {
-            await deleteDoc(doc(db, `artifacts/${appId}/public/data/edges`, edge.id));
-        }
-        setSelectedNodeId(null);
-    };
-
-    const handleAddEdge = async (sourceId, targetId, type, frequency) => {
-        if (!db || sourceId === targetId || edges.some(e => (e.source === sourceId && e.target === targetId))) return;
-        const newEdge = {
-            source: sourceId,
-            target: targetId,
-            type,
-            frequency,
-        };
-        await addDoc(getCollectionRef('edges'), newEdge);
-    };
-
-    const handleSetUserName = async (name) => {
-        if (!db || !user) return;
-        const colors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00', '#ff8800', '#0088ff', '#8800ff'];
-        const existingUser = team.find(m => m.id === user.uid);
-        const userColor = existingUser?.color || colors[team.length % colors.length];
-        await setDoc(doc(db, `artifacts/${appId}/public/data/team`, user.uid), { name, color: userColor, uid: user.uid });
-    };
-
-    const handleSendMessage = async (text) => {
-        if (!db || !user) return;
-        await addDoc(getCollectionRef('messages'), { text, senderId: user.uid, timestamp: serverTimestamp() });
-    };
-    
-    const handleSignOut = () => {
-        signOut(auth);
-    };
-
-    const handleNodeClick = (nodeId) => {
-        if (linkingState && selectedNodeId && selectedNodeId !== nodeId) {
-            handleAddEdge(selectedNodeId, nodeId, linkType, linkFrequency);
-            setLinkingState(false);
-        } else {
-            setSelectedNodeId(nodeId);
-        }
-    };
-    const handleLinkNodes = () => { setLinkingState(true); };
-    const handleNodeDragEnd = (nodeId, position) => {
-        handleUpdateNode(nodeId, { position });
-    };
-
-    if (!user) {
-        return auth ? <Login auth={auth} /> : <div className="bg-black text-white h-screen flex items-center justify-center">Initializing...</div>;
-    }
-
-    return (
-        <main className="h-screen w-screen font-sans bg-black relative overflow-hidden">
-            <div className="absolute inset-0 z-0">
-                <ThreeDNetworkView 
-                    nodes={nodes} edges={edges} teamColors={teamColors}
-                    onNodeClick={handleNodeClick} 
-                    onNodeDragEnd={handleNodeDragEnd}
-                    selectedNodeId={selectedNodeId}
-                    onDeselectAll={() => {
-                        setSelectedNodeId(null);
-                        setLinkingState(false);
-                    }}
-                    isFPSMode={isFPSMode}
-                    setFPSMode={setFPSMode}
-                />
-            </div>
-            
-            <div className={`absolute top-0 left-0 h-full z-20 transition-transform duration-500 ease-in-out ${isControlPanelVisible ? 'translate-x-0' : '-translate-x-full'}`}>
-                 <ControlPanel
-                    userId={user.uid} team={team} nodes={nodes} selectedNodeId={selectedNodeId}
-                    onSetUserName={handleSetUserName} onAddNode={handleAddNode} onSelectNode={setSelectedNodeId}
-                    onUpdateNode={handleUpdateNode} onDeleteNode={handleDeleteNode} onLinkNodes={handleLinkNodes}
-                    onJoinNode={setViewingNodeId}
-                    linkingState={linkingState}
-                    setLinkType={setLinkType}
-                    setLinkFrequency={setLinkFrequency}
-                    onSignOut={handleSignOut}
-                />
-            </div>
-
-            <div className={`absolute top-0 right-0 h-full z-20 transition-transform duration-500 ease-in-out ${isChatVisible ? 'translate-x-0' : 'translate-x-full'}`}>
-                 <ChatPanel messages={messages} team={team} onSendMessage={handleSendMessage} />
-            </div>
-
-            {viewingNodeId && 
-                <DraggablePacketWindow 
-                    node={nodes.find(n => n.id === viewingNodeId)} 
-                    onClose={() => setViewingNodeId(null)}
-                    team={team}
-                    onUpdateNode={handleUpdateNode}
-                />
-            }
-            
-            {isTerminalVisible && <TerminalWindow onClose={() => setIsTerminalVisible(false)} />}
-            
-            <MainToolbar 
-                onToggleControlPanel={() => setIsControlPanelVisible(v => !v)}
-                onToggleChat={() => setIsChatVisible(v => !v)}
-                onToggleTerminal={() => setIsTerminalVisible(v => !v)}
-                onToggleFPSMode={() => setFPSMode(v => !v)}
-            />
-
-            {linkingState && (
-                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-fuchsia-500/80 text-black px-4 py-2 rounded-lg shadow-lg z-20 border border-fuchsia-300 shadow-[0_0_15px_rgba(217,70,239,0.5)]">
-                    Click another packet to create a link.
-                </div>
-            )}
-            {isFPSMode && (
-                 <div className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none">
-                    <div className="text-white text-4xl opacity-50">+</div>
-                </div>
-            )}
-        </main>
-    );
-}
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
