@@ -72,10 +72,12 @@
         // --- Helper Functions ---
         const snapToGrid = (value, gridSize = 2) => Math.round(value / gridSize) * gridSize;
 
+        // --- Icon Components ---
+        const { Users, BrainCircuit, Plus, Trash2, Link: LinkIcon, UserPlus, Send, MessageSquare, X, Eye, Palette, Ruler, HelpCircle, ChevronsRightLeft, Minus, Terminal: TerminalIcon, PanelLeft, Gamepad2, LogOut } = lucide;
+
         // --- Authentication Component ---
         const Login = ({ auth }) => {
             const [error, setError] = React.useState('');
-            const { BrainCircuit } = lucide;
 
             const handleGoogleSignIn = async () => {
                 setError('');
@@ -161,7 +163,6 @@
             const [isCollapsed, setIsCollapsed] = React.useState(false);
             const { position, handleMouseDown } = useDraggable();
             const previewRef = React.useRef(null);
-            const { ChevronsRightLeft, Minus, X } = lucide;
 
             const geometries = React.useMemo(() => ({
                 sphere: new THREE.SphereGeometry(1, 16, 16),
@@ -253,7 +254,6 @@
             const { position, handleMouseDown } = useDraggable();
             const [history, setHistory] = React.useState([]);
             const [input, setInput] = React.useState('');
-            const { ChevronsRightLeft, Minus, X } = lucide;
 
             const handleCommand = (e) => {
                 e.preventDefault();
@@ -304,13 +304,12 @@
 
         // Main Toolbar Component
         const MainToolbar = ({ onToggleControlPanel, onToggleChat, onToggleTerminal, onToggleFPSMode }) => {
-            const { PanelLeft, MessageSquare, Terminal, Gamepad2 } = lucide;
             return (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md border border-cyan-500/30 rounded-lg text-white shadow-[0_0_25px_rgba(0,255,255,0.3)] z-40">
                     <div className="flex items-center p-2 space-x-2">
                         <button onClick={onToggleControlPanel} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><PanelLeft size={18} className="mr-2"/> Panel</button>
                         <button onClick={onToggleChat} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><MessageSquare size={18} className="mr-2"/> Chat</button>
-                        <button onClick={onToggleTerminal} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><Terminal size={18} className="mr-2"/> Terminal</button>
+                        <button onClick={onToggleTerminal} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><TerminalIcon size={18} className="mr-2"/> Terminal</button>
                         <button onClick={onToggleFPSMode} className="p-2 hover:bg-cyan-500/20 rounded flex items-center"><Gamepad2 size={18} className="mr-2"/> FPS Mode</button>
                     </div>
                 </div>
@@ -324,7 +323,6 @@
             const [nodeLabel, setNodeLabel] = React.useState('');
             const currentUser = team.find(m => m.id === userId);
             const selectedNode = nodes.find(n => n.id === selectedNodeId);
-            const { BrainCircuit, Plus, Eye, Link, Trash2, HelpCircle, Palette, Ruler, UserPlus, LogOut } = lucide;
 
             React.useEffect(() => {
                 if (selectedNode) setNodeLabel(selectedNode.label);
@@ -403,7 +401,7 @@
                             </div>
                             <div className="mt-4">
                                 <button onClick={onLinkNodes} className="w-full flex items-center justify-center bg-fuchsia-500 hover:bg-fuchsia-600 text-black font-bold py-2 px-4 rounded-lg transition duration-200 shadow-[0_0_10px_rgba(217,70,239,0.4)]">
-                                    <Link className="mr-2" size={20} /> Link Packets
+                                    <LinkIcon className="mr-2" size={20} /> Link Packets
                                 </button>
                                 {linkingState && (
                                     <div className="mt-2 space-y-2">
@@ -561,10 +559,10 @@
                 rendererRef.current.setClearColor(0x000000, 0);
                 mount.appendChild(rendererRef.current.domElement);
                 
-                orbitControlsRef.current = new THREE.OrbitControls(cameraRef.current, rendererRef.current.domElement);
+                orbitControlsRef.current = new window.THREE.OrbitControls(cameraRef.current, rendererRef.current.domElement);
                 orbitControlsRef.current.enableDamping = true;
                 
-                pointerLockControlsRef.current = new THREE.PointerLockControls(cameraRef.current, rendererRef.current.domElement);
+                pointerLockControlsRef.current = new window.THREE.PointerLockControls(cameraRef.current, rendererRef.current.domElement);
                 pointerLockControlsRef.current.addEventListener('lock', () => setFPSMode(true));
                 pointerLockControlsRef.current.addEventListener('unlock', () => setFPSMode(false));
                 scene.add(pointerLockControlsRef.current.getObject());
