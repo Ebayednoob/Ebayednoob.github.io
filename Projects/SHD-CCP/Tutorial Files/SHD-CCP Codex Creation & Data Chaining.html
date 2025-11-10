@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex Creation & Data Chaining</title>
+    <!-- Load Tailwind CSS for styling the UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Add Inter font family
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-cyan': '#00ffff',
+                        'neon-pink': '#ff50c0',
+                        'neon-green': '#39ff14',
+                        'neon-red': '#ff4103',
+                        'neon-blue': '#00aaff',
+                        'neon-purple': '#9f50ff',
+                        'neon-light-green': '#90ff80',
+                        
+                        // Bit colors
+                        'col-payload': '#ff4103',
+                        'col-dyn-freq': '#39ff14',
+                        'col-dyn-spin': '#90ff80',
+                        'col-state-form': '#9f50ff',
+                        'col-state-amp': '#ff50c0',
+                        'col-state-rsv': '#ff50c0',
+                        'col-quat-w': '#00aaff',
+                        'col-quat-x': '#ff50c0',
+                        'col-quat-y': '#ff4103',
+                        'col-quat-z': '#39ff14',
+                    },
+                    boxShadow: {
+                        'cyan': '0 0 8px #00ffff, 0 0 12px #00ffff',
+                    }
+                },
+            },
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at center, #1a2a2a 0%, #000000 70%);
+            color: #e0e0e0;
+        }
+
+        .panel {
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            backdrop-filter: blur(5px);
+        }
+        
+        /* Bit display styles */
+        .bit-packet-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            border-radius: 6px;
+        }
+        .bit {
+            width: 1.25rem; /* 20px */
+            height: 1.25rem; /* 20px */
+            font-size: 0.75rem; /* 12px */
+            font-weight: bold;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 3px;
+            transition: all 0.1s;
+        }
+        .bit-1 {
+            background-color: #00ffff;
+            color: #000;
+            box-shadow: 0 0 6px #00ffff;
+        }
+        .bit-0 {
+            background-color: #374151;
+            color: #9ca3af;
+        }
+        
+        /* Custom highlighting for packet bits */
+        .bit-packet-display .bit-1.highlight {
+            transform: scale(1.2);
+            border: 2px solid #ffffff;
+            z-index: 10;
+        }
+        .bit-packet-display .bit.highlight {
+            z-index: 10;
+            transform: scale(1.2);
+        }
+        .bit-packet-display .bit-1.highlight-tier1 { background-color: #neon-purple; box-shadow: 0 0 8px #neon-purple; }
+        .bit-packet-display .bit-1.highlight-tier2 { background-color: #neon-light-green; box-shadow: 0 0 8px #neon-light-green; }
+
+        
+        /* Custom inputs and selects */
+        input[type="text"], select {
+            background-color: #1f2937;
+            border: 1px solid #4b5563;
+            color: #e0e0e0;
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem; /* p-2 */
+        }
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.5);
+        }
+        
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background-color: rgba(0, 20, 20, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            color: #00ffff;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+        button:hover {
+            background-color: rgba(0, 50, 50, 0.9);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+        }
+        
+        /* Schema styles */
+        .schema-row {
+            display: flex;
+            border-bottom: 1px solid #374151;
+        }
+        .schema-bits {
+            width: 25%;
+            padding: 0.5rem;
+            font-family: monospace;
+            border-right: 1px solid #374151;
+        }
+        .schema-name {
+            width: 35%;
+            padding: 0.5rem;
+            font-weight: 500;
+            border-right: 1px solid #374151;
+        }
+        .schema-desc {
+            width: 40%;
+            padding: 0.5rem;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <div id="app-container" class="max-w-7xl mx-auto space-y-8">
+        
+        <h1 class="text-3xl font-bold text-center text-neon-cyan mb-8" style="text-shadow: 0 0 6px #00ffff;">Codex Creation & Data Chaining</h1>
+        
+        <!-- 1. SHD-CCP Packet Schema -->
+        <div class="panel">
+            <h2 class="text-2xl font-semibold text-neon-cyan mb-4">SHD-CCP 64-Bit Schema</h2>
+            <div class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+                <div class="schema-row bg-gray-800 font-semibold">
+                    <div class="schema-bits">Bits (MSB)</div>
+                    <div class="schema-name">Name</div>
+                    <div class="schema-desc">Description</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-payload">63-48</div>
+                    <div class="schema-name text-col-payload">Payload Scaler (FP16)</div>
+                    <div class="schema-desc">Master value scaler</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-dyn-freq">47-43</div>
+                    <div class="schema-name text-col-dyn-freq">Dynamics: Freq ID (5)</div>
+                    <div class="schema-desc">Timing / Frequency</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-dyn-spin">42-40</div>
+                    <div class="schema-name text-col-dyn-spin">Dynamics: Spin ID (3)</div>
+                    <div class="schema-desc">Harmonic class</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-state-form">39-36</div>
+                    <div class="schema-name text-col-state-form">State & ID: Form ID (4)</div>
+                    <div class="schema-desc">Logic / Instruction</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-state-amp">35-33</div>
+                    <div class="schema-name text-col-state-amp">State & ID: Amp ID (3)</div>
+                    <div class="schema-desc">Intensity modifier</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-state-rsv">32</div>
+                    <div class="schema-name text-col-state-rsv">State & ID: Parity (1)</div>
+                    <div class="schema-desc">Error checking bit</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-quat-w">31-24</div>
+                    <div class="schema-name text-col-quat-w">Quaternion W (FP8)</div>
+                    <div class="schema-desc">3D Orientation (W)</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-quat-x">23-16</div>
+                    <div class="schema-name text-col-quat-x">Quaternion X (FP8)</div>
+                    <div class="schema-desc">3D Orientation (X)</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-quat-y">15-8</div>
+                    <div class="schema-name text-col-quat-y">Quaternion Y (FP8)</div>
+                    <div class="schema-desc">3D Orientation (Y)</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-quat-z">7-0</div>
+                    <div class="schema-name text-col-quat-z">Quaternion Z (FP8)</div>
+                    <div class="schema-desc">3D Orientation (Z)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 2. Codex Creation UI -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Tier 1 Codex -->
+            <div class="panel">
+                <h2 class="text-2xl font-semibold text-neon-purple mb-4">Tier 1: Master Codex</h2>
+                <p class="text-gray-400 mb-4">Map text tokens to the 4-bit <strong class="text-neon-purple">Form ID [39-36]</strong>. This defines the packet's main instruction.</p>
+                <div id="tier-1-codex" class="space-y-2">
+                    <!-- JS will populate this -->
+                </div>
+            </div>
+            
+            <!-- Tier 2 Codex -->
+            <div class="panel">
+                <h2 class="text-2xl font-semibold text-neon-light-green mb-4">Tier 2: Dynamics Codex</h2>
+                <p class="text-gray-400 mb-4">Map text tokens to the 3-bit <strong class="text-neon-light-green">Spin ID [42-40]</strong>. This defines a dynamic behavior.</p>
+                <div id="tier-2-codex" class="space-y-2">
+                    <!-- JS will populate this -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 3. Compression Demo -->
+        <div class="panel">
+            <h2 class="text-2xl font-semibold text
