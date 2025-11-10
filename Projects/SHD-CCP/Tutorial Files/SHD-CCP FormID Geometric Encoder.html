@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometric Codex Encoder</title>
+    <!-- Load Tailwind CSS for styling the UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Add Inter font family
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-cyan': '#00ffff',
+                        'neon-pink': '#ff50c0',
+                        'neon-green': '#39ff14',
+                        'neon-red': '#ff4103',
+                        'neon-blue': '#00aaff',
+                        'neon-purple': '#9f50ff',
+                        'neon-light-green': '#90ff80',
+                        'neon-yellow': '#ffff00',
+                        
+                        // Bit colors
+                        'col-payload': '#ff4103',
+                        'col-dyn-freq': '#39ff14',
+                        'col-dyn-spin': '#90ff80',
+                        'col-state-form': '#9f50ff',
+                        'col-state-amp': '#ff50c0',
+                        'col-state-rsv': '#ff50c0',
+                        'col-quat-w': '#00aaff',
+                        'col-quat-x': '#ff50c0',
+                        'col-quat-y': '#ff4103',
+                        'col-quat-z': '#39ff14',
+                    },
+                    boxShadow: {
+                        'cyan': '0 0 8px #00ffff, 0 0 12px #00ffff',
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <!-- Load three.js (non-module) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+    <!-- ADDED: OrbitControls for camera -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at center, #1a2a2a 0%, #000000 70%);
+            color: #e0e0e0;
+        }
+
+        .panel {
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            backdrop-filter: blur(5px);
+        }
+        
+        /* Bit display styles */
+        .bit-packet-display {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            border-radius: 6px;
+        }
+        .bit {
+            width: 1.25rem; /* 20px */
+            height: 1.25rem; /* 20px */
+            font-size: 0.75rem; /* 12px */
+            font-weight: bold;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 3px;
+            transition: all 0.1s;
+        }
+        .bit-1 {
+            background-color: #00ffff;
+            color: #000;
+            box-shadow: 0 0 6px #00ffff;
+        }
+        .bit-0 {
+            background-color: #374151;
+            color: #9ca3af;
+        }
+        
+        /* Custom inputs and selects */
+        input[type="text"], input[type="range"], select {
+            background-color: #1f2937;
+            border: 1px solid #4b5563;
+            color: #e0e0e0;
+            border-radius: 0.375rem; /* rounded-md */
+            padding: 0.5rem; /* p-2 */
+        }
+        input[type="text"]:focus, input[type="range"]:focus, select:focus {
+            outline: none;
+            border-color: #00ffff;
+            box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.5);
+        }
+        
+        /* Custom button */
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background-color: rgba(0, 20, 20, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            color: #00ffff;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+        button:hover {
+            background-color: rgba(0, 50, 50, 0.9);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+        }
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            box-shadow: none;
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #9ca3af;
+        }
+        
+        /* Custom slider styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+            padding: 0;
+        }
+        input[type="range"]:hover { opacity: 1; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        
+        /* Schema styles */
+        .schema-row { display: flex; border-bottom: 1px solid #374151; }
+        .schema-bits { width: 25%; padding: 0.5rem; font-family: monospace; border-right: 1px solid #374151; }
+        .schema-name { width: 35%; padding: 0.5rem; font-weight: 500; border-right: 1px solid #374151; }
+        .schema-desc { width: 40%; padding: 0.5rem; color: #9ca3af; }
+        
+        /* 3D Canvas */
+        #geometric-canvas {
+            width: 100%;
+            height: 500px;
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            cursor: grab;
+        }
+        #geometric-canvas:grabbing {
+            cursor: grabbing;
+        }
+        
+        /* Custom checkbox */
+        .toggle-checkbox {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background-color: #374151;
+            border-radius: 9999px;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+            appearance: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .toggle-checkbox::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background-color: white;
+            border-radius: 9999px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease-in-out;
+        }
+        .toggle-checkbox:checked {
+            background-color: #00ffff;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        .toggle-checkbox:checked::before {
+            transform: translateX(16px);
+        }
+        
+        /* Bit display styles */
+        .bit-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            border-radius: 6px;
+        }
+        .bit-quat .bit-1 { background-color: var(--tw-color-col-quat-w); box-shadow: 0 0 6px var(--tw-color-col-quat-w); }
+        .bit-payload .bit-1 { background-color: var(--tw-color-col-payload); box-shadow: 0 0 6px var(--tw-color-col-payload); }
+        
+        .data-readout {
+            font-family: monospace;
+            font-size: 1.125rem; /* text-lg */
+            padding: 0.5rem;
+            background-color: #1f2937;
+            border-radius: 0.375rem;
+            border: 1px solid #374151;
+         }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <div id="app-container" class="max-w-7xl mx-auto space-y-8">
+        
+        <h1 class="text-3xl font-bold text-center text-neon-cyan mb-8" style="text-shadow: 0 0 6px #00ffff;">Geometric Codex Encoder</h1>
+        
+        <!-- 1. SHD-CCP Packet Schema -->
+        <div class="panel">
+            <h2 class="text-2xl font-semibold text-neon-cyan mb-4">SHD-CCP 64-Bit Schema</h2>
+            <div class="bg-gray-900 border border-gray-700 rounded-lg overflow-hidden">
+                <div class="schema-row bg-gray-800 font-semibold">
+                    <div class="schema-bits">Bits (MSB)</div>
+                    <div class="schema-name">Name</div>
+                    <div class="schema-desc">Description</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-payload">63-48</div>
+                    <div class="schema-name text-col-payload">Payload Scaler (FP16)</div>
+                    <div class="schema-desc">Micro-precision / Scaler / Offset</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-dyn-freq">47-43</div>
+                    <div class="schema-name text-col-dyn-freq">Dynamics: Freq ID (5)</div>
+                    <div class="schema-desc">Defines behavior / timing</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-dyn-spin">42-40</div>
+                    <div class="schema-name text-col-dyn-spin">Dynamics: Spin ID (3)</div>
+                    <div class="schema-desc">Defines behavior / harmonics</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-state-form">39-36</div>
+                    <div class="schema-name text-col-state-form">State & ID: Form ID (4)</div>
+                    <div class="schema-desc">Master Logic Switch / Codex Selector</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-state-amp">35-33</div>
+                    <div class="schema-name text-col-state-amp">State & ID: Amp ID (3)</div>
+                    <div class="schema-desc">Sub-Face Selection (A)</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-state-rsv">32</div>
+                    <div class="schema-name text-col-state-rsv">State & ID: Parity (1)</div>
+                    <div class="schema-desc">Sub-Face Selection (B) / Error Check</div>
+                </div>
+                <div class="schema-row">
+                    <div class="schema-bits text-col-quat-w">31-0</div>
+                    <div class="schema-name text-col-quat-w">Quaternion (FP8 x4)</div>
+                    <div class="schema-desc">Geometric Pointer / Coarse Value</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 2. Main Interface -->
+        <div class="flex flex-col md:flex-row gap-8">
+            <!-- Left Panel: Controls -->
+            <div class="panel w-full md:w-1/3 space-y-4">
+                <h2 class="text-2xl font-semibold text-neon-cyan mb-4">Encoding Controls</h2>
+                
+                <!-- Form ID -->
+                <div>
+                    <label for="form-id-select" class="block text-sm font-medium text-neon-purple mb-1">Form ID [39-36] (Selects Logic Mode)</label>
+                    <select id="form-id-select" class="w-full">
+                        <option value="0">Index 0: Default Scaling Mode</option>
+                        <option value="1">Index 1: Default Scaling Mode</option>
+                        <option value="2">Index 2: Default Scaling Mode</option>
+                        <option value="3" selected>Index 3: High Precision Mode</option>
+                        <option value="4">Index 4: Geometric Codex (Tetrahedron)</option>
+                        <option value="5">Index 5: Geometric Codex (Cube)</option>
+                        <option value="6">Index 6: Geometric Codex (Octahedron)</option>
+                        <option value="7">Index 7: Geometric Codex (Dodecahedron)</option>
+                        <option value="8">Index 8: Geometric Codex (Icosahedron)</option>
+                        <option value="9">Index 9: Geometric Codex (Subdiv. Icosa.)</option>
+                        <option value="10">Index 10: (Geometric Codex 10)</option>
+                        <option value="11">Index 11: (Geometric Codex 11)</option>
+                        <option value="12">Index 12: (Geometric Codex 12)</option>
+                        <option value="13">Index 13: (Geometric Codex 13)</option>
+                        <option value="14">Index 14: (Geometric Codex 14)</option>
+                        <option value="15">Index 15: (Geometric Codex 15)</option>
+                    </select>
+                </div>
+                
+                <!-- Quaternion -->
+                <h3 class="text-lg font-semibold text-neon-blue pt-2">Quaternion [31-0] (Pointer / Coarse Value)</h3>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="quat-w" class="text-sm font-medium">Quat W</label>
+                        <span id="quat-w-value" class="text-sm font-mono">1.00</span>
+                    </div>
+                    <input type="range" id="quat-w" min="-1" max="1" value="1" step="0.01">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="quat-x" class="text-sm font-medium">Quat X</label>
+                        <span id="quat-x-value" class="text-sm font-mono">0.00</span>
+                    </div>
+                    <input type="range" id="quat-x" min="-1" max="1" value="0" step="0.01">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="quat-y" class="text-sm font-medium">Quat Y</label>
+                        <span id="quat-y-value" class="text-sm font-mono">0.00</span>
+                    </div>
+                    <input type="range" id="quat-y" min="-1" max="1" value="0" step="0.01">
+                </div>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="quat-z" class="text-sm font-medium">Quat Z</label>
+                        <span id="quat-z-value" class="text-sm font-mono">0.00</span>
+                    </div>
+                    <input type="range" id="quat-z" min="-1" max="1" value="0" step="0.01">
+                </div>
+                
+                <!-- Sub-Face Selection -->
+                <h3 class="text-lg font-semibold text-neon-pink pt-2">Sub-Face Selection</h3>
+                <p class="text-sm text-gray-400">Amp ID (3 bits) + Parity (1 bit) = 4 bits, for 16 sub-regions.</p>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="amp-id-slider" class="text-sm font-medium">Amp ID [35-33]</label>
+                        <span id="amp-id-value" class="text-sm font-mono">0</span>
+                    </div>
+                    <input type="range" id="amp-id-slider" min="0" max="7" value="0" step="1">
+                </div>
+                <div>
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="parity-bit" class="toggle-checkbox">
+                        <span class="ml-3 text-sm font-medium text-gray-300">Parity Bit [32]</span>
+                    </label>
+                </div>
+                
+                <!-- Payload -->
+                <h3 class="text-lg font-semibold text-neon-red pt-2">Payload / Offset</h3>
+                <p class="text-sm text-gray-400">Payload [63-48] (16 bits). Acts as Scaler (Default Mode) or Offset (High Precision Mode).</p>
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="payload-slider" class="text-sm font-medium">Payload (16-bit Int)</label>
+                        <span id="payload-value" class="text-sm font-mono">0</span>
+                    </div>
+                    <input type="range" id="payload-slider" min="0" max="65535" value="0" step="1">
+                </div>
+
+            </div>
+            
+            <!-- Right Panel: 3D Visualization -->
+            <div class="panel w-full md:w-2/3">
+                <h2 class="text-2xl font-semibold text-neon-cyan mb-4">Logic Mode Visualization</h2>
+
+                <!-- NEW: Default Mode Panel -->
+                <div id="default-mode-panel" class="hidden">
+                    <h3 class="text-xl font-semibold text-neon-red mb-4">Mode Active: Default Scaling (Lossy)</h3>
+                    <p class="text-gray-300 mb-4">
+                        The `Form ID` (0-2) instructs the processor to use **Default Scaling Mode**. In this mode, the high-precision 16-bit `Payload Scaler` is
+                        **multiplied (×)** by the low-precision 8-bit `Decompressed Quaternion` value.
+                    </p>
+                    <p class="text-gray-400 mb-4">
+                        This is a **lossy** operation. Any precision lost during the 8-bit compression (the "snap") is
+                        magnified by the scaler, resulting in a final value that is fast, but inaccurate.
+                    </p>
+                    
+                    <div class="flex items-center justify-center gap-6 my-8 p-6 bg-gray-900 rounded-lg">
+                        <div class="text-center">
+                            <label class="block text-sm font-medium text-col-quat-w mb-1">Quat (Coarse)</label>
+                            <div class="bit-box bit-quat" style="width: 216px;"></div>
+                        </div>
+                        <div class="text-4xl font-bold text-neon-red">×</div>
+                         <div class="text-center">
+                            <label class="block text-sm font-medium text-col-payload mb-1">Payload (Scaler)</label>
+                            <div class="bit-box bit-payload" style="width: 436px;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- NEW: High Precision Mode Panel -->
+                <div id="high-precision-panel" class="hidden">
+                    <h3 class="text-xl font-semibold text-neon-yellow mb-4">Mode Active: High Precision (Lossless)</h3>
+                    <p class="text-gray-300 mb-4">
+                        The `Form ID` (3) instructs the processor to use **High Precision Mode**. In this mode, the 16-bit `Payload Scaler` is
+                        re-wired to be a **Fine Offset**.
+                    </p>
+                    <p class="text-gray-400 mb-4">
+                        The "loss data" from the 8-bit compression is stored in the 16-bit Payload field. The processor
+                        **adds (+)** the coarse 8-bit value to the 16-bit offset, perfectly reconstructing the original
+                        high-precision float. This operation is **lossless**.
+                    </p>
+                    
+                    <div class="flex items-center justify-center gap-6 my-8 p-6 bg-gray-900 rounded-lg">
+                        <div class="text-center">
+                            <label class="block text-sm font-medium text-col-quat-w mb-1">Quat (Coarse)</label>
+                            <div class="bit-box bit-quat" style="width: 216px;"></div>
+                        </div>
+                        <div class="text-4xl font-bold text-neon-yellow">+</div>
+                         <div class="text-center">
+                            <label class="block text-sm font-medium text-col-payload mb-1">Payload (Offset)</label>
+                            <div class="bit-box bit-payload" style="width: 436px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Geometric Codex Panel (Container) -->
+                <div id="geometric-codex-panel" class="hidden">
+                    <h3 class="text-xl font-semibold text-neon-green mb-4">Mode Active: Geometric Codex (Parallel)</h3>
+                    <p class="text-gray-300 mb-4">
+                        The `Form ID` (4+) instructs the processor to use **Geometric Codex Mode**. The `Form ID` selects a
+                        geometric shape from the codex. The 32-bit `Quaternion` is then used as a **3D pointer** to select one
+                        face on that geometry.
+                    </p>
+                    <div id="geometric-canvas"></div>
+                    <pre id="selection-log" class="w-full bg-gray-900 text-gray-300 p-3 rounded-md text-sm font-mono mt-4 h-20 overflow-y-auto">Select a Geometry and rotate the Quaternion pointer.</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Packet Display -->
+        <div class="panel">
+            <h3 class="text-lg font-semibold text-gray-300 mb-2">Resulting 64-Bit Packet</h3>
+            <div id="packet-display" class="bit-packet-display">
+                <!-- JS will populate this -->
+            </div>
+        </div>
+        
+        <!-- 4. Face Data Codex Panel -->
+        <div id="face-data-panel" class="panel hidden">
+            <h2 class="text-2xl font-semibold text-neon-cyan mb-4">Geometric Codex: Face Data</h2>
+            <p class="text-gray-400 mb-4">The pointer has selected the face below. You can assign string data to this specific face, creating a data lookup table (codex) mapped to the geometry.</p>
+            
+            <div class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="w-full md:w-1/4">
+                    <label for="selected-face-display" class="block text-sm font-medium text-gray-400 mb-1">Selected Face</label>
+                    <input type="text" id="selected-face-display" class="w-full" value="None" disabled>
+                </div>
+                <div class="w-full md:w-1/2">
+                    <label for="face-data-input" class="block text-sm font-medium text-gray-400 mb-1">Data to Save</label>
+                    <input type="text" id="face-data-input" class="w-full" placeholder="Enter data for this face..." disabled>
+                </div>
+                <div class="w-full md:w-1/4">
+                    <button id="save-face-data-btn" class="w-full" disabled>Save to Face</button>
+                </div>
+            </div>
+            
+            <hr class="border-gray-700 my-4">
+            
+            <label class="block text-sm font-medium text-gray-400 mb-1">Saved Codex Entries</label>
+            <pre id="face-codex-display" class="w-full bg-gray-900 text-gray-300 p-3 rounded-md text-sm font-mono mt-2 h-32 overflow-y-auto">No data saved yet.</pre>
+        </div>
+
+    </div>
+
+    <script>
+        // --- FP8 (E4M3) Helper Functions ---
+        const floatView = new DataView(new ArrayBuffer(4));
+        const intView = new DataView(new ArrayBuffer(4));
+
+        function floatToFp8e4m3(f) {
+            floatView.setFloat32(0, f);
+            const f32Bits = floatView.getUint32(0);
+            const sign = (f32Bits >> 31) & 0x1;
+            let exponent = (f32Bits >> 23) & 0xFF;
+            let mantissa = f32Bits & 0x7FFFFF;
+            if (exponent === 0xFF) { return sign ? 0x88 : 0x08; }
+            if (exponent === 0) { return sign << 7; }
+            let exp = exponent - 127 + 8;
+            if (exp <= 0) { return sign << 7; }
+            if (exp >= 0x0F) { return (sign << 7) | 0x0F; }
+            let man = mantissa >> (23 - 3);
+            return (sign << 7) | (exp << 3) | man;
+        }
+
+        // --- NEW: Added renderBits function ---
+        /**
+         * Renders a string of bits into a container as styled divs.
+         */
+        function renderBits(container, bitString, colorClass = '') {
+            if (!container) return; // Add null check
+            container.innerHTML = '';
+            container.classList.remove('bit-quat', 'bit-payload');
+            let color = 'var(--tw-color-neon-cyan)';
+            let shadow = '0 0 6px var(--tw-color-neon-cyan)';
+            
+            if (colorClass) {
+                container.classList.add(colorClass);
+                if (colorClass === 'bit-quat') {
+                    color = 'var(--tw-color-col-quat-w)';
+                    shadow = `0 0 6px ${color}`;
+                } else if (colorClass === 'bit-payload') {
+                    color = 'var(--tw-color-col-payload)';
+                    shadow = `0 0 6px ${color}`;
+                }
+            }
+            
+            for (const bit of bitString) {
+                const bitDiv = document.createElement('div');
+                bitDiv.className = 'bit ' + (bit === '1' ? 'bit-1' : 'bit-0');
+                bitDiv.textContent = bit;
+                if (bit === '1') {
+                    bitDiv.style.backgroundColor = color;
+                    bitDiv.style.boxShadow = shadow;
+                }
+                container.appendChild(bitDiv);
+            }
+        }
+
+        // --- Globals ---
+        let scene, camera, renderer, controls, pointerGroup, geometryMesh;
+        let raycaster, rayLine;
+        let lastHitFaceIndex = -1;
+        let is3DInitialized = false; // NEW: Flag for lazy init
+        
+        // Create shared materials
+        const mat_wire_base = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+        const mat_hit = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+        const mat_ray = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.7, linewidth: 2 });
+        
+        // Geometries
+        const geometries = {
+            '0': null, '1': null, '2': null, '3': null, // Logic Modes
+            '4': new THREE.TetrahedronGeometry(2, 0),    // 4 faces
+            '5': new THREE.BoxGeometry(3, 3, 3),        // 6 faces
+            '6': new THREE.OctahedronGeometry(2, 0),    // 8 faces
+            '7': new THREE.DodecahedronGeometry(2, 0),  // 12 faces
+            '8': new THREE.IcosahedronGeometry(2, 0),   // 20 faces
+            '9': new THREE.IcosahedronGeometry(2, 1), // 80 faces
+            '10': null, '11': null, '12': null, '13': null, '14': null, '15': null,
+        };
+        
+        // Data stores for Face Codex
+        let faceDataCodex = {};
+        let currentSelectedFace = { formId: null, faceIndex: null };
+
+        // UI Element Globals
+        const formSelect = document.getElementById('form-id-select');
+        const quatSliders = {
+            w: document.getElementById('quat-w'),
+            x: document.getElementById('quat-x'),
+            y: document.getElementById('quat-y'),
+            z: document.getElementById('quat-z'),
+        };
+        const quatValues = {
+            w: document.getElementById('quat-w-value'),
+            x: document.getElementById('quat-x-value'),
+            y: document.getElementById('quat-y-value'),
+            z: document.getElementById('quat-z-value'),
+        };
+        const ampSlider = document.getElementById('amp-id-slider');
+        const ampValue = document.getElementById('amp-id-value');
+        const parityBit = document.getElementById('parity-bit');
+        const payloadSlider = document.getElementById('payload-slider');
+        const payloadValue = document.getElementById('payload-value');
+        const packetDisplayEl = document.getElementById('packet-display');
+        
+        // Logic Mode Panels
+        const defaultModePanel = document.getElementById('default-mode-panel');
+        const highPrecisionPanel = document.getElementById('high-precision-panel');
+        const geometricCodexPanel = document.getElementById('geometric-codex-panel');
+        const selectionLog = document.getElementById('selection-log');
+        const faceDataPanel = document.getElementById('face-data-panel');
+        
+        // Face Codex UI Globals
+        const selectedFaceDisplay = document.getElementById('selected-face-display');
+        const faceDataInput = document.getElementById('face-data-input');
+        const saveFaceDataBtn = document.getElementById('save-face-data-btn');
+        const faceCodexDisplay = document.getElementById('face-codex-display');
+        
+        // Bit Display Containers
+        const defaultQuatBits = defaultModePanel.querySelector('.bit-quat');
+        const defaultPayloadBits = defaultModePanel.querySelector('.bit-payload');
+        const hpQuatBits = highPrecisionPanel.querySelector('.bit-quat');
+        const hpPayloadBits = highPrecisionPanel.querySelector('.bit-payload');
+
+
+        /**
+         * Initialize the 3D scene
+         */
+        function init3D() {
+            console.log("init3D called"); // Debug log
+            const container = document.getElementById('geometric-canvas');
+            if (!container) {
+                console.error("3D container not found!");
+                return;
+            }
+
+            scene = new THREE.Scene();
+            raycaster = new THREE.Raycaster();
+            
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            
+            if (w === 0 || h === 0) {
+                console.warn("3D container has no size. Renderer will be 0x0.");
+            }
+
+            camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+            camera.position.z = 8;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+            
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.addEventListener('start', () => container.classList.add('grabbing'));
+            controls.addEventListener('end', () => container.classList.remove('grabbing'));
+            
+            pointerGroup = new THREE.Group();
+            const sphereGeom = new THREE.SphereGeometry(0.3, 16, 12);
+            const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.5 });
+            pointerGroup.add(new THREE.Mesh(sphereGeom, sphereMat));
+            
+            const rayGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,50)]);
+            rayLine = new THREE.Line(rayGeom, mat_ray);
+            pointerGroup.add(rayLine);
+            
+            scene.add(pointerGroup);
+            
+            const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambient);
+            
+            const grid = new THREE.GridHelper(10, 10, 0x888888, 0x444444);
+            scene.add(grid);
+
+            window.addEventListener('resize', onWindowResize);
+            
+            updatePacket(); // NEW: Call updatePacket to set initial pointer rotation
+        }
+        
+        /**
+         * NEW: Update the visible panels based on Form ID
+         */
+        function updateLogicMode() {
+            const formId = parseInt(formSelect.value);
+            
+            // Hide all panels by default
+            defaultModePanel.classList.add('hidden');
+            highPrecisionPanel.classList.add('hidden');
+            geometricCodexPanel.classList.add('hidden');
+            faceDataPanel.classList.add('hidden');
+            
+            if (formId >= 0 && formId <= 2) {
+                // Default Mode
+                defaultModePanel.classList.remove('hidden');
+            } else if (formId === 3) {
+                // High Precision Mode
+                highPrecisionPanel.classList.remove('hidden');
+            } else {
+                // Geometric Codex Mode
+                geometricCodexPanel.classList.remove('hidden');
+                faceDataPanel.classList.remove('hidden');
+                
+                // --- FIXED: LAZY INIT 3D ---
+                if (!is3DInitialized) {
+                    init3D(); // Call init now that the panel is visible
+                    is3DInitialized = true;
+                }
+            }
+            
+            // Update geometry (this will clear it if not in Geometric Mode)
+            updateGeometry();
+        }
+
+        /**
+         * Change the visible geometry based on Form ID
+         */
+        function updateGeometry() {
+            const formId = formSelect.value;
+            
+            // This function can be called before init3D, so check for scene
+            if (scene && geometryMesh) {
+                scene.remove(geometryMesh);
+                geometryMesh.geometry.dispose();
+            }
+            lastHitFaceIndex = -1;
+            clearFaceSelection();
+            
+            const geom = geometries[formId]; // This will be null if formId < 4
+            if (geom && scene) { // Only add if 3D scene is initialized
+                // Face Highlighting Logic
+                const faceCount = geom.attributes.position.count / 3;
+                geom.clearGroups();
+                let materials = [];
+                for (let i = 0; i < faceCount; i++) {
+                    geom.addGroup(i * 3, 3, i);
+                    materials.push(mat_wire_base); // Use the shared base material
+                }
+                
+                geometryMesh = new THREE.Mesh(geom, materials);
+                scene.add(geometryMesh);
+                
+                log(`Loaded geometry "${formSelect.options[formSelect.selectedIndex].text}" (${faceCount} faces).`);
+            } else {
+                geometryMesh = null;
+                if (parseInt(formId) > 3) {
+                    log('Selected Form ID has no associated geometry.');
+                }
+            }
+            
+            updatePacket();
+        }
+        
+        /**
+         * Main update function, called by all controls
+         */
+        function updatePacket() {
+            // Update Quaternion Floats
+            const w = parseFloat(quatSliders.w.value);
+            const x = parseFloat(quatSliders.x.value);
+            const y = parseFloat(quatSliders.y.value);
+            const z = parseFloat(quatSliders.z.value);
+            quatValues.w.textContent = w.toFixed(2);
+            quatValues.x.textContent = x.toFixed(2);
+            quatValues.y.textContent = y.toFixed(2);
+            quatValues.z.textContent = z.toFixed(2);
+            
+            if (pointerGroup) { // Check if 3D is initialized
+                pointerGroup.quaternion.set(x, y, z, w).normalize();
+            }
+            
+            // Update other values
+            ampValue.textContent = ampSlider.value;
+            payloadValue.textContent = payloadSlider.value;
+            
+            // --- Assemble 64-bit packet ---
+            const form_id = BigInt(formSelect.value);
+            const amp_id = BigInt(ampSlider.value);
+            const parity = BigInt(parityBit.checked ? 1 : 0);
+            const payload = BigInt(payloadSlider.value);
+            
+            // We only need the payload int for the packet display
+            const payload_int = BigInt(payloadSlider.value);
+            
+            const qW_fp8 = BigInt(floatToFp8e4m3(w));
+            const qX_fp8 = BigInt(floatToFp8e4m3(x));
+            const qY_fp8 = BigInt(floatToFp8e4m3(y));
+            const qZ_fp8 = BigInt(floatToFp8e4m3(z));
+            
+            // LSB-first packet construction
+            let packet = 0n;
+            packet |= (qZ_fp8 << 0n);
+            packet |= (qY_fp8 << 8n);
+            packet |= (qX_fp8 << 16n);
+            packet |= (qW_fp8 << 24n);
+            packet |= (parity << 32n);
+            packet |= (amp_id << 33n);
+            packet |= (form_id << 36n);
+            // Assuming Freq/Spin are 0 for this demo
+            packet |= (payload_int << 48n);
+            
+            // Re-order for MSB display (63 -> 0)
+            let displayPacket = 0n;
+            for(let i=0; i<64; i++) {
+                if((packet >> BigInt(i)) & 1n) {
+                    displayPacket |= (1n << BigInt(63-i));
+                }
+            }
+            
+            // Render the packet
+            renderPacket(displayPacket);
+            
+            // NEW: Update bit displays in logic panels
+            const q_bits_str = (qW_fp8 | (qX_fp8 << 8n) | (qY_fp8 << 16n) | (qZ_fp8 << 24n)).toString(2).padStart(32, '0').slice(0, 8); // Just show one quat
+            const p_bits_str = payload_int.toString(2).padStart(16, '0');
+            
+            renderBits(defaultQuatBits, q_bits_str.slice(0,8), 'bit-quat');
+            renderBits(defaultPayloadBits, p_bits_str, 'bit-payload');
+            renderBits(hpQuatBits, q_bits_str.slice(0,8), 'bit-quat');
+            renderBits(hpPayloadBits, p_bits_str, 'bit-payload');
+        }
+        
+        /**
+         * Renders the 64-bit packet display
+         */
+        function renderPacket(packetValue) {
+            packetDisplayEl.innerHTML = '';
+            const bitString = packetValue.toString(2).padStart(64, '0');
+            
+            for (let i = 0; i < 64; i++) {
+                const bit = bitString[i];
+                const bitDiv = document.createElement('div');
+                bitDiv.className = 'bit ' + (bit === '1' ? 'bit-1' : 'bit-0');
+                bitDiv.textContent = bit;
+                
+                // Add color based on schema
+                bitDiv.style.backgroundColor = bit === '0' ? '#374151' : getBitColor(i);
+                if (bit === '1') {
+                    bitDiv.style.boxShadow = `0 0 6px ${getBitColor(i)}`;
+                    bitDiv.style.color = '#000';
+                }
+                
+                packetDisplayEl.appendChild(bitDiv);
+            }
+        }
+        
+        function getBitColor(index_msb) {
+            if (index_msb >= 0 && index_msb <= 15) return 'var(--tw-color-col-payload)';
+            if (index_msb >= 16 && index_msb <= 20) return 'var(--tw-color-col-dyn-freq)';
+            if (index_msb >= 21 && index_msb <= 23) return 'var(--tw-color-col-dyn-spin)';
+            if (index_msb >= 24 && index_msb <= 27) return 'var(--tw-color-col-state-form)';
+            if (index_msb >= 28 && index_msb <= 30) return 'var(--tw-color-col-state-amp)';
+            if (index_msb === 31) return 'var(--tw-color-col-state-rsv)';
+            if (index_msb >= 32 && index_msb <= 39) return 'var(--tw-color-col-quat-w)';
+            if (index_msb >= 40 && index_msb <= 47) return 'var(--tw-color-col-quat-x)';
+            if (index_msb >= 48 && index_msb <= 55) return 'var(--tw-color-col-quat-y)';
+            if (index_msb >= 56 && index_msb <= 63) return 'var(--tw-color-col-quat-z)';
+            return '#374151';
+        }
+
+        function log(message) {
+            if (selectionLog) { // Check if element exists
+                selectionLog.textContent = message;
+            }
+        }
+
+        /**
+         * Handle window resize
+         */
+        function onWindowResize() {
+            const container = document.getElementById('geometric-canvas');
+            if (is3DInitialized && container && renderer) { // Only resize if init
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            }
+        }
+        
+        // Face Codex Functions
+        
+        function saveFaceData() {
+            if (currentSelectedFace.faceIndex === null) return;
+            
+            const formId = currentSelectedFace.formId;
+            const faceIndex = currentSelectedFace.faceIndex;
+            const data = faceDataInput.value;
+            const key = `Form_${formId}_Face_${faceIndex}`;
+            
+            if (data) {
+                faceDataCodex[key] = data;
+            } else {
+                delete faceDataCodex[key];
+            }
+            
+            updateFaceCodexDisplay();
+        }
+        
+        function updateFaceCodexDisplay() {
+            const entries = Object.keys(faceDataCodex);
+            if (entries.length === 0) {
+                faceCodexDisplay.textContent = 'No data saved yet.';
+                return;
+            }
+            
+            faceCodexDisplay.textContent = entries.map(key => {
+                return `${key}: "${faceDataCodex[key]}"`;
+            }).join('\n');
+        }
+        
+        function clearFaceSelection() {
+            currentSelectedFace = { formId: null, faceIndex: null };
+            selectedFaceDisplay.value = 'None';
+            faceDataInput.value = '';
+            faceDataInput.disabled = true;
+            saveFaceDataBtn.disabled = true;
+        }
+
+        /**
+         * The main animation loop
+         */
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // --- FIXED: Guard clause ---
+            if (!is3DInitialized || !renderer) return;
+            
+            // Only run raycasting if in geometric mode
+            const formId = parseInt(formSelect.value);
+            if (formId > 3 && geometryMesh && scene) {
+                // Raycasting Logic
+                const rayDir = new THREE.Vector3(0, 0, 1);
+                rayDir.applyQuaternion(pointerGroup.quaternion); 
+                rayDir.normalize();
+                
+                raycaster.set(pointerGroup.position, rayDir);
+                
+                const intersects = raycaster.intersectObject(geometryMesh);
+                
+                // Reset last hit face
+                if (lastHitFaceIndex > -1 && geometryMesh.material[lastHitFaceIndex] === mat_hit) {
+                    geometryMesh.material[lastHitFaceIndex] = mat_wire_base; 
+                }
+                
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    const hitFaceMaterialIndex = hit.face.materialIndex;
+                    
+                    if (hitFaceMaterialIndex !== undefined) {
+                        lastHitFaceIndex = hitFaceMaterialIndex;
+                        geometryMesh.material[lastHitFaceIndex] = mat_hit; 
+                        
+                        const subSelectA = parseInt(ampSlider.value);
+                        const subSelectB = parityBit.checked ? 8 : 0;
+                        const subFaceIndex = subSelectA + subSelectB;
+                        
+                        log(`Pointer selected Face ${lastHitFaceIndex}.\nSub-Face Index [${subFaceIndex}] (from Amp+Parity).`);
+                        
+                        // Update Face Codex UI
+                        currentSelectedFace = { formId: formId, faceIndex: lastHitFaceIndex };
+                        selectedFaceDisplay.value = `Face ${lastHitFaceIndex} (on Form ${formId})`;
+                        faceDataInput.disabled = false;
+                        saveFaceDataBtn.disabled = false;
+                        
+                        const key = `Form_${formId}_Face_${lastHitFaceIndex}`;
+                        faceDataInput.value = faceDataCodex[key] || '';
+                        
+                    } else {
+                        if (lastHitFaceIndex === -1) {
+                            log('Pointer is not intersecting with a valid face.');
+                            clearFaceSelection();
+                        }
+                        lastHitFaceIndex = -1;
+                    }
+                } else {
+                    if (lastHitFaceIndex !== -1) {
+                        lastHitFaceIndex = -1;
+                    }
+                    log('Pointer is not intersecting with geometry.');
+                    clearFaceSelection();
+                }
+            } else {
+                // Not in geometric mode, clear selection
+                if(lastHitFaceIndex > -1 && geometryMesh) {
+                     geometryMesh.material[lastHitFaceIndex] = mat_wire_base;
+                }
+                lastHitFaceIndex = -1;
+                clearFaceSelection();
+            }
+            
+            // Update controls and render
+            if(renderer) {
+                controls.update();
+                renderer.render(scene, camera);
+            }
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // init3D(); // <-- DO NOT CALL HERE
+            
+            // Init all controls
+            formSelect.addEventListener('change', updateLogicMode); // NEW: Use this handler
+            Object.values(quatSliders).forEach(s => s.addEventListener('input', updatePacket));
+            ampSlider.addEventListener('input', updatePacket);
+            parityBit.addEventListener('input', updatePacket);
+            payloadSlider.addEventListener('input', updatePacket);
+            
+            // Init Face Codex Save Button
+            saveFaceDataBtn.addEventListener('click', saveFaceData);
+            
+            // Initial calls
+            updateLogicMode(); // NEW: Use this to init
+            
+            // Start animation loop
+            animate(); // <-- START THE LOOP
+        });
+
+    </script>
+</body>
+</html>
