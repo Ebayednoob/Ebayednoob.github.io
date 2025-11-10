@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Precision Mode Visualizer</title>
+    <!-- Load Tailwind CSS for styling the UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Add Inter font family
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-cyan': '#00ffff',
+                        'neon-pink': '#ff50c0',
+                        'neon-green': '#39ff14',
+                        'neon-red': '#ff4103',
+                        'neon-blue': '#00aaff',
+                        'neon-purple': '#9f50ff',
+                        'neon-yellow': '#ffff00',
+                        
+                        // Bit colors
+                        'col-payload': '#ff4103',
+                        'col-quat-w': '#00aaff',
+                    },
+                    boxShadow: {
+                        'cyan': '0 0 8px #00ffff, 0 0 12px #00ffff',
+                        'red': '0 0 8px #ff4103, 0 0 12px #ff4103',
+                        'green': '0 0 8px #39ff14, 0 0 12px #39ff14',
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <!-- NEW: Load three.js libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at center, #1a2a2a 0%, #000000 70%);
+            color: #e0e0e0;
+        }
+
+        /* Custom slider styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover { opacity: 1; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        
+        /* Custom button */
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            background-color: rgba(0, 20, 20, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            color: #00ffff;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+        button:hover {
+            background-color: rgba(0, 50, 50, 0.9);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
+        }
+        /* NEW: Secondary button style */
+        button.secondary {
+            background-color: rgba(20, 20, 20, 0.5);
+            border: 1px solid rgba(150, 150, 150, 0.4);
+            color: #9ca3af;
+            box-shadow: none;
+        }
+        button.secondary:hover {
+            background-color: rgba(50, 50, 50, 0.7);
+            box-shadow: none;
+        }
+
+
+        /* Bit display styles */
+        .bit-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            border-radius: 6px;
+        }
+        .bit {
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 3px;
+            transition: all 0.1s;
+        }
+        .bit-1 {
+            background-color: #00ffff;
+            color: #000;
+            box-shadow: 0 0 6px #00ffff;
+        }
+        .bit-0 {
+            background-color: #374151;
+            color: #9ca3af;
+        }
+        
+        .panel {
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            backdrop-filter: blur(5px);
+        }
+         
+         .data-readout {
+            font-family: monospace;
+            font-size: 1.125rem; /* text-lg */
+            padding: 0.5rem;
+            background-color: #1f2937;
+            border-radius: 0.375rem;
+            border: 1px solid #374151;
+         }
+         
+         /* Bit colors for final math */
+        .bit-quat .bit-1 { background-color: var(--tw-color-col-quat-w); box-shadow: 0 0 6px var(--tw-color-col-quat-w); }
+        .bit-payload .bit-1 { background-color: var(--tw-color-col-payload); box-shadow: 0 0 6px var(--tw-color-col-payload); }
+        
+        /* UPDATED: 3D Animation Canvas */
+        #animation-canvas {
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            border-radius: 8px;
+            width: 100%;
+            height: 400px; /* Set a fixed height */
+            cursor: grab;
+        }
+        #animation-canvas:grabbing {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <div id="app-container" class="max-w-7xl mx-auto space-y-8">
+        
+        <h1 class="text-3xl font-bold text-center text-neon-cyan mb-2" style="text-shadow: 0 0 6px #00ffff;">High Precision Mode Visualizer</h1>
+        <h2 class="text-xl font-light text-center text-gray-400 mb-8">Form ID 3: Reconstructing Lossy Data</h2>
+
+        <!-- Panel 1: The Problem (Compression) -->
+        <div class="panel border-2 border-neon-red">
+            <h3 class="text-xl font-semibold text-neon-red mb-4" style="text-shadow: 0 0 6px #ff4103;">Panel 1: The "Lossy" Compression</h3>
+            <p class="text-gray-400 mb-4">Select a high-precision Float-32 value. The system compresses it to the *nearest* 8-bit "snap point" (FP8), which introduces a "Precision Loss." This loss is the data that is normally discarded.</p>
+            
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="float-slider" class="text-lg font-medium text-gray-300">Original Float-32 (Target)</label>
+                    <span id="float-value-display" class="text-2xl font-mono text-white">-1.000</span>
+                </div>
+                <input type="range" id="float-slider" min="-1" max="1" value="-1" step="0.001" class="control-slider">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Decompressed "Snap" Point (Lossy)</label>
+                    <pre id="decompressed-float-display" class="data-readout text-neon-red"></pre>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Precision Loss (Difference)</label>
+                    <pre id="precision-loss-display" class="data-readout text-neon-red"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel 2: The Solution (Payload) -->
+        <div class="panel border-2 border-neon-yellow">
+            <h3 class="text-xl font-semibold text-neon-yellow mb-4" style="text-shadow: 0 0 6px #ffff00;">Panel 2: The "Corrective" Payload</h3>
+            <p class="text-gray-400 mb-4">In High Precision Mode, the 16-bit `Payload Scaler` is re-wired to be a **Fine Offset**. We can store the *exact* "Precision Loss" from Panel 1 in this 16-bit field.</p>
+            
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="payload-scaler-slider" class="text-lg font-medium text-gray-300">Payload Scaler (16-bit Int)</label>
+                    <span id="payload-scaler-int-value" class="text-2xl font-mono text-white">0</span>
+                </div>
+                <input type="range" id="payload-scaler-slider" min="0" max="65535" value="0" step="1" class="control-slider">
+                <label class="block text-sm font-medium text-gray-400 mt-2 mb-1">...converts to Float-16 Value:</label>
+                <pre id="payload-scaler-float-value" class="data-readout text-neon-yellow"></pre>
+            </div>
+            
+            <!-- NEW: Button Group -->
+            <div class="flex gap-4">
+                <button id="auto-set-button" class="w-1/2">Auto-Set Payload to Match Loss</button>
+                <button id="reset-button" class="w-1/2 secondary">Reset Sliders</button>
+            </div>
+        </div>
+        
+        <!-- Panel 3: Animation (NOW 3D) -->
+        <div class="panel border-2 border-neon-green">
+            <h3 class="text-xl font-semibold text-neon-green mb-4" style="text-shadow: 0 0 6px #39ff14;">Panel 3: Animated 3D Visualization</h3>
+            <p class="text-gray-400 mb-4">This 3D graph shows the process. The "Lossy" (red) bar is the 8-bit snap point. The "Correction" (yellow) bar is the `Payload` value. It grows from the red bar to land *exactly* at the "Target" (cyan wireframe) height, resulting in the "Final" (green wireframe) value with 0% loss. (Drag to orbit, scroll to zoom).</p>
+            
+            <div id="animation-canvas"></div>
+        </div>
+        
+        <!-- Panel 4: The Final Math -->
+        <div class="panel border-2 border-neon-cyan">
+            <h3 class="text-xl font-semibold text-neon-cyan mb-4" style="text-shadow: 0 0 6px #00ffff;">Panel 4: The Final Result</h3>
+            <p class="text-gray-400 mb-4">The processor performs this final calculation in hardware, perfectly reconstructing the original high-precision value.</p>
+            
+             <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Quaternion (Coarse Value - 8 bits)</label>
+                <div id="high-precision-quat-bits" class="bit-box bit-quat" style="width: 216px;"></div>
+                
+                <div class="text-center text-neon-cyan font-bold text-2xl my-2">+</div>
+                
+                <label class="block text-sm font-medium text-gray-400 mb-1">Payload Scaler (Fine Offset - 16 bits)</label>
+                <div id="high-precision-payload-bits" class="bit-box bit-payload" style="width: 436px;"></div>
+            </div>
+            
+             <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Final Reconstructed Value</label>
+                <pre id="final-result-display" class="data-readout text-neon-green text-xl"></pre>
+             </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Globals ---
+        const slider = document.getElementById('float-slider');
+        const floatValueDisplay = document.getElementById('float-value-display');
+        
+        const decompressedFloatDisplay = document.getElementById('decompressed-float-display');
+        const precisionLossDisplay = document.getElementById('precision-loss-display');
+        
+        const payloadScalerSlider = document.getElementById('payload-scaler-slider');
+        const payloadScalerIntValue = document.getElementById('payload-scaler-int-value');
+        const payloadScalerFloatValue = document.getElementById('payload-scaler-float-value');
+        
+        const autoSetButton = document.getElementById('auto-set-button');
+        const resetButton = document.getElementById('reset-button'); // NEW: Reset button
+        
+        const finalResultDisplay = document.getElementById('final-result-display');
+        const highPrecisionQuatBits = document.getElementById('high-precision-quat-bits');
+        const highPrecisionPayloadBits = document.getElementById('high-precision-payload-bits');
+        
+        // --- NEW: 3D Animation Globals ---
+        const canvasContainer = document.getElementById('animation-canvas');
+        let scene, camera, renderer, controls;
+        let mat_target, mat_lossy, mat_correction, mat_final;
+        let bar_target, bar_lossy, bar_correction, bar_final_wireframe;
+        let base_geom;
+        
+        // Animation
+        let currentPayloadFloat = 0; // For animation
+        let targetPayloadFloat = 0; // For animation
+        
+        // Data state
+        let f_original = -1.0;
+        let f_decompressed = -1.0;
+        let f_loss = 0.0;
+        let i_payload = 0;
+        
+        // DataViews for bit-level conversion
+        const floatView = new DataView(new ArrayBuffer(4));
+        const intView = new DataView(new ArrayBuffer(4));
+
+        // --- Bit Conversion Functions ---
+
+        /**
+         * Compresses a 32-bit float into an 8-bit E4M3 float (represented as an integer 0-255).
+         */
+        function floatToFp8e4m3(f) {
+            floatView.setFloat32(0, f);
+            const f32Bits = floatView.getUint32(0);
+            const sign = (f32Bits >> 31) & 0x1;
+            let exponent = (f32Bits >> 23) & 0xFF;
+            let mantissa = f32Bits & 0x7FFFFF;
+            if (exponent === 0xFF) { return sign ? 0x88 : 0x08; }
+            if (exponent === 0) { return sign << 7; }
+            let exp = exponent - 127 + 8;
+            if (exp <= 0) { return sign << 7; }
+            if (exp >= 0x0F) { return (sign << 7) | 0x0F; }
+            let man = mantissa >> (23 - 3);
+            return (sign << 7) | (exp << 3) | man;
+        }
+        
+        /**
+         * Decompresses an 8-bit E4M3 float (integer 0-255) into a 32-bit float.
+         */
+        function fp8e4m3ToFloat(b) {
+            const sign = (b >> 7) & 0x1;
+            const exponent = (b >> 3) & 0x0F;
+            const mantissa = b & 0x07;
+            if (exponent === 0 && mantissa === 0) { return sign ? -0.0 : 0.0; }
+            if (exponent === 0x0F) { return sign ? -Infinity : Infinity; }
+            if (exponent === 0x08 && mantissa !== 0) { return NaN; }
+            let exp = exponent - 8 + 127;
+            let man = mantissa << (23 - 3);
+            const f32Bits = (sign << 31) | (exp << 23) | man;
+            intView.setUint32(0, f32Bits);
+            return intView.getFloat32(0);
+        }
+        
+        /**
+         * Decompresses a 16-bit FP16 (integer 0-65535) into a 32-bit float.
+         */
+        function fp16ToFloat(b) {
+            const sign = (b >> 15) & 0x1;
+            const exponent = (b >> 10) & 0x1F; // 5 bits
+            const mantissa = b & 0x3FF; // 10 bits
+            
+            if (exponent === 0) {
+                if (mantissa === 0) return sign ? -0.0 : 0.0;
+                return (sign ? -1 : 1) * Math.pow(2, -14) * (mantissa / 1024);
+            }
+            if (exponent === 0x1F) {
+                if (mantissa === 0) return sign ? -Infinity : Infinity;
+                return NaN; // <-- THIS is the source of the NaN
+            }
+            let exp = exponent - 15 + 127; // Convert bias
+            let man = mantissa << (23 - 10);
+            const f32Bits = (sign << 31) | (exp << 23) | man;
+            intView.setUint32(0, f32Bits);
+            return intView.getFloat32(0);
+        }
+        
+        /**
+         * Compresses a 32-bit float into a 16-bit FP16 float (integer 0-65535).
+         */
+        function floatToFp16(f) {
+            floatView.setFloat32(0, f);
+            const f32Bits = floatView.getUint32(0);
+            const sign = (f32Bits >> 31) & 0x1;
+            let exponent = (f32Bits >> 23) & 0xFF;
+            let mantissa = f32Bits & 0x7FFFFF;
+            
+            if (exponent === 0xFF) { return (sign << 15) | 0x7C00 | (mantissa ? 1 : 0); }
+            if (exponent === 0) { return sign << 15; }
+            
+            let exp = exponent - 127 + 15;
+            
+            if (exp >= 0x1F) { return (sign << 15) | 0x7C00; }
+            
+            if (exp <= 0) {
+                if (exp < -10) { return sign << 15; }
+                mantissa = (mantissa | 0x800000) >> (1 - exp);
+                return (sign << 15) | (mantissa >> (23 - 10));
+            }
+            
+            let man = mantissa >> (23 - 10);
+            return (sign << 15) | (exp << 10) | man;
+        }
+
+
+        /**
+         * Renders a string of bits into a container as styled divs.
+         */
+        function renderBits(container, bitString, colorClass = '') {
+            container.innerHTML = '';
+            container.classList.remove('bit-quat', 'bit-payload');
+            let color = 'var(--tw-color-neon-cyan)';
+            let shadow = '0 0 6px var(--tw-color-neon-cyan)';
+            
+            if (colorClass) {
+                container.classList.add(colorClass);
+                if (colorClass === 'bit-quat') {
+                    color = 'var(--tw-color-col-quat-w)';
+                    shadow = `0 0 6px ${color}`;
+                } else if (colorClass === 'bit-payload') {
+                    color = 'var(--tw-color-col-payload)';
+                    shadow = `0 0 6px ${color}`;
+                }
+            }
+            
+            for (const bit of bitString) {
+                const bitDiv = document.createElement('div');
+                bitDiv.className = 'bit ' + (bit === '1' ? 'bit-1' : 'bit-0');
+                bitDiv.textContent = bit;
+                if (bit === '1') {
+                    bitDiv.style.backgroundColor = color;
+                    bitDiv.style.boxShadow = shadow;
+                }
+                container.appendChild(bitDiv);
+            }
+        }
+
+        /**
+         * Main update function, called by all controls
+         */
+        function updateVisuals() {
+            // --- Panel 1 ---
+            f_original = parseFloat(slider.value);
+            floatValueDisplay.textContent = f_original.toFixed(6);
+            
+            const i_fp8 = floatToFp8e4m3(f_original);
+            f_decompressed = fp8e4m3ToFloat(i_fp8);
+            f_loss = f_original - f_decompressed;
+            
+            decompressedFloatDisplay.textContent = f_decompressed.toFixed(6);
+            precisionLossDisplay.textContent = f_loss.toExponential(4);
+            
+            // --- Panel 2 ---
+            i_payload = parseInt(payloadScalerSlider.value);
+            payloadScalerIntValue.textContent = i_payload;
+            
+            targetPayloadFloat = fp16ToFloat(i_payload);
+            payloadScalerFloatValue.textContent = targetPayloadFloat.toExponential(4);
+            
+            // --- Panel 4 ---
+            // This is updated in the animate loop now
+            
+            renderBits(highPrecisionQuatBits, i_fp8.toString(2).padStart(8, '0'), 'bit-quat');
+            renderBits(highPrecisionPayloadBits, i_payload.toString(2).padStart(16, '0'), 'bit-payload');
+        }
+        
+        /**
+         * Auto-set button click handler
+         */
+        function onAutoSet() {
+            // 1. Get the current loss
+            f_original = parseFloat(slider.value);
+            f_decompressed = fp8e4m3ToFloat(floatToFp8e4m3(f_original));
+            f_loss = f_original - f_decompressed;
+            
+            // 2. Convert that loss to an FP16 integer
+            const i_loss = floatToFp16(f_loss);
+            
+            // 3. Set the payload slider to that integer
+            payloadScalerSlider.value = i_loss;
+            
+            // 4. Trigger the update
+            updateVisuals();
+        }
+        
+        /**
+         * NEW: Reset button click handler
+         */
+        function onReset() {
+            slider.value = -1.0;
+            payloadScalerSlider.value = 0;
+            updateVisuals();
+        }
+        
+        // --- NEW: 3D Functions ---
+        
+        /**
+         * Initialize the 3D scene
+         */
+        function init3D() {
+            scene = new THREE.Scene();
+            
+            // Camera
+            const w = canvasContainer.clientWidth;
+            const h = canvasContainer.clientHeight;
+            camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+            camera.position.set(2, 2, 3);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.1;
+            controls.addEventListener('start', () => canvasContainer.classList.add('grabbing'));
+            controls.addEventListener('end', () => canvasContainer.classList.remove('grabbing'));
+            
+            // Lights
+            const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambient);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(5, 10, 7);
+            scene.add(dirLight);
+            
+            // Grid
+            const grid = new THREE.GridHelper(4, 8, 0x888888, 0x444444);
+            scene.add(grid);
+
+            // Materials
+            mat_target = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.5 });
+            mat_lossy = new THREE.MeshBasicMaterial({ color: 0xff4103, transparent: true, opacity: 0.8 });
+            mat_correction = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.9 });
+            mat_final = new THREE.MeshBasicMaterial({ color: 0x39ff14, wireframe: true, transparent: true, opacity: 1.0 });
+
+            // Geometry (a 1x1 base, we will scale Y)
+            base_geom = new THREE.BoxGeometry(0.5, 1, 0.5);
+            
+            // Create bars
+            bar_target = new THREE.Mesh(base_geom, mat_target);
+            bar_lossy = new THREE.Mesh(base_geom, mat_lossy);
+            bar_correction = new THREE.Mesh(base_geom, mat_correction);
+            bar_final_wireframe = new THREE.Mesh(base_geom, mat_final);
+            
+            // Set positions (Target and Final will be at 0,0,0)
+            bar_target.position.x = -0.5;
+            bar_lossy.position.x = 0.5;
+            bar_correction.position.x = 0.5;
+            bar_final_wireframe.position.x = 0.5;
+            
+            scene.add(bar_target);
+            scene.add(bar_lossy);
+            scene.add(bar_correction);
+            scene.add(bar_final_wireframe);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+        
+        /**
+         * Handle window resize for 3D canvas
+         */
+        function onWindowResize() {
+            if (renderer) {
+                const w = canvasContainer.clientWidth;
+                const h = canvasContainer.clientHeight;
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+                renderer.setSize(w, h);
+            }
+        }
+        
+        /**
+         * Animation loop for the 3D graph
+         */
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Animate the payload value
+            const lerpSpeed = 0.05;
+            if (isNaN(targetPayloadFloat)) {
+                // Handle NaN case to prevent crash
+                currentPayloadFloat = 0; 
+            } else if (Math.abs(targetPayloadFloat - currentPayloadFloat) < 1e-10) {
+                currentPayloadFloat = targetPayloadFloat;
+            } else {
+                 currentPayloadFloat += (targetPayloadFloat - currentPayloadFloat) * lerpSpeed;
+            }
+            
+            // Update final math text display
+            const f_final = f_decompressed + currentPayloadFloat;
+            let accuracy = f_original === 0 ? 100 : (1 - Math.abs(f_original - f_final) / Math.abs(f_original)) * 100;
+            
+            // Handle NaN display
+            if (isNaN(accuracy)) {
+                finalResultDisplay.textContent = `NaN (Invalid Payload Value)`;
+            } else {
+                finalResultDisplay.textContent = `${f_final.toExponential(8)} (Accuracy: ${accuracy.toFixed(4)}%)`;
+            }
+            
+            // --- Update 3D Graph Bars ---
+            // Use Math.max with a small number to avoid 0-scale flickering
+            const epsilon = 1e-6;
+            
+            // 1. Target Bar (Cyan)
+            const h_target = isNaN(f_original) ? epsilon : Math.abs(f_original) + epsilon;
+            bar_target.scale.y = h_target;
+            bar_target.position.y = isNaN(f_original) ? 0 : f_original / 2;
+            
+            // 2. Lossy Bar (Red)
+            const h_lossy = isNaN(f_decompressed) ? epsilon : Math.abs(f_decompressed) + epsilon;
+            bar_lossy.scale.y = h_lossy;
+            bar_lossy.position.y = isNaN(f_decompressed) ? 0 : f_decompressed / 2;
+            
+            // 3. Correction Bar (Yellow)
+            const h_correction = isNaN(currentPayloadFloat) ? epsilon : Math.abs(currentPayloadFloat) + epsilon;
+            bar_correction.scale.y = h_correction;
+            bar_correction.position.y = isNaN(currentPayloadFloat) || isNaN(f_decompressed) ? 0 : f_decompressed + (currentPayloadFloat / 2);
+            
+            // 4. Final Wireframe (Green)
+            const h_final = isNaN(f_final) ? epsilon : Math.abs(f_final) + epsilon;
+            bar_final_wireframe.scale.y = h_final;
+            bar_final_wireframe.position.y = isNaN(f_final) ? 0 : f_final / 2;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Event Listeners ---
+        slider.addEventListener('input', updateVisuals);
+        payloadScalerSlider.addEventListener('input', updateVisuals);
+        autoSetButton.addEventListener('click', onAutoSet);
+        resetButton.addEventListener('click', onReset); // NEW: Attach reset
+        
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            init3D(); // Initialize the 3D scene
+            
+            // Initial call to populate all UIs
+            updateVisuals();
+            
+            // Start animation loop
+            animate();
+        });
+
+    </script>
+</body>
+</html>
