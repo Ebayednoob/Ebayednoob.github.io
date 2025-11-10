@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Lattice Transformation</title>
+    <style>
+        body { 
+            margin: 0; 
+            background-color: #111; 
+            color: #fff; 
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #main-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            min-width: 50%;
+        }
+        canvas { 
+            display: block; 
+            width: 100%;
+            height: 100%;
+        }
+        #comparison-panel {
+            flex: 1;
+            padding: 20px;
+            background-color: #1a1a2a;
+            overflow-y: auto;
+            border-left: 2px solid #333;
+            box-sizing: border-box;
+        }
+        #comparison-panel h2 {
+            margin-top: 0;
+            color: #eee;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        #comparison-panel h3 {
+            color: #aaccff;
+            margin-top: 25px;
+        }
+        #comparison-panel p, #comparison-panel li {
+            line-height: 1.6;
+            color: #ccc;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            font-size: 1.2rem;
+            pointer-events: none;
+            text-shadow: 0 0 5px #000;
+        }
+        #controls-container {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+        }
+        button {
+            background-color: #333;
+            border: 1px solid #555;
+            color: #fff;
+            padding: 10px 20px;
+            margin: 0 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        button:hover {
+            background-color: #555;
+        }
+        button:disabled {
+            background-color: #222;
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 800px) {
+            #main-container {
+                flex-direction: column;
+            }
+            #comparison-panel {
+                border-left: none;
+                border-top: 2px solid #333;
+                height: 50%;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="main-container">
+        <div id="canvas-container">
+            <div id="info">Press Play to begin</div>
+            <div id="controls-container">
+                <button id="play-deconstruction">Play Deconstruction (Toda ⟶ Kagome)</button>
+                <button id="play-reconstruction">Play Compression (Kagome ⟶ Toda)</button>
+                <button id="reset">Reset</button>
+            </div>
+        </div>
+        <div id="comparison-panel">
+            <h2>Lattice Transformation Theory</h2>
+            <p>This visualization demonstrates the geometric and theoretical physical relationship between a close-packed Triangular (or 2D Toda) lattice and the geometrically frustrated Kagome lattice.</p>
+            <p>For a static, step-by-step graphical breakdown, see the <a href="transformation_steps.html" style="color: #8af; text-decoration: underline;">Transformation Steps Diagram</a>.</p>
+            <p>For an abstract representation of the compression as a gradient flow, see the <a href="gradient_flow_theory.html" style="color: #8af; text-decoration: underline;">Theoretical Gradient Flow Diagram</a>.</p>
+            
+            <h3>Deconstruction: Toda ⟶ Kagome</h3>
+            <p>This process shows the geometric origin of the Kagome lattice. It is a direct substructure of the triangular lattice, formed by systematically removing 1/4 of the atoms and reconnecting the remaining ones.</p>
+            <ol>
+                <li><b>Start:</b> A stable, close-packed triangular lattice.</li>
+                <li><b>Identify:</b> A repeating subset of atoms are targeted.</li>
+                <li><b>Remove:</b> The targeted atoms are removed, breaking the original bonds.</li>
+                <li><b>Re-form:</b> The remaining atoms form new bonds with their closest neighbors, creating the characteristic corner-sharing triangles of the Kagome lattice.</li>
+            </ol>
+            
+            <h3>Compression: Kagome ⟶ Toda</h3>
+            <p>This animation visualizes a theoretical physical process. Under uniform compression, a Kagome structure would become unstable and seek a more dense, lower-energy state, which is the triangular lattice. This is an example of a "gradient flow" towards stability.</p>
+             <ol>
+                <li><b>Start:</b> A low-density Kagome lattice under pressure.</li>
+                <li><b>Void Collapse:</b> The large hexagonal voids become unstable and begin to collapse. The bonds of the Kagome structure break.</li>
+                <li><b>Atom Insertion:</b> The "missing" atoms are re-inserted into the collapsing voids.</li>
+                <li><b>Re-form:</b> As the new atoms settle, the entire structure re-bonds into the highly stable, close-packed triangular lattice.</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
+    <script>
+        // --- Global Variables ---
+        let scene, camera, renderer, orbitControls;
+        let latticeGroup = new THREE.Group();
+        let atomsToRemove = [], allAtoms = [], allBonds = [], kagomeBonds = [];
+        const infoElement = document.getElementById('info');
+        const canvasContainer = document.getElementById('canvas-container');
+        const deconstructionBtn = document.getElementById('play-deconstruction');
+        const reconstructionBtn = document.getElementById('play-reconstruction');
+        const resetBtn = document.getElementById('reset');
+        let isAnimating = false;
+
+        // --- Core Functions ---
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2a);
+            scene.add(latticeGroup);
+
+            camera = new THREE.PerspectiveCamera(75, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+            camera.position.set(0, 15, 35);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            canvasContainer.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0xcccccc, 0.7);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+            orbitControls.enableDamping = true;
+
+            deconstructionBtn.addEventListener('click', playDeconstruction);
+            reconstructionBtn.addEventListener('click', playReconstruction);
+            resetBtn.addEventListener('click', resetVisualization);
+            window.addEventListener('resize', onWindowResize, false);
+            
+            resetVisualization();
+            animate();
+        }
+
+        function setControlsEnabled(enabled) {
+            isAnimating = !enabled;
+            deconstructionBtn.disabled = !enabled;
+            reconstructionBtn.disabled = !enabled;
+            resetBtn.disabled = !enabled;
+        }
+
+        // --- Animation Sequences ---
+        function playDeconstruction() {
+            if (isAnimating) return;
+            setControlsEnabled(false);
+            resetVisualization();
+
+            const animationChain = new Promise(resolve => {
+                infoElement.textContent = "Step 1: Identifying atoms for removal...";
+                identifyAtomsForRemoval();
+                setTimeout(resolve, 1500);
+            }).then(() => new Promise(resolve => {
+                infoElement.textContent = "Step 2: Removing atoms...";
+                fadeObjects(atomsToRemove, false, 1000).then(resolve);
+            })).then(() => new Promise(resolve => {
+                infoElement.textContent = "Step 3: Removing original bonds...";
+                fadeObjects(allBonds, false, 1000).then(resolve);
+            })).then(() => new Promise(resolve => {
+                infoElement.textContent = "Step 4: Forming Kagome lattice...";
+                createKagomeBonds();
+                fadeObjects(kagomeBonds, true, 1000).then(resolve);
+            })).then(() => {
+                infoElement.textContent = "Transformation Complete: Kagome Lattice";
+                setControlsEnabled(true);
+            });
+        }
+
+        function playReconstruction() {
+            if (isAnimating) return;
+            setControlsEnabled(false);
+            
+            // Silently setup the Kagome state
+            resetVisualization();
+            identifyAtomsForRemoval();
+            atomsToRemove.forEach(a => { a.visible = false; });
+            allBonds.forEach(b => { b.visible = false; });
+            createKagomeBonds();
+            infoElement.textContent = "Initial State: Kagome Lattice";
+
+            const animationChain = new Promise(resolve => {
+                setTimeout(resolve, 1500);
+            }).then(() => new Promise(resolve => {
+                infoElement.textContent = "Step 1: Compressing... Kagome bonds break";
+                fadeObjects(kagomeBonds, false, 1000).then(resolve);
+            })).then(() => new Promise(resolve => {
+                infoElement.textContent = "Step 2: Inserting atoms into voids...";
+                atomsToRemove.forEach(atom => {
+                    atom.visible = true;
+                    atom.material.transparent = true;
+                    atom.material.opacity = 0;
+                });
+                fadeObjects(atomsToRemove, true, 1000).then(resolve);
+            })).then(() => new Promise(resolve => {
+                infoElement.textContent = "Step 3: Re-forming Triangular lattice...";
+                allBonds.forEach(b => {
+                     b.material.transparent = true;
+                     b.material.opacity = 0;
+                });
+                fadeObjects(allBonds, true, 1000).then(resolve);
+            })).then(() => {
+                infoElement.textContent = "Compression Complete: Triangular Lattice";
+                setControlsEnabled(true);
+            });
+        }
+        
+        function fadeObjects(objects, fadeIn, duration) {
+            return new Promise(resolve => {
+                const targetOpacity = fadeIn ? 1 : 0;
+                objects.forEach(obj => {
+                    obj.visible = true;
+                    obj.material.transparent = true;
+                    new TWEEN.Tween(obj.material)
+                        .to({ opacity: targetOpacity }, duration)
+                        .easing(TWEEN.Easing.Quadratic.InOut)
+                        .onComplete(() => {
+                            if (!fadeIn) obj.visible = false;
+                            obj.material.transparent = false;
+                        })
+                        .start();
+                });
+                setTimeout(resolve, duration);
+            });
+        }
+
+        // --- Lattice Creation and Manipulation ---
+        function resetVisualization() {
+            TWEEN.removeAll();
+            infoElement.textContent = "Press Play to begin";
+            
+            while(latticeGroup.children.length > 0){ 
+                latticeGroup.remove(latticeGroup.children[0]); 
+            }
+            atomsToRemove = [];
+            allAtoms = [];
+            allBonds = [];
+            kagomeBonds = [];
+            createTriangularLattice(1);
+            setControlsEnabled(true);
+        }
+
+        function createTriangularLattice(numLayers) {
+            const atomRadius = 0.5;
+            const atomGeometry = new THREE.SphereGeometry(atomRadius, 32, 32);
+            
+            const a = 4;
+            const v1 = new THREE.Vector3(a, 0, 0);
+            const v2 = new THREE.Vector3(a * 0.5, a * Math.sqrt(3) / 2, 0);
+            const sizeI = 8, sizeJ = 8;
+
+            for (let j = -sizeJ/2; j < sizeJ/2; j++) {
+                for (let i = -sizeI/2; i < sizeI/2; i++) {
+                    const atomMaterial = new THREE.MeshPhongMaterial({ color: 0x66ccff, shininess: 80 });
+                    const pos = new THREE.Vector3().addScaledVector(v1, i).addScaledVector(v2, j);
+                    
+                    const atom = new THREE.Mesh(atomGeometry, atomMaterial);
+                    atom.position.copy(pos);
+                    atom.userData = { i, j, originalColor: atomMaterial.color.clone() }; 
+                    latticeGroup.add(atom);
+                    allAtoms.push(atom);
+                }
+            }
+            
+            for (let i = 0; i < allAtoms.length; i++) {
+                for (let j = i + 1; j < allAtoms.length; j++) {
+                    if (allAtoms[i].position.distanceTo(allAtoms[j].position) < a * 1.1) {
+                         const bond = createBond(allAtoms[i].position, allAtoms[j].position, 0xaaaaaa);
+                         allBonds.push(bond);
+                         latticeGroup.add(bond);
+                    }
+                }
+            }
+            
+            const box = new THREE.Box3().setFromObject(latticeGroup);
+            const center = box.getCenter(new THREE.Vector3());
+            latticeGroup.position.sub(center);
+        }
+
+        function identifyAtomsForRemoval() {
+            allAtoms.forEach(atom => {
+                const { i, j } = atom.userData;
+                if (i % 2 === 0 && j % 2 === 0) { 
+                    atom.material.color.set(0xff6666);
+                    atomsToRemove.push(atom);
+                }
+            });
+        }
+
+        function createKagomeBonds() {
+            const remainingAtoms = allAtoms.filter(atom => !atomsToRemove.includes(atom));
+            const bondLength = 4;
+
+            for (let i = 0; i < remainingAtoms.length; i++) {
+                for (let j = i + 1; j < remainingAtoms.length; j++) {
+                    if (Math.abs(remainingAtoms[i].position.distanceTo(remainingAtoms[j].position) - bondLength) < 0.1) {
+                         const bond = createBond(remainingAtoms[i].position, remainingAtoms[j].position, 0xffffff);
+                         bond.material.transparent = true;
+                         bond.material.opacity = 0;
+                         kagomeBonds.push(bond);
+                         latticeGroup.add(bond);
+                    }
+                }
+            }
+        }
+        
+        function createBond(p1, p2, color) {
+            const bondMaterial = new THREE.MeshPhongMaterial({ color: color, shininess: 50 });
+            const direction = new THREE.Vector3().subVectors(p2, p1);
+            const bondGeometry = new THREE.CylinderGeometry(0.1, 0.1, direction.length(), 8, 1);
+            const bond = new THREE.Mesh(bondGeometry, bondMaterial);
+            bond.position.copy(p1).add(direction.multiplyScalar(0.5));
+            bond.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.clone().normalize());
+            return bond;
+        }
+
+        // --- Boilerplate ---
+        function onWindowResize() {
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            TWEEN.update(time);
+            orbitControls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
