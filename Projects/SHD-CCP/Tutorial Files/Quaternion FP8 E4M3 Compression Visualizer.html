@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FP8 E4M3 Compression Visualizer</title>
+    <!-- Load Tailwind CSS for styling the UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Add Inter font family
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-cyan': '#00ffff',
+                        'neon-pink': '#ff50c0',
+                        'neon-green': '#39ff14',
+                        'neon-red': '#ff4103',
+                        'neon-blue': '#00aaff',
+                        'neon-purple': '#9f50ff', // Added for consistency
+                        
+                        // Bit colors from geometric-encoder
+                        'col-payload': '#ff4103',
+                        'col-quat-w': '#00aaff',
+                    },
+                    boxShadow: {
+                        'cyan': '0 0 8px #00ffff, 0 0 12px #00ffff',
+                        'pink': '0 0 8px #ff50c0, 0 0 12px #ff50c0',
+                        'green': '0 0 8px #39ff14, 0 0 12px #39ff14',
+                    }
+                },
+            },
+        }
+    </script>
+    
+    <!-- Load three.js (non-module) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at center, #1a2a2a 0%, #000000 70%);
+            color: #e0e0e0;
+        }
+
+        /* Custom slider styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover { opacity: 1; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+
+        /* Bit display styles */
+        .bit-box {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            border-radius: 6px;
+        }
+        .bit {
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 3px;
+            transition: all 0.1s;
+        }
+        .bit-1 {
+            background-color: #00ffff;
+            color: #000;
+            box-shadow: 0 0 6px #00ffff;
+        }
+        .bit-0 {
+            background-color: #374151;
+            color: #9ca3af;
+        }
+        
+        .panel {
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            backdrop-filter: blur(5px);
+        }
+        
+        /* Color-coded bits for quaternion panel */
+        .bit-w .bit-1 { background-color: #00aaff; box-shadow: 0 0 6px #00aaff; }
+        .bit-x .bit-1 { background-color: #ff50c0; box-shadow: 0 0 6px #ff50c0; }
+        .bit-y .bit-1 { background-color: #ff4103; box-shadow: 0 0 6px #ff4103; }
+        .bit-z .bit-1 { background-color: #39ff14; box-shadow: 0 0 6px #39ff14; }
+        
+        /* Color-coded bits for new panels */
+        .bit-quat .bit-1 { background-color: var(--tw-color-col-quat-w); box-shadow: 0 0 6px var(--tw-color-col-quat-w); }
+        .bit-payload .bit-1 { background-color: var(--tw-color-col-payload); box-shadow: 0 0 6px var(--tw-color-col-payload); }
+
+
+        /* Custom select */
+        select {
+            background-color: #1f2937;
+            border: 1px solid #4b5563;
+            color: #e0e0e0;
+        }
+        
+        /* Style for the new 3D canvas */
+        #codex-3d-canvas {
+            width: 100%;
+            height: 100%;
+            min-height: 250px;
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 1px solid #374151;
+            cursor: grab;
+        }
+         #codex-3d-canvas:grabbing {
+            cursor: grabbing;
+         }
+         
+         /* Clickable bits for Step 1 */
+         #codex-step1-bits .bit {
+            cursor: pointer;
+            transition: transform 0.1s ease;
+         }
+         #codex-step1-bits .bit:hover {
+            transform: scale(1.1);
+         }
+         
+         /* Decompression panel styles */
+         .data-readout {
+            font-family: monospace;
+            font-size: 1.125rem; /* text-lg */
+            padding: 0.5rem;
+            background-color: #1f2937;
+            border-radius: 0.375rem;
+            border: 1px solid #374151;
+         }
+    </style>
+</head>
+<body class="min-h-screen p-8">
+
+    <div id="app-container" class="max-w-7xl mx-auto">
+        
+        <h1 class="text-3xl font-bold text-center text-neon-cyan mb-2" style="text-shadow: 0 0 6px #00ffff;">FP8 E4M3 Compression</h1>
+        <h2 class="text-xl font-light text-center text-gray-400 mb-8">Live Float-32 to 8-bit Conversion</h2>
+
+        <!-- Input Slider -->
+        <div class="panel mb-8">
+            <h3 class="text-xl font-semibold text-neon-pink mb-4" style="text-shadow: 0 0 6px #ff50c0;">Input: Float-32</h3>
+            <div class="flex justify-between items-center mb-1">
+                <label for="float-slider" class="text-lg font-medium text-gray-300">Input Float Value</label>
+                <span id="float-value-display" class="text-2xl font-mono text-white">-1.00</span>
+            </div>
+            <input type="range" id="float-slider" min="-1" max="1" value="-1" step="0.005" class="control-slider">
+        </div>
+
+        <!-- Main Animation Panel -->
+        <div class="flex flex-col md:flex-row items-start justify-between gap-6">
+
+            <!-- 1. Float-32 Input Panel -->
+            <div class="panel w-full md:w-5/12">
+                <h3 class="text-xl font-semibold text-neon-pink mb-4" style="text-shadow: 0 0 6px #ff50c0;">Float-32 Bit Layout</h3>
+                
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400">Sign (1 bit)</label>
+                    <div id="f32-sign" class="bit-box"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400">Exponent (8 bits)</label>
+                    <div id="f32-exponent" class="bit-box"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400">Mantissa (23 bits)</label>
+                    <div id="f32-mantissa" class="bit-box"></div>
+                </div>
+            </div>
+
+            <!-- 2. Conversion Arrow -->
+            <div class="w-full md:w-auto flex-shrink-0 text-center py-16">
+                <h3 class="text-xl font-semibold text-neon-cyan mb-4" style="text-shadow: 0 0 6px #00ffff;">Compress</h3>
+                <div class="text-6xl text-neon-cyan opacity-50 transform md:rotate-0 rotate-90">→</div>
+                <div classs="text-sm text-gray-400 font-mono mt-4">
+                    <p>Sign → Copy</p>
+                    <p>Exp → Re-bias</p>
+                    <p>Man → Truncate</p>
+                </div>
+            </div>
+
+            <!-- 3. FP8 Output Panel -->
+            <div class="panel w-full md:w-5/12">
+                <h3 class="text-xl font-semibold text-neon-green mb-4" style="text-shadow: 0 0 6px #39ff14;">Output: FP8 (E4M3)</h3>
+                
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400">Sign (1 bit)</label>
+                    <div id="fp8-sign" class="bit-box"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400">Exponent (4 bits)</label>
+                    <div id="fp8-exponent" class="bit-box"></div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="text-sm font-medium text-gray-400">Mantissa (3 bits)</label>
+                    <div id="fp8-mantissa" class="bit-box"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Final Result -->
+        <div class="panel mt-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="text-center md:text-left">
+                    <h3 class="text-xl font-semibold text-neon-cyan mb-2">Final 8-Bit Packet</h3>
+                    <p class="text-gray-400">Assembled Integer (0-255)</p>
+                    <p id="fp8-int-display" class="text-4xl font-mono text-white">0</p>
+                </div>
+                <div class="w-full md:w-auto mt-4 md:mt-0">
+                    <label class="text-sm font-medium text-gray-400">Final 8-Bit String</label>
+                    <div id="final-fp8-bits" class="bit-box"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Decompression & Scaling Panel (Mode 1) -->
+        <div class="panel mt-8">
+            <h3 class="text-xl font-semibold text-neon-pink mb-4" style="text-shadow: 0 0 6px #ff50c0;">Mode 1 (Form ID 0-2): Default Decompression & Scaling</h3>
+            <p class="text-gray-400 mb-4">The 8-bit packet is decompressed (a lossy conversion). This value is then <strong class="text-neon-pink">multiplied</strong> by the 16-bit Payload Scaler (an FP16 float) to get the final value.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Original Float-32</label>
+                    <pre id="original-float-display" class="data-readout text-gray-400"></pre>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Decompressed Float-32 (Coarse)</label>
+                    <pre id="decompressed-float-display" class="data-readout text-neon-pink"></pre>
+                </div>
+            </div>
+             <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Precision Loss (Difference)</label>
+                <pre id="precision-loss-display" class="data-readout text-neon-red"></pre>
+            </div>
+            
+            <hr class="border-gray-600 my-6">
+            
+            <!-- Payload Scaler (16-bit Int) -->
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="payload-scaler-slider" class="text-lg font-medium text-gray-300">Payload Scaler (16-bit Int)</label>
+                    <span id="payload-scaler-int-value" class="text-2xl font-mono text-white">0</span>
+                </div>
+                <input type="range" id="payload-scaler-slider" min="0" max="65535" value="0" step="1" class="control-slider">
+                <label class="block text-sm font-medium text-gray-400 mt-2 mb-1">...converts to Float-16 Value:</label>
+                <pre id="payload-scaler-float-value" class="data-readout text-neon-red"></pre>
+            </div>
+            
+            <!-- Bit Visuals for Mode 1 -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Quaternion (Coarse Value - 8 bits)</label>
+                <div id="default-mode-quat-bits" class="bit-box bit-quat" style="width: 216px;"></div>
+                
+                <div class="text-center text-neon-red font-bold text-2xl my-2">×</div>
+                
+                <label class="block text-sm font-medium text-gray-400 mb-1">Payload Scaler (FP16 Value - 16 bits)</label>
+                <div id="default-mode-payload-bits" class="bit-box bit-payload" style="width: 436px;"></div>
+            </div>
+            
+            <!-- NEW: Mode 1 Results -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Original Float-32 (Mirrored)</label>
+                    <pre id="mode1-original-float" class="data-readout text-gray-400"></pre>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Final Scaled Value (Decompressed * Scaler)</label>
+                    <pre id="final-scaled-value-display" class="data-readout text-neon-pink text-lg"></pre>
+                </div>
+            </div>
+            <div class="mb-4 mt-4">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Comparison Accuracy</label>
+                <pre id="mode1-accuracy" class="data-readout text-neon-pink text-xl"></pre>
+            </div>
+        </div>
+
+        <!-- NEW: High Precision Mode Panel (Mode 2) -->
+        <div class="panel mt-8">
+            <h3 class="text-xl font-semibold text-neon-cyan mb-4" style="text-shadow: 0 0 6px #00ffff;">Mode 2 (Form ID 3): High Precision Mode</h3>
+            <p class="text-gray-400 mb-4">With <strong class="text-neon-purple">Form ID 3</strong>, the packet is re-wired. The Payload Scaler is now read as a high-precision FP16 *offset* that is <strong class="text-neon-cyan">added</strong> to the decompressed FP8 value to restore precision.</p>
+            
+            <!-- Bit Visuals for Mode 2 -->
+            <div class="mt-6">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Quaternion (Coarse Value - 8 bits)</label>
+                <div id="high-precision-quat-bits" class="bit-box bit-quat" style="width: 216px;"></div>
+                
+                <div class="text-center text-neon-cyan font-bold text-2xl my-2">+</div>
+                
+                <label class="block text-sm font-medium text-gray-400 mb-1">Payload Scaler (Fine Offset - FP16)</label>
+                <div id="high-precision-payload-bits" class="bit-box bit-payload" style="width: 436px;"></div>
+            </div>
+            
+            <!-- NEW: Mode 2 Results -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Original Float-32 (Mirrored)</label>
+                    <pre id="mode2-original-float" class="data-readout text-gray-400"></pre>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Final High Precision Value (Decompressed + Scaler)</label>
+                    <pre id="final-high-precision-value-display" class="data-readout text-neon-cyan text-lg"></pre>
+                </div>
+            </div>
+            <div class="mb-4 mt-4">
+                <label class="block text-sm font-medium text-gray-400 mb-1">Comparison Accuracy</label>
+                <pre id="mode2-accuracy" class="data-readout text-neon-cyan text-xl"></pre>
+            </div>
+        </div>
+
+
+        <!-- Quaternion Packet Compression -->
+        <div class="panel mt-8">
+            <h3 class="text-2xl font-semibold text-neon-cyan mb-6" style="text-shadow: 0 0 6px #00ffff;">Quaternion Packet Compression (4x FP8)</h3>
+            <div class="space-y-4">
+                
+                <!-- Quat W -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div class="flex justify-between items-center">
+                        <label for="quat-w-slider" class="text-lg font-medium text-neon-blue">Quat W</label>
+                        <span id="quat-w-value" class="text-lg font-mono text-white">1.00</span>
+                    </div>
+                    <input type="range" id="quat-w-slider" min="-1" max="1" value="1" step="0.01" class="control-slider md:col-span-1">
+                    <div id="quat-w-bits" class="bit-box bit-w md:col-span-1"></div>
+                </div>
+                
+                <!-- Quat X -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div class="flex justify-between items-center">
+                        <label for="quat-x-slider" class="text-lg font-medium text-neon-pink">Quat X</label>
+                        <span id="quat-x-value" class="text-lg font-mono text-white">0.00</span>
+                    </div>
+                    <input type="range" id="quat-x-slider" min="-1" max="1" value="0" step="0.01" class="control-slider">
+                    <div id="quat-x-bits" class="bit-box bit-x"></div>
+                </div>
+
+                <!-- Quat Y -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div class="flex justify-between items-center">
+                        <label for="quat-y-slider" class="text-lg font-medium text-neon-red">Quat Y</label>
+                        <span id="quat-y-value" class="text-lg font-mono text-white">0.00</span>
+                    </div>
+                    <input type="range" id="quat-y-slider" min="-1" max="1" value="0" step="0.01" class="control-slider">
+                    <div id="quat-y-bits" class="bit-box bit-y"></div>
+                </div>
+
+                <!-- Quat Z -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                    <div class="flex justify-between items-center">
+                        <label for="quat-z-slider" class="text-lg font-medium text-neon-green">Quat Z</label>
+                        <span id="quat-z-value" class="text-lg font-mono text-white">0.00</span>
+                    </div>
+                    <input type="range" id="quat-z-slider" min="-1" max="1" value="0" step="0.01" class="control-slider">
+                    <div id="quat-z-bits" class="bit-box bit-z"></div>
+                </div>
+            </div>
+            
+            <hr class="border-gray-600 my-6">
+            
+            <div>
+                <label class="text-sm font-medium text-gray-400">Final 32-Bit Quaternion Packet (W, X, Y, Z)</label>
+                <div id="final-32bit-packet" class="bit-box"></div>
+            </div>
+        </div>
+        
+        <!-- Codex Data Amplification (Restructured) -->
+        <div class="panel mt-8">
+            <h3 class="text-2xl font-semibold text-neon-cyan mb-4" style="text-shadow: 0 0 6px #00ffff;">Mode 3 (Form ID 4+): Codex Data Amplification</h3>
+            <p class="text-gray-400 mb-4">This panel demonstrates "data amplification." A small 4-bit "codex index" (like the <strong class="text-neon-purple">Form ID</strong>) is used to look up a complete, pre-defined 3D rotation from a 16-entry "codex" (or lookup table). This "amplifies" 4 bits of data into a full 32-bit compressed quaternion packet, which in turn defines a 3D orientation.</p>
+            <p class="text-gray-400 mb-6">This process also works in reverse for compression. A system could take a full-precision quaternion, compare it to all 16 entries in the codex, and find the "closest" match. It would then store <strong class="text-neon-cyan">only the 4-bit index</strong> of that match. This compresses the 32-bit rotation down to just 4 bits, saving 28 bits of space at the cost of perfect precision.</p>
+            
+            <!-- Step 1: Input -->
+            <div class="mb-6">
+                <label for="codex-select" class="block text-sm font-medium text-gray-300 mb-2"><strong class="text-neon-pink">Step 1:</strong> Select Codex Index (4-bit Input)</label>
+                <div class="flex flex-col md:flex-row gap-4 items-center">
+                    <select id="codex-select" class="block w-full md:w-1/2 p-2 rounded-md">
+                        <!-- Options will be generated by JS -->
+                    </select>
+                    <div id="codex-step1-bits" class="bit-box w-full md:w-1/2"></div>
+                </div>
+            </div>
+            
+            <!-- Step 2, 3, 4 -->
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Left Column: Steps 2 & 3 -->
+                <div class="w-full md:w-1/2 space-y-6">
+                    <!-- Step 2: Lookup -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2"><strong class="text-neon-pink">Step 2:</strong> Codex Lookup (Float Values)</label>
+                        <pre id="codex-quat-display" class="w-full bg-gray-900 text-gray-300 p-3 rounded-md text-sm font-mono break-words">W: 1.000, X: 0.000, Y: 0.000, Z: 0.000</pre>
+                    </div>
+                    
+                    <!-- Step 3: Compression -->
+                    <div>
+                        <label class="text-sm font-medium text-gray-400"><strong class="text-neon-pink">Step 3:</strong> FP8 Compression (32-Bit Packet)</label>
+                        <div id="codex-32bit-packet" class="bit-box"></div>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Step 4 -->
+                <div class="w-full md:w-1/2">
+                    <label class="block text-sm font-medium text-gray-300 mb-2"><strong class="text-neon-pink">Step 4:</strong> 3D Orientation (Animated Output)</label>
+                    <div id="codex-3d-canvas"></div>
+                </div>
+            </div>
+            
+            <!-- Step 5 -->
+            <hr class="border-gray-600 my-6">
+            <div>
+                <h4 class="text-xl font-semibold text-neon-pink mb-4">Conceptual Add-on: Parallel Geometric Encoding</h4>
+                <p class="text-gray-400 mb-4">
+                    The 3D orientation from Step 4 can be used for more than just rotation. It can act as a high-speed "pointer" within a geometric data structure.
+                </p>
+                <ul class="list-disc list-inside text-gray-400 space-y-2">
+                    <li>
+                        Imagine the 6 primary orientations (+X, -X, +Y, -Y, +Z, -Z) as pointing to the 6 faces of a cube.
+                    </li>
+                    <li>
+                        In a full SHD-CCP packet, the 4-bit <strong class="text-neon-purple">Form ID</strong> (from the Codex Creator) could select a geometric "codex" (e.g., a Cube, Tetrahedron, or Octahedron).
+                    </li>
+                    <li>
+                        The 32-bit <strong class="text-neon-cyan">Quaternion</strong> would then act as a pointer, selecting a specific face, edge, or vertex on that shape.
+                    </li>
+                    <li>
+                        Each face/vertex could itself store another data index. This creates <strong class="text-white">parallel data streams</strong>: the Form ID selects the *codex type*, and the Quaternion selects the *data entry* within it.
+                    </li>
+                    <li>
+                        This "time compression" allows a single 64-bit packet to encode multiple, related data points simultaneously using parallel geometric lookups.
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+        // --- Globals ---
+        const slider = document.getElementById('float-slider');
+        const floatValueDisplay = document.getElementById('float-value-display');
+        
+        const f32SignEl = document.getElementById('f32-sign');
+        const f32ExpEl = document.getElementById('f32-exponent');
+        const f32ManEl = document.getElementById('f32-mantissa');
+        
+        const fp8SignEl = document.getElementById('fp8-sign');
+        const fp8ExpEl = document.getElementById('fp8-exponent');
+        const fp8ManEl = document.getElementById('fp8-mantissa');
+        
+        const fp8IntDisplay = document.getElementById('fp8-int-display');
+        const finalFp8El = document.getElementById('final-fp8-bits');
+        
+        // --- Decompression Globals ---
+        const payloadScalerSlider = document.getElementById('payload-scaler-slider');
+        const payloadScalerIntValue = document.getElementById('payload-scaler-int-value');
+        const payloadScalerFloatValue = document.getElementById('payload-scaler-float-value');
+        const originalFloatDisplay = document.getElementById('original-float-display');
+        const decompressedFloatDisplay = document.getElementById('decompressed-float-display');
+        const precisionLossDisplay = document.getElementById('precision-loss-display');
+        
+        // --- NEW: Mode 1 Globals ---
+        const mode1OriginalFloat = document.getElementById('mode1-original-float');
+        const finalScaledValueDisplay = document.getElementById('final-scaled-value-display');
+        const mode1Accuracy = document.getElementById('mode1-accuracy');
+        
+        // --- NEW: Mode 2 Globals ---
+        const mode2OriginalFloat = document.getElementById('mode2-original-float');
+        const finalHighPrecisionValueDisplay = document.getElementById('final-high-precision-value-display');
+        const mode2Accuracy = document.getElementById('mode2-accuracy');
+        
+        // --- NEW: High Precision Globals ---
+        const defaultModeQuatBits = document.getElementById('default-mode-quat-bits');
+        const defaultModePayloadBits = document.getElementById('default-mode-payload-bits');
+        const highPrecisionQuatBits = document.getElementById('high-precision-quat-bits');
+        const highPrecisionPayloadBits = document.getElementById('high-precision-payload-bits');
+        
+        let currentFp8Int = 0; // To store the latest 8-bit value
+        
+        // DataViews for bit-level conversion
+        const floatView = new DataView(new ArrayBuffer(4));
+        const intView = new DataView(new ArrayBuffer(4));
+
+        // --- Globals for Quaternion Panel ---
+        const quatWSlider = document.getElementById('quat-w-slider');
+        const quatXSlider = document.getElementById('quat-x-slider');
+        const quatYSlider = document.getElementById('quat-y-slider');
+        const quatZSlider = document.getElementById('quat-z-slider');
+        
+        const quatWValue = document.getElementById('quat-w-value');
+        const quatXValue = document.getElementById('quat-x-value');
+        const quatYValue = document.getElementById('quat-y-value');
+        const quatZValue = document.getElementById('quat-z-value');
+        
+        const quatWBitsEl = document.getElementById('quat-w-bits');
+        const quatXBitsEl = document.getElementById('quat-x-bits');
+        const quatYBitsEl = document.getElementById('quat-y-bits');
+        const quatZBitsEl = document.getElementById('quat-z-bits');
+        const final32BitEl = document.getElementById('final-32bit-packet');
+        
+        // --- Globals for Codex Panel ---
+        const codexSelect = document.getElementById('codex-select');
+        const codexStep1BitsEl = document.getElementById('codex-step1-bits');
+        const codexQuatDisplay = document.getElementById('codex-quat-display');
+        const codex32BitEl = document.getElementById('codex-32bit-packet');
+
+        // --- Globals for new 3D Codex Scene ---
+        let codexScene, codexCamera, codexRenderer, codexObjectGroup;
+        let codexTargetQuat = new THREE.Quaternion();
+        let codexCurrentQuat = new THREE.Quaternion();
+        let codexMouse = { x: 0, y: 0 };
+        let codexTargetRot = { x: 0, y: 0 };
+
+
+        // A 16-entry (4-bit) Lookup Table (LUT) of example quaternions
+        const QUATERNION_LUT = [
+            { w: 1, x: 0, y: 0, z: 0 }, // 0: Identity
+            { w: 0.707, x: 0.707, y: 0, z: 0 }, // 1: 90 deg X
+            { w: 0.707, x: -0.707, y: 0, z: 0 }, // 2: -90 deg X
+            { w: 0, x: 1, y: 0, z: 0 }, // 3: 180 deg X
+            { w: 0.707, x: 0, y: 0.707, z: 0 }, // 4: 90 deg Y
+            { w: 0.707, x: 0, y: -0.707, z: 0 }, // 5: -90 deg Y
+            { w: 0, x: 0, y: 1, z: 0 }, // 6: 180 deg Y
+            { w: 0.707, x: 0, y: 0, z: 0.707 }, // 7: 90 deg Z
+            { w: 0.707, x: 0, y: 0, z: -0.707 }, // 8: -90 deg Z
+            { w: 0, x: 0, y: 0, z: 1 }, // 9: 180 deg Z
+            { w: 0.5, x: 0.5, y: 0.5, z: 0.5 }, // 10: Diagonal 1
+            { w: 0.5, x: -0.5, y: 0.5, z: -0.5 }, // 11: Diagonal 2
+            { w: 0.866, x: 0.5, y: 0, z: 0 }, // 12: 60 deg X
+            { w: 0.866, x: 0, y: 0.5, z: 0 }, // 13: 60 deg Y
+            { w: 0.866, x: 0, y: 0, z: 0.5 }, // 14: 60 deg Z
+            { w: 0, x: 0.707, y: 0.707, z: 0 }, // 15: 180 deg XY
+        ];
+
+
+        /**
+         * Compresses a 32-bit float into an 8-bit E4M3 float (represented as an integer 0-255).
+         */
+        function floatToFp8e4m3(f) {
+            floatView.setFloat32(0, f);
+            const f32Bits = floatView.getUint32(0);
+            const sign = (f32Bits >> 31) & 0x1;
+            let exponent = (f32Bits >> 23) & 0xFF; // f32 exponent (8 bits)
+            let mantissa = f32Bits & 0x7FFFFF; // f32 mantissa (23 bits)
+            
+            // Handle special cases: NaN, Infinity
+            if (exponent === 0xFF) { return sign ? 0x88 : 0x08; } // NaN/Inf -> E4M3 special
+            // Handle zero / denormals
+            if (exponent === 0) { return sign << 7; } // f32 zero -> E4M3 zero
+
+            // Convert f32 exponent bias (127) to E4M3 bias (8)
+            let exp = exponent - 127 + 8;
+
+            // Handle underflow
+            if (exp <= 0) { return sign << 7; } // Underflow to zero
+            // Handle overflow
+            if (exp >= 0x0F) { return (sign << 7) | 0x0F; } // Overflow to max
+
+            // Shift f32 mantissa to 3 bits
+            let man = mantissa >> (23 - 3);
+
+            // Assemble the 8-bit number
+            return (sign << 7) | (exp << 3) | man;
+        }
+        
+        /**
+         * Decompresses an 8-bit E4M3 float (integer 0-255) into a 32-bit float.
+         */
+        function fp8e4m3ToFloat(b) {
+            const sign = (b >> 7) & 0x1;
+            const exponent = (b >> 3) & 0x0F; // E4M3 exponent (4 bits)
+            const mantissa = b & 0x07; // E4M3 mantissa (3 bits)
+
+            // Handle zero
+            if (exponent === 0 && mantissa === 0) { return sign ? -0.0 : 0.0; }
+            
+            // Handle special cases (E4M3 "max" value, 0x0F)
+            // This is a rough approximation for Inf/NaN
+            if (exponent === 0x0F) { return sign ? -Infinity : Infinity; }
+            if (exponent === 0x08 && mantissa !== 0) { return NaN; }
+
+
+            // Convert E4M3 exponent bias (8) to f32 bias (127)
+            let exp = exponent - 8 + 127;
+            
+            // Shift 3-bit mantissa to 23 bits
+            let man = mantissa << (23 - 3);
+
+            // Assemble the 32-bit float
+            const f32Bits = (sign << 31) | (exp << 23) | man;
+            intView.setUint32(0, f32Bits);
+            return intView.getFloat32(0);
+        }
+        
+        /**
+         * NEW: Decompresses a 16-bit FP16 (integer 0-65535) into a 32-bit float.
+         */
+        function fp16ToFloat(b) {
+            const sign = (b >> 15) & 0x1;
+            const exponent = (b >> 10) & 0x1F; // 5 bits
+            const mantissa = b & 0x3FF; // 10 bits
+            
+            // Handle zero
+            if (exponent === 0) {
+                if (mantissa === 0) return sign ? -0.0 : 0.0;
+                // Denormalized
+                return (sign ? -1 : 1) * Math.pow(2, -14) * (mantissa / 1024);
+            }
+            
+            // Handle Inf/NaN
+            if (exponent === 0x1F) {
+                if (mantissa === 0) return sign ? -Infinity : Infinity;
+                return NaN;
+            }
+            
+            // Normalized
+            let exp = exponent - 15 + 127; // Convert bias
+            let man = mantissa << (23 - 10); // Shift 10-bit mantissa to 23 bits
+            
+            const f32Bits = (sign << 31) | (exp << 23) | man;
+            intView.setUint32(0, f32Bits);
+            return intView.getFloat32(0);
+        }
+
+
+        /**
+         * Renders a string of bits into a container as styled divs.
+         */
+        function renderBits(container, bitString, colorClass = '') {
+            container.innerHTML = ''; // Clear old bits
+            
+            // Manage color classes
+            container.classList.remove('bit-w', 'bit-x', 'bit-y', 'bit-z', 'bit-quat', 'bit-payload');
+            let color = 'var(--tw-color-neon-cyan)';
+            let shadow = '0 0 6px var(--tw-color-neon-cyan)';
+            
+            if (colorClass) {
+                container.classList.add(colorClass);
+                if (colorClass === 'bit-quat') {
+                    color = 'var(--tw-color-col-quat-w)';
+                    shadow = `0 0 6px ${color}`;
+                } else if (colorClass === 'bit-payload') {
+                    color = 'var(--tw-color-col-payload)';
+                    shadow = `0 0 6px ${color}`;
+                } else {
+                     // Get color from class e.g. 'bit-w' -> '00aaff'
+                    const c = colorClass.split('-')[1];
+                    if (c === 'w') color = '#00aaff';
+                    if (c === 'x') color = '#ff50c0';
+                    if (c === 'y') color = '#ff4103';
+                    if (c === 'z') color = '#39ff14';
+                    shadow = `0 0 6px ${color}`;
+                }
+            }
+            
+            for (const bit of bitString) {
+                const bitDiv = document.createElement('div');
+                bitDiv.className = 'bit ' + (bit === '1' ? 'bit-1' : 'bit-0');
+                bitDiv.textContent = bit;
+                
+                if (bit === '1') {
+                    bitDiv.style.backgroundColor = color;
+                    bitDiv.style.boxShadow = shadow;
+                }
+                
+                container.appendChild(bitDiv);
+            }
+        }
+
+        /**
+         * The main update function for the top panel.
+         */
+        function updateVisuals() {
+            const f = parseFloat(slider.value);
+            floatValueDisplay.textContent = f.toFixed(3);
+            
+            floatView.setFloat32(0, f);
+            const f32Bits = floatView.getUint32(0);
+            const f32Sign = (f32Bits >> 31) & 0x1;
+            const f32Exp = (f32Bits >> 23) & 0xFF;
+            const f32Man = f32Bits & 0x7FFFFF;
+
+            renderBits(f32SignEl, f32Sign.toString(2));
+            renderBits(f32ExpEl, f32Exp.toString(2).padStart(8, '0'));
+            renderBits(f32ManEl, f32Man.toString(2).padStart(23, '0'));
+
+            const fp8Sign = f32Sign;
+            let fp8Exp = 0;
+            let fp8Man = 0;
+            let fp8Int = 0;
+
+            if (f32Exp === 0xFF) { 
+                fp8Exp = 0x0F;
+                fp8Man = f32Man === 0 ? 0 : 4;
+                if (f32Man !== 0) fp8Exp = 0x08;
+            } 
+            else if (f32Exp === 0) {
+                fp8Exp = 0;
+                fp8Man = 0;
+            } 
+            else {
+                let exp = f32Exp - 127 + 8;
+                if (exp <= 0) {
+                    fp8Exp = 0;
+                    fp8Man = 0;
+                } 
+                else if (exp >= 0x0F) {
+                    fp8Exp = 0x0F;
+                    fp8Man = 0x07;
+                } 
+                else {
+                    fp8Exp = exp;
+                    fp8Man = f32Man >> (23 - 3);
+                }
+            }
+
+            fp8Int = (fp8Sign << 7) | (fp8Exp << 3) | fp8Man;
+            currentFp8Int = fp8Int; // Store for decompression panel
+
+            renderBits(fp8SignEl, fp8Sign.toString(2));
+            renderBits(fp8ExpEl, fp8Exp.toString(2).padStart(4, '0'));
+            renderBits(fp8ManEl, fp8Man.toString(2).padStart(3, '0'));
+            
+            fp8IntDisplay.textContent = fp8Int;
+            renderBits(finalFp8El, fp8Int.toString(2).padStart(8, '0'));
+            
+            // --- NEW: Update Decompression Panel ---
+            updateDecompressionVisuals();
+        }
+        
+        /**
+         * Update function for the Decompression panel.
+         */
+        function updateDecompressionVisuals() {
+            const f_original = parseFloat(slider.value);
+            const f_decompressed = fp8e4m3ToFloat(currentFp8Int);
+            const loss = Math.abs(f_original - f_decompressed);
+            
+            // NEW: Read 16-bit integer and convert to float
+            const scaler_int = parseInt(payloadScalerSlider.value);
+            const scaler_float = fp16ToFloat(scaler_int);
+            
+            const scaledValue = f_decompressed * scaler_float;
+            
+            // NEW: Calculate high precision value
+            const highPrecisionValue = f_decompressed + scaler_float;
+            
+            // --- NEW Accuracy Calculations ---
+            const trueScaledValue = f_original * scaler_float;
+            const trueHighPrecisionValue = f_original + scaler_float;
+            
+            let accuracyMode1 = 100.0;
+            if (trueScaledValue !== 0) {
+                const error = Math.abs(trueScaledValue - scaledValue);
+                accuracyMode1 = (1 - (error / Math.abs(trueScaledValue))) * 100;
+            } else if (scaledValue !== 0) { // True is 0, but actual is not
+                accuracyMode1 = 0;
+            }
+            if (isNaN(accuracyMode1)) accuracyMode1 = 100.0;
+            
+            let accuracyMode2 = 100.0;
+            if (trueHighPrecisionValue !== 0) {
+                const error = Math.abs(trueHighPrecisionValue - highPrecisionValue);
+                accuracyMode2 = (1 - (error / Math.abs(trueHighPrecisionValue))) * 100;
+            } else if (highPrecisionValue !== 0) {
+                accuracyMode2 = 0;
+            }
+            if (isNaN(accuracyMode2)) accuracyMode2 = 100.0;
+            // --- END NEW ---
+            
+            // Update all displays
+            originalFloatDisplay.textContent = f_original.toFixed(8);
+            decompressedFloatDisplay.textContent = f_decompressed.toFixed(8);
+            precisionLossDisplay.textContent = loss.toExponential(4);
+            
+            payloadScalerIntValue.textContent = scaler_int;
+            payloadScalerFloatValue.textContent = `${scaler_float.toExponential(4)} (from 16-bit int)`;
+            
+            // Update Mode 1
+            mode1OriginalFloat.textContent = f_original.toFixed(8); // Mirror
+            finalScaledValueDisplay.textContent = scaledValue.toExponential(6);
+            mode1Accuracy.textContent = `${accuracyMode1.toFixed(6)} %`; // Accuracy
+            
+            // Update Mode 2
+            mode2OriginalFloat.textContent = f_original.toFixed(8); // Mirror
+            finalHighPrecisionValueDisplay.textContent = highPrecisionValue.toExponential(6);
+            mode2Accuracy.textContent = `${accuracyMode2.toFixed(6)} %`; // Accuracy
+            
+            // Update bit displays
+            const quat_bits = currentFp8Int.toString(2).padStart(8, '0');
+            const payload_bits = scaler_int.toString(2).padStart(16, '0');
+            
+            renderBits(defaultModeQuatBits, quat_bits, 'bit-quat');
+            renderBits(defaultModePayloadBits, payload_bits, 'bit-payload');
+            renderBits(highPrecisionQuatBits, quat_bits, 'bit-quat');
+            renderBits(highPrecisionPayloadBits, payload_bits, 'bit-payload');
+        }
+
+        /**
+         * Update function for the Quaternion Packet panel.
+         */
+        function updateQuatPacketVisuals() {
+            const w = parseFloat(quatWSlider.value);
+            const x = parseFloat(quatXSlider.value);
+            const y = parseFloat(quatYSlider.value);
+            const z = parseFloat(quatZSlider.value);
+            
+            quatWValue.textContent = w.toFixed(2);
+            quatXValue.textContent = x.toFixed(2);
+            quatYValue.textContent = y.toFixed(2);
+            quatZValue.textContent = z.toFixed(2);
+
+            const fp8W = floatToFp8e4m3(w);
+            const fp8X = floatToFp8e4m3(x);
+            const fp8Y = floatToFp8e4m3(y);
+            const fp8Z = floatToFp8e4m3(z);
+
+            const bitsW = fp8W.toString(2).padStart(8, '0');
+            const bitsX = fp8X.toString(2).padStart(8, '0');
+            const bitsY = fp8Y.toString(2).padStart(8, '0');
+            const bitsZ = fp8Z.toString(2).padStart(8, '0');
+
+            renderBits(quatWBitsEl, bitsW, 'bit-w');
+            renderBits(quatXBitsEl, bitsX, 'bit-x');
+            renderBits(quatYBitsEl, bitsY, 'bit-y');
+            renderBits(quatZBitsEl, bitsZ, 'bit-z');
+            
+            renderBits(final32BitEl, bitsW + bitsX + bitsY + bitsZ);
+        }
+        
+        /**
+         * Update function for the Codex Amplification panel.
+         */
+        function updateCodexVisuals() {
+            const index = parseInt(codexSelect.value);
+            const quat = QUATERNION_LUT[index];
+            
+            // Step 1: Render 4-bit Index
+            renderBits(codexStep1BitsEl, index.toString(2).padStart(4, '0'), 'bit-w');
+            
+            // Step 2: Display float values
+            codexQuatDisplay.textContent = `W: ${quat.w.toFixed(3)}, X: ${quat.x.toFixed(3)}, Y: ${quat.y.toFixed(3)}, Z: ${quat.z.toFixed(3)}`;
+            
+            // Step 3: Compress and render 32-bit packet
+            const fp8W = floatToFp8e4m3(quat.w);
+            const fp8X = floatToFp8e4m3(quat.x);
+            const fp8Y = floatToFp8e4m3(quat.y);
+            const fp8Z = floatToFp8e4m3(quat.z);
+            
+            const bitsW = fp8W.toString(2).padStart(8, '0');
+            const bitsX = fp8X.toString(2).padStart(8, '0');
+            const bitsY = fp8Y.toString(2).padStart(8, '0');
+            const bitsZ = fp8Z.toString(2).padStart(8, '0');
+            
+            renderBits(codex32BitEl, bitsW + bitsX + bitsY + bitsZ);
+            
+            // Step 4: Set target for 3D animation
+            codexTargetQuat.set(quat.x, quat.y, quat.z, quat.w).normalize();
+        }
+        
+        /**
+         * Initialize the Codex panel
+         */
+        function initCodexPanel() {
+            for (let i = 0; i < 16; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Index ${i} (0b${i.toString(2).padStart(4, '0')}) - ${QUATERNION_LUT[i].w === 1 ? 'Identity' : 'Rotate...'}`;
+                codexSelect.appendChild(option);
+            }
+            // Sync from dropdown to bits
+            codexSelect.addEventListener('input', updateCodexVisuals);
+            
+            // Sync from bits to dropdown
+            codexStep1BitsEl.addEventListener('click', (e) => {
+                if (e.target.classList.contains('bit')) {
+                    // Read the current bits from the DOM
+                    let bits = Array.from(codexStep1BitsEl.querySelectorAll('.bit'))
+                                    .map(bitDiv => bitDiv.textContent)
+                                    .join('');
+                    
+                    // Find which bit was clicked
+                    const allBits = Array.from(codexStep1BitsEl.querySelectorAll('.bit'));
+                    const clickedIndex = allBits.indexOf(e.target);
+                    
+                    if (clickedIndex !== -1) {
+                        // Flip the clicked bit
+                        let bitArray = bits.split('');
+                        bitArray[clickedIndex] = bitArray[clickedIndex] === '1' ? '0' : '1';
+                        const newBitString = bitArray.join('');
+                        
+                        // Parse the new index
+                        const newIndex = parseInt(newBitString, 2);
+                        
+                        // Set the dropdown value
+                        codexSelect.value = newIndex;
+                        
+                        // Trigger a full update
+                        updateCodexVisuals();
+                    }
+                }
+            });
+            
+            updateCodexVisuals(); // Initial call
+        }
+        
+        /**
+         * Initialize the 3D canvas for the Codex panel
+         */
+        function initCodex3D() {
+            const container = document.getElementById('codex-3d-canvas');
+            if (!container) return;
+            
+            // Scene
+            codexScene = new THREE.Scene();
+            
+            // Camera
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            codexCamera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
+            codexCamera.position.z = 3.5;
+            
+            // Renderer
+            codexRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            codexRenderer.setSize(w, h);
+            codexRenderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(codexRenderer.domElement);
+            
+            // --- Object Group (NEW) ---
+            codexObjectGroup = new THREE.Group();
+            codexScene.add(codexObjectGroup);
+            
+            // Axes
+            const axes = new THREE.AxesHelper(1.2); // Red=X, Green=Y, Blue=Z
+            codexObjectGroup.add(axes);
+            
+            // Sphere
+            const sphereGeom = new THREE.SphereGeometry(0.8, 16, 12);
+            const sphereMat = new THREE.MeshBasicMaterial({ 
+                color: 0x00ffff, 
+                wireframe: true, 
+                transparent: true, 
+                opacity: 0.3 
+            });
+            const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+            codexObjectGroup.add(sphere);
+            
+            // Vector/Spin Indicator
+            const arrowDir = new THREE.Vector3(0, 0, 1.2); // Point "forward" along Z
+            const arrowOrigin = new THREE.Vector3(0, 0, 0);
+            const arrowLength = 1.5;
+            const arrowColor = 0x00ffff;
+            const spinArrow = new THREE.ArrowHelper(arrowDir.normalize(), arrowOrigin, arrowLength, arrowColor, 0.2, 0.1);
+            codexObjectGroup.add(spinArrow);
+            // --- End Object Group ---
+            
+            // Lights
+            const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+            codexScene.add(ambient);
+            
+            // Grid
+            const grid = new THREE.GridHelper(2, 4, 0x888888, 0x444444);
+            // grid.rotation.x = Math.PI / 2; // Keep grid on XZ plane
+            codexScene.add(grid);
+
+            // Mouse controls
+            let isDragging = false;
+            container.addEventListener('mousedown', () => { isDragging = true; container.classList.add('grabbing'); });
+            window.addEventListener('mouseup', () => { isDragging = false; container.classList.remove('grabbing'); });
+            container.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                codexTargetRot.y += e.movementX * 0.01;
+                codexTargetRot.x += e.movementY * 0.01;
+            });
+        }
+        
+        /**
+         * Main animation loop
+         */
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Animate the Codex 3D View
+            if (codexRenderer) {
+                // Slerp (smoothly interpolate) the object's rotation
+                codexCurrentQuat.slerp(codexTargetQuat, 0.05);
+                
+                // Apply manual mouse rotation on top of the slerped rotation
+                const euler = new THREE.Euler(codexTargetRot.x, codexTargetRot.y, 0, 'YXZ');
+                const dragQuat = new THREE.Quaternion().setFromEuler(euler);
+                
+                codexObjectGroup.quaternion.copy(dragQuat).multiply(codexCurrentQuat);
+                
+                codexRenderer.render(codexScene, codexCamera);
+            }
+        }
+        
+        /**
+         * Handle window resizing
+         */
+        function onWindowResize() {
+            if (codexRenderer) {
+                const container = document.getElementById('codex-3d-canvas');
+                if (container) {
+                    const w = container.clientWidth;
+                    const h = container.clientHeight;
+                    codexCamera.aspect = w / h;
+                    codexCamera.updateProjectionMatrix();
+                    codexRenderer.setSize(w, h);
+                }
+            }
+        }
+        window.addEventListener('resize', onWindowResize);
+
+
+        // --- Event Listeners ---
+        slider.addEventListener('input', updateVisuals);
+        
+        // --- Event listener for decompression panel ---
+        payloadScalerSlider.addEventListener('input', updateDecompressionVisuals);
+        
+        // --- Event Listeners for new panels ---
+        quatWSlider.addEventListener('input', updateQuatPacketVisuals);
+        quatXSlider.addEventListener('input', updateQuatPacketVisuals);
+        quatYSlider.addEventListener('input', updateQuatPacketVisuals);
+        quatZSlider.addEventListener('input', updateQuatPacketVisuals);
+        
+        // Initial call to populate all UIs
+        updateVisuals();
+        updateQuatPacketVisuals();
+        initCodexPanel();
+        initCodex3D();
+        animate(); // Start the animation loop
+
+    </script>
+</body>
+</html>
