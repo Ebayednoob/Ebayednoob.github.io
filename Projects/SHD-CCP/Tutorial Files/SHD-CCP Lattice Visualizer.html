@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHD-CCP Lattice Visualizer</title>
+    <!-- Load Tailwind CSS for styling the UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Add Inter font family
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
+    <!-- Load three.js libraries (non-module versions) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(ellipse at center, #1a2a2a 0%, #000000 70%);
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #scene-container {
+            position: fixed;
+            top: 0;
+            left: 25%;
+            width: 75%;
+            height: 100%;
+            z-index: 0;
+            cursor: pointer;
+        }
+        #scene-container.grabbing {
+            cursor: grabbing;
+        }
+
+        #side-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 25%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            z-index: 20;
+            padding: 1.5rem;
+            overflow-y: auto;
+            color: #f0f0f0;
+        }
+        
+        /* Panel for selected packet controls, to be disabled */
+        #packet-controller {
+            transition: opacity 0.3s;
+        }
+        #packet-controller:disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        #packet-controller:disabled input {
+            cursor: not-allowed;
+        }
+
+
+        /* Custom slider styles */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #374151;
+            border-radius: 4px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover { opacity: 1; }
+        input[type="range"]:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        input[type="range"]:disabled::-webkit-slider-thumb {
+            cursor: not-allowed;
+            background: #9ca3af; /* gray-400 */
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #00ffff;
+            border-radius: 50%;
+            border: 2px solid #000;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00ffff;
+        }
+
+        /* Custom checkbox */
+        .toggle-checkbox {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background-color: #374151;
+            border-radius: 9999px;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+            appearance: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out;
+        }
+        .toggle-checkbox::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background-color: white;
+            border-radius: 9999px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s ease-in-out;
+        }
+        .toggle-checkbox:checked {
+            background-color: #00ffff;
+            box-shadow: 0 0 8px #00ffff;
+        }
+        .toggle-checkbox:checked::before {
+            transform: translateX(16px);
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            color: #00ffff;
+        }
+    </style>
+</head>
+<body class="bg-black">
+
+    <!-- Side Panel for Lattice Controls -->
+    <div id="side-panel">
+        <!-- === LATTICE CONTROLS === -->
+        <fieldset id="lattice-controller">
+            <h1 class="text-2xl font-bold text-cyan-300 mb-2" style="text-shadow: 0 0 6px #00ffff;">SHD-CCP Lattice</h1>
+            <h2 class="text-lg font-light text-gray-400 mb-6">Lattice Controller</h2>
+
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="lattice-dim" class="text-sm font-medium text-gray-300">Lattice Size (NxNxN)</label>
+                    <span id="lattice-dim-value" class="text-sm text-gray-400">3</span>
+                </div>
+                <input type="range" id="lattice-dim" min="2" max="6" value="3" step="1" class="control-slider">
+            </div>
+
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="lattice-spacing" class="text-sm font-medium text-gray-300">Packet Spacing</label>
+                    <span id="lattice-spacing-value" class="text-sm text-gray-400">3.0</span>
+                </div>
+                <input type="range" id="lattice-spacing" min="1" max="5" value="3" step="0.1" class="control-slider">
+            </div>
+
+            <h3 class="text-lg font-semibold text-gray-400 mt-6 mb-2">Animation</h3>
+            <div class="mb-4">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="animate-packets" class="toggle-checkbox" checked>
+                    <span class="ml-3 text-sm font-medium text-gray-300 toggle-label">Animate Packets</span>
+                </label>
+            </div>
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="anim-speed" class="text-sm font-medium text-gray-300">Animation Speed</label>
+                    <span id="anim-speed-value" class="text-sm text-gray-400">0.5</span>
+                </div>
+                <input type="range" id="anim-speed" min="0.1" max="2.0" value="0.5" step="0.1" class="control-slider">
+            </div>
+        </fieldset>
+
+        <!-- === SELECTED PACKET CONTROLS === -->
+        <fieldset id="packet-controller" class="mt-6 border-t-2 border-cyan-500 pt-4" disabled>
+            <h1 class="text-2xl font-bold text-cyan-300 mb-2" style="text-shadow: 0 0 6px #00ffff;">Selected Packet</h1>
+            <h2 class="text-lg font-light text-gray-400 mb-6">64-Bit Voxel Controller</h2>
+
+            <!-- Hex Display -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Packet 64-Bit (Hex)</label>
+                <pre id="hex-display" class="w-full bg-gray-900 text-cyan-300 p-3 rounded-md text-sm font-mono break-words" style="box-shadow: 0 0 8px #00ffff inset;">N/A</pre>
+            </div>
+
+            <!-- Payload Scaler [63-48] -->
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="payload" class="flex items-center text-sm font-medium text-red-400">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #ff4103"></span>
+                        Payload Scaler (16 bits)
+                    </label>
+                    <span id="payload-value" class="text-sm text-gray-400">0</span>
+                </div>
+                <input type="range" id="payload" min="0" max="65535" value="0" class="control-slider packet-control">
+            </div>
+
+            <!-- Dynamics [47-40] -->
+            <h3 class="text-lg font-semibold text-green-400 mt-6 mb-2">Dynamics [47-40]</h3>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="freq" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #39ff14"></span>
+                        Freq ID (5 bits)
+                    </label>
+                    <span id="freq-value" class="text-sm text-gray-400">0</span>
+                </div>
+                <input type="range" id="freq" min="0" max="31" value="0" class="control-slider packet-control">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="spin" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #90ff80"></span>
+                        Spin ID (3 bits)
+                    </label>
+                    <span id="spin-value" class="text-sm text-gray-400">0</span>
+                </div>
+                <input type="range" id="spin" min="0" max="7" value="0" class="control-slider packet-control">
+            </div>
+
+            <!-- State & ID [39-32] -->
+            <h3 class="text-lg font-semibold text-purple-400 mt-6 mb-2">State & ID [39-32]</h3>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="form" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #9f50ff"></span>
+                        Form ID (4 bits)
+                    </label>
+                    <span id="form-value" class="text-sm text-gray-400">0</span>
+                </div>
+                <input type="range" id="form" min="0" max="15" value="0" class="control-slider packet-control">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="amp" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #ff50c0"></span>
+                        Amp ID (3 bits)
+                    </label>
+                    <span id="amp-value" class="text-sm text-gray-400">0</span>
+                </div>
+                <input type="range" id="amp" min="0" max="7" value="0" class="control-slider packet-control">
+            </div>
+            <div class="mb-4">
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="parity" class="toggle-checkbox packet-control">
+                    <span class="ml-3 text-sm font-medium text-gray-300 toggle-label flex items-center">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #ff50c0"></span>
+                        Parity Bit (1 bit)
+                    </span>
+                </label>
+            </div>
+
+            <!-- Quaternion [31-0] -->
+            <h3 class="text-lg font-semibold text-cyan-400 mt-6 mb-2">Quaternion [31-0] (FP8 x4)</h3>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="quat-w" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #00aaff"></span>
+                        Quat W
+                    </label>
+                    <span id="quat-w-value" class="text-sm text-gray-400">1.00</span>
+                </div>
+                <input type="range" id="quat-w" min="-1" max="1" value="1" step="0.01" class="control-slider packet-control">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="quat-x" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #ff50c0"></span>
+                        Quat X
+                    </label>
+                    <span id="quat-x-value" class="text-sm text-gray-400">0.00</span>
+                </div>
+                <input type="range" id="quat-x" min="-1" max="1" value="0" step="0.01" class="control-slider packet-control">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="quat-y" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #ff4103"></span>
+                        Quat Y
+                    </label>
+                    <span id="quat-y-value" class="text-sm text-gray-400">0.00</span>
+                </div>
+                <input type="range" id="quat-y" min="-1" max="1" value="0" step="0.01" class="control-slider packet-control">
+            </div>
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-1">
+                    <label for="quat-z" class="flex items-center text-sm font-medium text-gray-300">
+                        <span class="inline-block w-3 h-3 rounded-sm mr-2" style="background-color: #39ff14"></span>
+                        Quat Z
+                    </label>
+                    <span id="quat-z-value" class="text-sm text-gray-400">0.00</span>
+                </div>
+                <input type="range" id="quat-z" min="-1" max="1" value="0" step="0.01" class="control-slider packet-control">
+            </div>
+        </fieldset>
+
+    </div>
+
+    <!-- This div will hold the 3D canvas -->
+    <div id="scene-container"></div>
+
+    <script>
+        // --- FP8 (E4M3) Helper Functions ---
+        const floatView = new DataView(new ArrayBuffer(4));
+        const intView = new DataView(new ArrayBuffer(4));
+
+        function floatToFp8e4m3(f) {
+            floatView.setFloat32(0, f);
+            const f32Bits = floatView.getUint32(0);
+            const sign = (f32Bits >> 31) & 0x1;
+            let exponent = (f32Bits >> 23) & 0xFF;
+            let mantissa = f32Bits & 0x7FFFFF;
+            if (exponent === 0xFF) { return sign ? 0x88 : 0x08; }
+            if (exponent === 0) { return sign << 7; }
+            let exp = exponent - 127 + 8;
+            if (exp <= 0) { return sign << 7; }
+            if (exp >= 0x0F) { return (sign << 7) | 0x0F; }
+            let man = mantissa >> (23 - 3);
+            return (sign << 7) | (exp << 3) | man;
+        }
+
+        function fp8e4m3ToFloat(b) {
+            const sign = (b >> 7) & 0x1;
+            const exponent = (b >> 3) & 0x0F;
+            const mantissa = b & 0x07;
+            if (exponent === 0) { return sign ? -0.0 : 0.0; }
+            if (exponent === 0x0F) { return sign ? -3.84e+2 : 3.84e+2; }
+            let exp = exponent - 8 + 127;
+            let man = mantissa << (23 - 3);
+            const f32Bits = (sign << 31) | (exp << 23) | man;
+            intView.setUint32(0, f32Bits);
+            return intView.getFloat32(0);
+        }
+        // --- END FP8 Helpers ---
+
+
+        // --- Globals ---
+        let scene, camera, renderer, controls, clock;
+        let mainGroup; // A group to hold the whole lattice
+        let packetLattice = []; // Array to store all packet groups
+        let selectablePackets = []; // Array to store outer wireframes for raycasting
+        let raycaster, mouse;
+        let selectedPacket = null;
+        let selectionHighlight;
+        
+        // --- Materials for each block ---
+        let qZMat, qYMat, qXMat, qWMat;
+        let payloadMat, freqMat, spinMat, formMat, ampMat;
+        let outerWireMat; // For the outer wireframe of each packet
+        
+        // --- Constants for a SINGLE packet ---
+        const CUBE_SIZE = 0.1;
+        const SPACING = 0.02;
+        const STEP = CUBE_SIZE + SPACING;
+        const INNER_LATTICE_SIZE = 4;
+        const OFFSET = (INNER_LATTICE_SIZE - 1) * STEP / 2;
+        const TOTAL_SIZE = INNER_LATTICE_SIZE * CUBE_SIZE + (INNER_LATTICE_SIZE - 1) * SPACING + (SPACING * 2);
+
+        const OPACITY_ON = 0.8;
+        const OPACITY_OFF = 0.15;
+
+
+        /**
+         * Initialize the entire 3D scene
+         */
+        function init() {
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Camera
+            const w = window.innerWidth * 0.75;
+            const h = window.innerHeight;
+            camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1000);
+            camera.position.z = 15;
+            camera.position.y = 10;
+
+            // WebGL Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            const sceneContainer = document.getElementById('scene-container');
+            sceneContainer.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.addEventListener('start', () => sceneContainer.classList.add('grabbing'));
+            controls.addEventListener('end', () => sceneContainer.classList.remove('grabbing'));
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            // A main group to hold the lattice
+            mainGroup = new THREE.Group();
+            scene.add(mainGroup);
+
+            // Create selection highlight box
+            const highlightGeom = new THREE.BoxGeometry(TOTAL_SIZE + 0.1, TOTAL_SIZE + 0.1, TOTAL_SIZE + 0.1);
+            const highlightMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true });
+            selectionHighlight = new THREE.Mesh(highlightGeom, highlightMat);
+            selectionHighlight.visible = false;
+            scene.add(selectionHighlight);
+
+            createMaterials();
+            setupLatticeControls();
+            setupPacketControls();
+            rebuildLattice();
+            
+            window.addEventListener('resize', onWindowResize);
+            sceneContainer.addEventListener('pointerdown', onPointerDown);
+            animate();
+        }
+
+        /**
+         * Create reusable materials
+         */
+        function createMaterials() {
+             // --- Quaternion FP8 materials (Solid) ---
+             qZMat = new THREE.MeshBasicMaterial({ color: 0x39ff14, transparent: true, opacity: OPACITY_ON });
+             qYMat = new THREE.MeshBasicMaterial({ color: 0xff4103, transparent: true, opacity: OPACITY_ON });
+             qXMat = new THREE.MeshBasicMaterial({ color: 0xff50c0, transparent: true, opacity: OPACITY_ON });
+             qWMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: OPACITY_ON });
+            
+            // --- Other Solid materials ---
+            payloadMat = new THREE.MeshBasicMaterial({ color: 0xff4103, transparent: true, opacity: OPACITY_ON });
+            freqMat = new THREE.MeshBasicMaterial({ color: 0x39ff14, transparent: true, opacity: OPACITY_ON });
+            spinMat = new THREE.MeshBasicMaterial({ color: 0x90ff80, transparent: true, opacity: OPACITY_ON });
+            formMat = new THREE.MeshBasicMaterial({ color: 0x9f50ff, transparent: true, opacity: OPACITY_ON });
+            ampMat = new THREE.MeshBasicMaterial({ color: 0xff50c0, transparent: true, opacity: OPACITY_ON });
+            
+            // --- Outer Wireframe Material ---
+            outerWireMat = new THREE.LineBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0.3,
+                linewidth: 2
+            });
+        }
+
+        /**
+         * Maps a 3D lattice coordinate to a 64-bit index
+         */
+        function getBitIndex(x, y, z) {
+            if (z < 2) {
+                return (z * 16) + (y * 4) + x; // 0-31
+            } else if (z === 2) {
+                return 48 + (y * 4) + x; // 48-63
+            } else { // z === 3
+                return 32 + (y * 4) + x; // 32-47
+            }
+        }
+
+        /**
+         * Clears and rebuilds the entire lattice based on slider values
+         */
+        function rebuildLattice() {
+            // Read values from sliders
+            const latticeDim = parseInt(document.getElementById('lattice-dim').value);
+            const latticeSpacing = parseFloat(document.getElementById('lattice-spacing').value);
+
+            // Clear old lattice
+            mainGroup.clear();
+            packetLattice = [];
+            selectablePackets = [];
+            deselectPacket();
+            
+            const latticeOffset = (latticeDim - 1) * latticeSpacing / 2;
+
+            for (let x = 0; x < latticeDim; x++) {
+                for (let y = 0; y < latticeDim; y++) {
+                    for (let z = 0; z < latticeDim; z++) {
+                        const packet = createPacket();
+                        
+                        const posX = x * latticeSpacing - latticeOffset;
+                        const posY = y * latticeSpacing - latticeOffset;
+                        const posZ = z * latticeSpacing - latticeOffset;
+                        packet.position.set(posX, posY, posZ);
+                        
+                        // Store unique animation speeds in userData
+                        packet.userData.animRot = new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5
+                        );
+
+                        mainGroup.add(packet);
+                        packetLattice.push(packet);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Creates a single 64-voxel SHD-CCP packet as a THREE.Group
+         */
+        function createPacket() {
+            const packetGroup = new THREE.Group();
+            
+            // Store all 64 cubes for this packet
+            packetGroup.userData.bitCubes = new Array(64);
+            
+            // Store this packet's data
+            packetGroup.userData.packetData = {
+                payload: 0,
+                freq: 0,
+                spin: 0,
+                form: 0,
+                amp: 0,
+                parity: false,
+                quatW: 1.0,
+                quatX: 0.0,
+                quatY: 0.0,
+                quatZ: 0.0
+            };
+            
+            // Reusable geometries
+            const cubeGeom = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
+            const outerGeom = new THREE.BoxGeometry(TOTAL_SIZE, TOTAL_SIZE, TOTAL_SIZE);
+            const outerEdgeGeom = new THREE.EdgesGeometry(outerGeom);
+            
+            // Outer wireframe for the packet (for selection)
+            const outerWireframe = new THREE.LineSegments(outerEdgeGeom, outerWireMat);
+            outerWireframe.userData.parentPacket = packetGroup; // Link for raycasting
+            packetGroup.add(outerWireframe);
+            selectablePackets.push(outerWireframe);
+
+            // Create the 4x4x4 (64) voxels
+            for (let z = 0; z < INNER_LATTICE_SIZE; z++) {
+                for (let y = 0; y < INNER_LATTICE_SIZE; y++) {
+                    for (let x = 0; x < INNER_LATTICE_SIZE; x++) {
+                        
+                        let mat;
+                        const bitIndex = getBitIndex(x, y, z);
+
+                        if (bitIndex < 32) {
+                            if (bitIndex <= 7) { mat = qZMat; }
+                            else if (bitIndex <= 15) { mat = qYMat; }
+                            else if (bitIndex <= 23) { mat = qXMat; }
+                            else { mat = qWMat; }
+                        } else if (bitIndex >= 48) {
+                            mat = payloadMat;
+                        } else { 
+                            if (bitIndex === 32 || (bitIndex >= 33 && bitIndex <= 35)) { mat = ampMat; }
+                            else if (bitIndex >= 36 && bitIndex <= 39) { mat = formMat; }
+                            else if (bitIndex >= 40 && bitIndex <= 42) { mat = spinMat; }
+                            else { mat = freqMat; }
+                        }
+                        
+                        const cube = new THREE.Mesh(cubeGeom, mat.clone());
+                        cube.position.set(
+                            x * STEP - OFFSET,
+                            y * STEP - OFFSET,
+                            z * STEP - OFFSET
+                        );
+                        packetGroup.add(cube);
+                        packetGroup.userData.bitCubes[bitIndex] = cube;
+                    }
+                }
+            }
+            
+            // Add the orientation arrow
+            const arrowOrigin = new THREE.Vector3(0, TOTAL_SIZE / 2, 0);
+            const arrowDir = new THREE.Vector3(0, 1, 0);
+            const arrowLength = TOTAL_SIZE * 2;
+            const arrowColor = 0x00ffff;
+            const arrowHelper = new THREE.ArrowHelper(arrowDir, arrowOrigin, arrowLength, arrowColor, 0.4, 0.2);
+            packetGroup.add(arrowHelper);
+            packetGroup.userData.arrowHelper = arrowHelper;
+            
+            // Set initial visual state from data
+            updatePacketVisuals(packetGroup);
+            
+            return packetGroup;
+        }
+
+        /**
+         * Set up event listeners for side panel LATTICE controls
+         */
+        function setupLatticeControls() {
+            const dimSlider = document.getElementById('lattice-dim');
+            const spacingSlider = document.getElementById('lattice-spacing');
+            
+            dimSlider.addEventListener('input', () => {
+                document.getElementById('lattice-dim-value').textContent = dimSlider.value;
+            });
+            dimSlider.addEventListener('change', rebuildLattice); 
+
+            spacingSlider.addEventListener('input', () => {
+                document.getElementById('lattice-spacing-value').textContent = parseFloat(spacingSlider.value).toFixed(1);
+            });
+            spacingSlider.addEventListener('change', rebuildLattice);
+            
+            document.getElementById('anim-speed').addEventListener('input', (e) => {
+                document.getElementById('anim-speed-value').textContent = parseFloat(e.target.value).toFixed(1);
+            });
+        }
+        
+        /**
+         * Set up event listeners for side panel PACKET controls
+         */
+        function setupPacketControls() {
+            document.querySelectorAll('.packet-control').forEach(element => {
+                element.addEventListener('input', updateDataFromControls);
+            });
+        }
+        
+        /**
+         * Event handler for clicking to select a packet
+         */
+        function onPointerDown(event) {
+            // Calculate mouse position in normalized device coordinates
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            // Check for intersects with selectable packets
+            const intersects = raycaster.intersectObjects(selectablePackets);
+
+            if (intersects.length > 0) {
+                // Find the parent packet group from the intersected wireframe
+                const packet = intersects[0].object.userData.parentPacket;
+                if (packet !== selectedPacket) {
+                    selectPacket(packet);
+                }
+            } else {
+                // Clicked in empty space
+                if (selectedPacket) {
+                    deselectPacket();
+                }
+            }
+        }
+        
+        /**
+         * Select a packet: highlight it and load its data
+         */
+        function selectPacket(packet) {
+            selectedPacket = packet;
+            
+            // Move highlight box
+            selectionHighlight.position.copy(packet.position);
+            selectionHighlight.visible = true;
+            
+            // Load data into controls
+            loadPacketDataToControls(packet);
+            
+            // Enable controller
+            document.getElementById('packet-controller').disabled = false;
+        }
+        
+        /**
+         * Deselect a packet: hide highlight and disable controls
+         */
+        function deselectPacket() {
+            selectedPacket = null;
+            selectionHighlight.visible = false;
+            
+            // Disable controller
+            document.getElementById('packet-controller').disabled = true;
+            document.getElementById('hex-display').textContent = 'N/A';
+        }
+        
+        /**
+         * Read data from a packet and update the side panel controls
+         */
+        function loadPacketDataToControls(packet) {
+            const data = packet.userData.packetData;
+            
+            document.getElementById('payload').value = data.payload;
+            document.getElementById('freq').value = data.freq;
+            document.getElementById('spin').value = data.spin;
+            document.getElementById('form').value = data.form;
+            document.getElementById('amp').value = data.amp;
+            document.getElementById('parity').checked = data.parity;
+            document.getElementById('quat-w').value = data.quatW;
+            document.getElementById('quat-x').value = data.quatX;
+            document.getElementById('quat-y').value = data.quatY;
+            document.getElementById('quat-z').value = data.quatZ;
+            
+            // Update value labels
+            document.getElementById('payload-value').textContent = data.payload;
+            document.getElementById('freq-value').textContent = data.freq;
+            document.getElementById('spin-value').textContent = data.spin;
+            document.getElementById('form-value').textContent = data.form;
+            document.getElementById('amp-value').textContent = data.amp;
+            document.getElementById('quat-w-value').textContent = data.quatW.toFixed(2);
+            document.getElementById('quat-x-value').textContent = data.quatX.toFixed(2);
+            document.getElementById('quat-y-value').textContent = data.quatY.toFixed(2);
+            document.getElementById('quat-z-value').textContent = data.quatZ.toFixed(2);
+            
+            updateHexDisplay(data);
+        }
+        
+        /**
+         * Read data from controls and update the selected packet's data
+         */
+        function updateDataFromControls() {
+            if (!selectedPacket) return;
+            
+            const data = selectedPacket.userData.packetData;
+            
+            // Read values from sliders and checkbox
+            data.payload = parseInt(document.getElementById('payload').value);
+            data.freq = parseInt(document.getElementById('freq').value);
+            data.spin = parseInt(document.getElementById('spin').value);
+            data.form = parseInt(document.getElementById('form').value);
+            data.amp = parseInt(document.getElementById('amp').value);
+            data.parity = document.getElementById('parity').checked;
+            data.quatW = parseFloat(document.getElementById('quat-w').value);
+            data.quatX = parseFloat(document.getElementById('quat-x').value);
+            data.quatY = parseFloat(document.getElementById('quat-y').value);
+            data.quatZ = parseFloat(document.getElementById('quat-z').value);
+
+            // Update value labels
+            document.getElementById('payload-value').textContent = data.payload;
+            document.getElementById('freq-value').textContent = data.freq;
+            document.getElementById('spin-value').textContent = data.spin;
+            document.getElementById('form-value').textContent = data.form;
+            document.getElementById('amp-value').textContent = data.amp;
+            document.getElementById('quat-w-value').textContent = data.quatW.toFixed(2);
+            document.getElementById('quat-x-value').textContent = data.quatX.toFixed(2);
+            document.getElementById('quat-y-value').textContent = data.quatY.toFixed(2);
+            document.getElementById('quat-z-value').textContent = data.quatZ.toFixed(2);
+            
+            // Update the packet's visuals
+            updatePacketVisuals(selectedPacket);
+            updateHexDisplay(data);
+        }
+        
+        /**
+         * Update the opacity and rotation of a single packet based on its data
+         */
+        function updatePacketVisuals(packet) {
+            const data = packet.userData.packetData;
+            
+            // --- Update Rotation ---
+            const visualQuaternion = new THREE.Quaternion(data.quatX, data.quatY, data.quatZ, data.quatW);
+            visualQuaternion.normalize();
+            packet.setRotationFromQuaternion(visualQuaternion);
+            
+            // --- Compress Floats to FP8 (0-255) ---
+            const qW_fp8 = floatToFp8e4m3(data.quatW);
+            const qX_fp8 = floatToFp8e4m3(data.quatX);
+            const qY_fp8 = floatToFp8e4m3(data.quatY);
+            const qZ_fp8 = floatToFp8e4m3(data.quatZ);
+
+            // --- Convert 8-bit ints to 8-bit binary strings ---
+            const qZBits = qZ_fp8.toString(2).padStart(8, '0').split('').reverse().join(''); // [7-0]
+            const qYBits = qY_fp8.toString(2).padStart(8, '0').split('').reverse().join(''); // [15-8]
+            const qXBits = qX_fp8.toString(2).padStart(8, '0').split('').reverse().join(''); // [23-16]
+            const qWBits = qW_fp8.toString(2).padStart(8, '0').split('').reverse().join(''); // [31-24]
+            
+            // Convert other values to binary strings
+            const parityBit = data.parity ? '1' : '0'; // [32]
+            const ampBits = data.amp.toString(2).padStart(3, '0').split('').reverse().join(''); // [35-33]
+            const formBits = data.form.toString(2).padStart(4, '0').split('').reverse().join(''); // [39-36]
+            const spinBits = data.spin.toString(2).padStart(3, '0').split('').reverse().join(''); // [42-40]
+            const freqBits = data.freq.toString(2).padStart(5, '0').split('').reverse().join(''); // [47-43]
+            const payloadBits = data.payload.toString(2).padStart(16, '0').split('').reverse().join(''); // [63-48]
+
+            // --- Assemble the full 64-bit string (LSB-first, 0 -> 63) ---
+            const full64BitString = 
+                qZBits + qYBits + qXBits + qWBits +
+                parityBit + ampBits + formBits + spinBits + freqBits +
+                payloadBits;
+
+            // --- Update Cube Opacity ---
+            const bitCubes = packet.userData.bitCubes;
+            if (bitCubes && full64BitString.length === 64) {
+                for (let i = 0; i < 64; i++) {
+                    const cube = bitCubes[i];
+                    const bit = full64BitString[i];
+                    if (cube) {
+                        cube.material.opacity = (bit === '1') ? OPACITY_ON : OPACITY_OFF;
+                    }
+                }
+            }
+        }
+        
+        /**
+         * Update the hex display in the side panel based on packetData
+         */
+        function updateHexDisplay(packetData) {
+            // Re-assemble MSB-first string for hex conversion
+            const payloadBits = packetData.payload.toString(2).padStart(16, '0');
+            const freqBits = packetData.freq.toString(2).padStart(5, '0');
+            const spinBits = packetData.spin.toString(2).padStart(3, '0');
+            const formBits = packetData.form.toString(2).padStart(4, '0');
+            const ampBits = packetData.amp.toString(2).padStart(3, '0');
+            const parityBit = packetData.parity ? '1' : '0';
+            
+            const qWBits = floatToFp8e4m3(packetData.quatW).toString(2).padStart(8, '0');
+            const qXBits = floatToFp8e4m3(packetData.quatX).toString(2).padStart(8, '0');
+            const qYBits = floatToFp8e4m3(packetData.quatY).toString(2).padStart(8, '0');
+            const qZBits = floatToFp8e4m3(packetData.quatZ).toString(2).padStart(8, '0');
+            
+            const msbFirstString = 
+                payloadBits + freqBits + spinBits + formBits + ampBits + parityBit +
+                qWBits + qXBits + qYBits + qZBits;
+            
+            try {
+                const bigIntValue = BigInt('0b' + msbFirstString);
+                const hexString = bigIntValue.toString(16).padStart(16, '0').toUpperCase();
+                const formattedHex = hexString.match(/.{1,4}/g).join(' ');
+                document.getElementById('hex-display').textContent = formattedHex;
+            } catch (e) {
+                document.getElementById('hex-display').textContent = "Error";
+            }
+        }
+
+        /**
+         * Handle window resize
+         */
+        function onWindowResize() {
+            const w = window.innerWidth * 0.75;
+            const h = window.innerHeight;
+            
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+
+        /**
+         * The main animation loop
+         */
+        function animate() {
+            requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+
+            // Animate all packets in the lattice if toggled
+            if (document.getElementById('animate-packets').checked) {
+                const speed = parseFloat(document.getElementById('anim-speed').value);
+                
+                packetLattice.forEach(packet => {
+                    // Don't auto-animate the selected packet
+                    if (packet !== selectedPacket) {
+                        const animRot = packet.userData.animRot;
+                        packet.rotation.x += animRot.x * speed * deltaTime;
+                        packet.rotation.y += animRot.y * speed * deltaTime;
+                        packet.rotation.z += animRot.z * speed * deltaTime;
+                    }
+                });
+            }
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Start the application
+        init();
+
+    </script>
+</body>
+</html>
