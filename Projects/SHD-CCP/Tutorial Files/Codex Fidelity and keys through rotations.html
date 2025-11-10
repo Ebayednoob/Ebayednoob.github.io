@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comprehensive Compression Tutorial</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- three.js Import Map -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.138.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.138.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        /* --- Base Styles --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111;
+            color: #eee;
+            /* Allow scrolling for the whole page */
+            overflow-y: auto; 
+            height: auto;
+            margin: 0;
+            display: flex;
+            flex-direction: column; /* Stack tutorial on top of app */
+            align-items: center; /* Center content */
+        }
+
+        /* --- Tutorial Pane (Top) --- */
+        #tutorial-pane {
+            width: 100%;
+            max-width: 900px;
+            height: auto; /* Auto height */
+            padding: 2rem;
+            background-color: #18181b; /* zinc-900 */
+            border-radius: 0.5rem; /* 8px */
+            border: 1px solid #3f3f46; /* zinc-700 */
+            text-align: center;
+            margin: 2rem;
+        }
+        
+        /* Styles from codex_fidelity.html, scoped to #tutorial-pane */
+        #tutorial-pane .concept-text {
+            font-size: 1rem;
+            color: #d1d5db;
+            max-width: 700px;
+            margin: 0 auto 2rem auto;
+            line-height: 1.6;
+            border-left: 3px solid #f59e0b;
+            padding-left: 1rem;
+            text-align: left;
+            font-style: italic;
+        }
+        #tutorial-pane .control-group { margin: 2rem 0; }
+        #tutorial-pane .control-group label {
+            display: block;
+            font-size: 1rem;
+            color: #a1a1aa;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        }
+        #tutorial-pane .control-group input[type="range"] {
+            width: 80%;
+            max-width: 400px;
+        }
+        #tutorial-pane #viz-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+        #tutorial-pane .viz-box {
+            background-color: #27272a;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border: 1px solid #3f3f46;
+        }
+        #tutorial-pane .viz-box h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 1rem;
+        }
+        #tutorial-pane svg {
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            background-color: #18181b;
+            border-radius: 0.25rem;
+        }
+        #tutorial-pane .explanation-text {
+            font-size: 1.25rem;
+            color: #a5f3fc;
+            margin: 0 auto;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+        #tutorial-pane .explanation-text span {
+            color: #fde68a;
+            font-weight: 600;
+        }
+        #tutorial-pane .divider {
+            height: 1px;
+            background-color: #3f3f46;
+            margin: 3rem 0;
+        }
+        #tutorial-pane #amplification-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+            align-items: center;
+        }
+        #tutorial-pane .packet-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+            margin: 2rem 0;
+            align-items: start;
+        }
+        #tutorial-pane .calc-box {
+            background-color: #27272a;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border: 1px solid #3f3f46;
+            text-align: left;
+            height: 100%;
+        }
+        #tutorial-pane .calc-box h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #52525b;
+            padding-bottom: 0.5rem;
+        }
+        #tutorial-pane .calc-box p {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            color: #d1d5db;
+            margin-bottom: 0.75rem;
+            line-height: 1.6;
+        }
+        #tutorial-pane .calc-box span {
+            color: #fde68a;
+            font-weight: 600;
+        }
+        #tutorial-pane .calc-box .final-result {
+            font-size: 1.25rem;
+            color: #a5f3fc;
+            font-weight: 600;
+        }
+        #tutorial-pane .calc-box code {
+            color: #f59e0b;
+            font-weight: 600;
+            background-color: #18181b;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.25rem;
+        }
+        #tutorial-pane .calc-box .example {
+            font-family: 'Inter', sans-serif;
+            font-style: italic;
+            color: #a1a1aa;
+            font-size: 0.875rem;
+            border-left: 2px solid #52525b;
+            padding-left: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        #tutorial-pane .animation-box {
+            height: 100px;
+            background-color: #18181b;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+            border: 1px solid #3f3f46;
+        }
+        #tutorial-pane .animation-box svg {
+            width: 100%;
+            height: 100%;
+            aspect-ratio: auto;
+        }
+        
+        /* --- App Pane (Bottom) --- */
+        #app-pane {
+            width: 100%;
+            max-width: 900px;
+            height: 80vh; /* Fixed viewport height */
+            min-height: 700px;
+            margin: 0 2rem 2rem 2rem; /* Margin bottom */
+            border: 1px solid #3f3f46; /* zinc-700 */
+            border-radius: 0.5rem;
+            overflow: hidden; /* Hide overflow */
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Styles from toroidal_encoding_3d.html, scoped to #app-pane */
+        #app-pane #app-main-container {
+            display: flex;
+            flex-direction: row; /* Sim and its controls */
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #app-pane #app-canvas-container {
+            flex-grow: 1;
+            height: 100%;
+            background-color: #18181b; /* zinc-900 */
+            position: relative;
+            overflow: hidden;
+        }
+        #app-pane canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #app-pane #app-controls-panel {
+            width: 300px;
+            flex-shrink: 0;
+            background-color: #27272a; /* zinc-800 */
+            border-left: 1px solid #3f3f46; /* zinc-700 */
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow-y: auto; /* Allow controls to scroll */
+        }
+        #app-pane #app-info-box {
+            padding: 1rem;
+            border-bottom: 1px solid #3f3f46;
+        }
+        #app-pane #app-step-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+        #app-pane #app-step-description {
+            font-size: 0.875rem;
+            color: #d1d5db;
+        }
+        #app-pane details {
+            border-bottom: 1px solid #3f3f46;
+        }
+        #app-pane details summary {
+            padding: 1rem;
+            font-weight: 600;
+            color: #f59e0b;
+            cursor: pointer;
+            list-style: none;
+        }
+        #app-pane details summary::-webkit-details-marker { display: none; }
+        #app-pane details summary:before { content: '► '; font-size: 0.8em; }
+        #app-pane details[open] summary:before { content: '▼ '; }
+        #app-pane .panel-content {
+            padding: 0 1rem 1rem 1rem;
+            background-color: #18181b;
+        }
+        #app-pane .control-group { margin-bottom: 1rem; }
+        #app-pane .control-group label {
+            display: block;
+            font-size: 0.875rem;
+            color: #a1a1aa;
+            margin-bottom: 0.5rem;
+        }
+        #app-pane .control-group input[type="range"] { width: 100%; }
+        #app-pane .control-group input[type="checkbox"] { margin-right: 0.5rem; }
+        #app-pane .time-controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        #app-pane .radio-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            color: #a1a1aa;
+        }
+        #app-pane .action-button {
+            width: 100%;
+            background-color: #4f46e5;
+            color: white;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        #app-pane .action-button:hover { background-color: #4338ca; }
+        #app-pane .secondary-button { background-color: #4b5563; }
+        #app-pane .secondary-button:hover { background-color: #374151; }
+        #app-pane #app-play-pause-button.paused { background-color: #16a34a; }
+        #app-pane #app-play-pause-button.paused:hover { background-color: #15803d; }
+        #app-pane #app-data-inputs-container {
+            overflow-y: auto;
+            padding: 1rem;
+            flex-grow: 1;
+            height: 100px;
+            max-height: 50%;
+        }
+        #app-pane #app-data-inputs-container h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f59e0b;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #52525b;
+            padding-bottom: 0.5rem;
+        }
+        #app-pane .node-input-group {
+            background-color: #3f3f46;
+            border-radius: 0.375rem;
+            padding: 0.75rem 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #52525b;
+        }
+        #app-pane .node-input-group label {
+            font-size: 0.875rem;
+            color: #f59e0b;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        #app-pane .component-input {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.25rem;
+        }
+        #app-pane .component-input label {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #a1a1aa;
+            margin-bottom: 0;
+        }
+        #app-pane .component-input input {
+            width: 100px;
+            background-color: #18181b;
+            color: #eee;
+            border: 1px solid #52525b;
+            border-radius: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            text-align: right;
+            -moz-appearance: textfield;
+        }
+        #app-pane .input-group input::-webkit-outer-spin-button,
+        #app-pane .input-group input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        #app-pane #app-quaternion-output-container {
+            flex-grow: 0;
+            flex-shrink: 0;
+            padding: 1rem;
+            border-top: 1px solid #3f3f46;
+        }
+        #app-pane #app-quaternion-output-container h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #22d3ee;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid #52525b;
+            padding-bottom: 0.5rem;
+        }
+        #app-pane #app-quaternion-output-container p {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+            color: #d1d5db;
+            line-height: 1.6;
+        }
+        #app-pane #app-quaternion-output-container span {
+            font-weight: 600;
+            color: white;
+            min-width: 50px;
+            display: inline-block;
+            text-align: right;
+            margin-right: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        #app-pane .q-w { background-color: rgba(255, 255, 255, 0.2); }
+        #app-pane .q-x { background-color: rgba(239, 68, 68, 0.3); }
+        #app-pane .q-y { background-color: rgba(34, 197, 94, 0.3); }
+        #app-pane .q-z { background-color: rgba(59, 130, 246, 0.3); }
+        
+        /* Responsive layout for mobile */
+        @media (max-width: 900px) {
+            #tutorial-pane #amplification-container {
+                grid-template-columns: 1fr; /* Force stack on mobile */
+            }
+            #tutorial-pane #viz-container {
+                grid-template-columns: 1fr; /* Force stack on mobile */
+            }
+            #app-pane #app-main-container {
+                flex-direction: column; /* Stack controls below canvas */
+            }
+            #app-pane #app-controls-panel {
+                width: 100%;
+                height: 400px; /* Fixed height for controls */
+                flex-shrink: 0;
+                border-left: none;
+                border-top: 1px solid #3f3f46;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- --- Tutorial Pane (Top) --- -->
+    <div id="tutorial-pane">
+        <!-- This is the content from codex_fidelity.html -->
+        <h1 class="text-3xl font-bold text-white mb-6">Fidelity & Codex Size</h1>
+
+        <p class="concept-text">
+            "Each Quadrant represents either the 12 node, 6 node, 3 node or 1 node compression amplitude at that point in the compression cycle. The higher the rotations per cycle, the more accurate a curve trace we will get. This really helps amplify accuracy when projecting or 'decompressing' back out from a central quaternion with compressed neural symbolic data and codex. The higher the precision per rotation per cycle you can get, the codex size available grows exponentially."
+        </p>
+
+        <div class="control-group">
+            <label for="tutorial-phase-freq-slider">
+                Phase Rotations / Quadrant (R): <span id="tutorial-phase-freq-label" class="font-bold text-white text-lg">1</span>
+            </label>
+            <input type="range" id="tutorial-phase-freq-slider" min="1" max="24" step="1" value="1">
+        </div>
+
+        <div id="viz-container">
+            <div class="viz-box">
+                <h3>Low Fidelity (1 Rotation/Quadrant)</h3>
+                <svg id="tutorial-svg-low-fi"></svg>
+            </div>
+            <div class="viz-box">
+                <h3>Interactive Fidelity</h3>
+                <svg id="tutorial-svg-high-fi"></svg>
+            </div>
+        </div>
+
+        <p class="explanation-text">
+            The complex wave (right) can store <span>exponentially more data</span> (a larger "codex") than the simple wave (left).
+        </p>
+        
+        <div class="divider"></div>
+        <h2 class="text-2xl font-bold text-white mb-6">The Amplification Mechanism</h2>
+        
+        <div id="amplification-container">
+            <div class="viz-box">
+                <h3>Codex Matrix Projection</h3>
+                <svg id="tutorial-svg-codex"></svg>
+            </div>
+            <div class="calc-box">
+                <h3>Geometric Codex Size</h3>
+                <p>Base Codex Entry (S):<br><span>2^24</span> (or 256³)</p>
+                
+                <p>Rotations per Quadrant (R):<br><span id="tutorial-calc-r">1</span></p>
+                
+                <p>Total Rotations (4 * R):<br><span id="tutorial-calc-total-r">4</span></p>
+                
+                <p>Formula:<br><span>C = S ^ (4 * R)</span></p>
+                
+                <p class="final-result">Geometric Codex Size:<br><span>2^<span id="tutorial-calc-bits">96</span></span></p>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+        <h2 class="text-2xl font-bold text-white mb-6">The Full 64-bit Packet</h2>
+        
+        <p class="text-gray-300 text-left mb-6">
+            The calculation above only describes the <strong>Geometric Codex</strong>, which is derived from the <code>Quaternion (FP8 x4)</code> (bits 0-31) and the <code>Freq ID</code> (which sets 'R'). The *other 32 bits* of the packet define the *context* and add <strong>three new layers of amplification</strong>.
+        </p>
+
+        <div class="packet-container">
+            <div class="calc-box">
+                <h3>1. State & ID (8 bits)</h3>
+                <p><code>[39-36] Form ID (4)</code><br><code>[35-33] Amp ID (3)</code><br><code>[32]    Parity (1)</code></p>
+                <p>These 8 bits (<code>2⁸ = 256</code> possibilities) act as a <strong>Master Logic Switch</strong>. They select *which* codex the quaternion is pointing to, effectively multiplying the total data space by 256.</p>
+                <p class="example">
+                    <strong>AI Context Example:</strong> The <code>Form ID</code> selects an implied logic system.<br>
+                    - <code>0001</code>: 'This token is *causal* (A → B)'.<br>
+                    - <code>0010</code>: 'This token is *comparative* (A vs B)'.<br>
+                    The <code>Amp ID</code> could then select a sub-rule, like 'A *causes* B' vs. 'A *prevents* B'.
+                </p>
+                <p class="final-result">Amplification: <span>x 256</span></p>
+                <div id="tutorial-viz-state" class="animation-box"></div>
+            </div>
+
+            <div class="calc-box">
+                <h3>2. Dynamics (8 bits)</h3>
+                <p><code>[47-43] Freq ID (5)</code><br><code>[42-40] Spin ID (3)</code></p>
+                <p>These 8 bits define the *physics and relationships* of the packet.</p>
+                <p><code>Freq ID (R)</code> (<code>2⁵ = 32</code>): <span><span id="tutorial-freq-id-label">1</span></span><br>
+                This sets the <strong>Phase Rotations</strong>, creating exponential growth (<code>2^96R</code>). It can also act as a <strong>Synchronization Key</strong>.</p>
+                <p class="example">
+                    <strong>AI Context Example:</strong> All token packets with <code>Freq ID = 10101</code> are "synchronized" and belong to the same conceptual group (e.g., 'topic_finance'), allowing an AI to process their shared 4D dynamics.
+                </p>
+                <p><code>Spin ID</code> (<code>2³ = 8</code>) defines the <strong>Harmonics</strong> (the wave shape). This selects a <strong>Parallel Codex</strong>. The same geometric pointer can have 8 different meanings (e.g., linguistic, mathematical, emotional).</p>
+                <p class="example">
+                    <strong>AI Context Example:</strong> A quaternion points to a location.
+                    - <code>Spin ID: 001</code>: Use the 'Linguistic' codex. (Result: 'King').
+                    - <code>Spin ID: 010</code>: Use the 'Spatial' codex. (Result: 'Chessboard Square e4').
+                </p>
+                <div id="tutorial-viz-spin" class="animation-box"></div>
+            </div>
+
+            <div class="calc-box">
+                <h3>3. Payload Scaler (16 bits)</h3>
+                <p><code>[63-48] Scaler (FP16)</code></p>
+                <p>This 16-bit float (<code>2¹⁶ = 65,536</code> levels) is the final <strong>High-Precision Modifier</strong>. It provides a massive amplification layer for precision or context.</p>
+                <p class="example">
+                    <strong>AI Context Example 1 (Precision):</strong> If the quaternion+spin points to the token 'run', the <code>Scaler</code> defines its *intensity* on a high-fidelity scale:
+                    (0.1 = 'walk', 0.5 = 'jog', 1.0 = 'sprint').
+                </p>
+                 <p class="example">
+                    <strong>AI Context Example 2 (Amplifier):</strong> The quaternion selects *which* 256-matrix to use. The <code>Scaler</code> then provides the high-precision address *within* that matrix, massively amplifying the "usable bits" of the geometric trace.
+                </p>
+                <p class="final-result">Amplification: <span>x 65,536</span></p>
+                <div id="tutorial-viz-scaler" class="animation-box"></div>
+            </div>
+        </div>
+
+        <p class="explanation-text mt-4">
+            The <strong>Total Codex</strong> is a combination of all three: <br><span>(State Selector) x (Geometric Size) x (Payload Scaler)</span>
+        </p>
+
+    </div>
+    
+    <!-- --- App Pane (Bottom) --- -->
+    <div id="app-pane">
+        <!-- This is the container from toroidal_encoding_3d.html -->
+        <div id="app-main-container">
+            <!-- Canvas Graph Container -->
+            <div id="app-canvas-container"></div>
+    
+            <!-- Controls Panel -->
+            <div id="app-controls-panel">
+                <!-- Info Box -->
+                <div id="app-info-box">
+                    <h1 id="app-step-title">3D Quaternion Compression</h1>
+                    <p id="app-step-description">
+                        Sequential 12-node quaternion compression. Each node's (w,x,y,z) data drives the wave.
+                    </p>
+                </div>
+                
+                <!-- Randomize Button -->
+                <div id="app-button-container" class="p-4 border-b border-zinc-700">
+                    <button id="app-random-button" class="action-button">Randomize & Auto-Scale Nodes</button>
+                </div>
+                
+                <!-- Time Controls Panel -->
+                <details id="app-time-controls-panel">
+                    <summary>Time Controls</summary>
+                    <div class="panel-content">
+                        <div class="time-controls-grid">
+                            <button id="app-play-pause-button" class="action-button">Pause</button>
+                            <button id="app-reset-time-button" class="action-button secondary-button">Reset Time</button>
+                        </div>
+                        <div class="control-group radio-group">
+                            <label>Step Mode:</label>
+                            <label><input type="radio" name="app-step-mode" value="frame" checked> Frame</label>
+                            <label><input type="radio" name="app-step-mode" value="quadrant"> Quadrant</label>
+                            <label><input type="radio" name="app-step-mode" value="node"> Node</label>
+                        </div>
+                        <div class="control-group">
+                            <button id="app-next-step-button" class="action-button secondary-button" disabled>Next Step</button>
+                        </div>
+                    </div>
+                </details>
+                
+                <!-- Particle Controls Panel -->
+                <details id="app-particle-controls-panel">
+                    <summary>Wave & Particle Controls</summary>
+                    <div class="panel-content">
+                        <div class="control-group">
+                            <label for="app-trail-lifespan-slider">Helix Trail / Particle Lifespan: <span id="app-trail-duration-label">1.0</span>s</label>
+                            <input type="range" id="app-trail-lifespan-slider" min="0.5" max="2.0" step="0.1" value="1.0">
+                        </div>
+                        <div class="control-group">
+                            <label>
+                                <input type="checkbox" id="app-particle-size-fade-toggle">
+                                Maintain Particle Size (No Fade)
+                            </label>
+                        </div>
+                        <div class="control-group">
+                            <label for="app-phase-freq-slider">Phase Rotations / Quadrant: <span id="app-phase-freq-label">8</span></label>
+                            <input type="range" id="app-phase-freq-slider" min="1" max="24" step="1" value="8">
+                        </div>
+                    </div>
+                </details>
+    
+                <!-- Data Inputs -->
+                <div id="app-data-inputs-container">
+                    <h3>L12 Node Quaternions</h3>
+                    <div id="app-inputs-list">
+                        <!-- Inputs will be generated here -->
+                    </div>
+                </div>
+    
+                <!-- Quaternion Output -->
+                <div id="app-quaternion-output-container">
+                    <h3>Final Quaternion (Q_f)</h3>
+                    <p>Q_f = Q_1 * Q_2 * ... * Q_12</p>
+                    <div id="app-quaternion-display">
+                        <!-- Quaternion values will be generated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 
+    ========================================
+    --- SCRIPT 1: 3D SIMULATION (three.js) ---
+    ========================================
+    -->
+    <script type="module" id="script-app">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- DOM Elements (scoped to #app-pane) ---
+        const container = document.getElementById('app-canvas-container');
+        const inputsList = document.getElementById('app-inputs-list');
+        const quaternionDisplay = document.getElementById('app-quaternion-display');
+        const randomButton = document.getElementById('app-random-button');
+        const playPauseButton = document.getElementById('app-play-pause-button');
+        const resetTimeButton = document.getElementById('app-reset-time-button');
+        const nextStepButton = document.getElementById('app-next-step-button');
+        const trailLifespanSlider = document.getElementById('app-trail-lifespan-slider');
+        const trailDurationLabel = document.getElementById('app-trail-duration-label');
+        const sizeFadeToggle = document.getElementById('app-particle-size-fade-toggle');
+        const phaseFreqSlider = document.getElementById('app-phase-freq-slider');
+        const phaseFreqLabel = document.getElementById('app-phase-freq-label');
+        
+        // --- 3D Scene ---
+        let scene, camera, renderer, controls;
+        let allObjects = {}; 
+        let allGroups = {}; 
+
+        // --- Animation & State ---
+        const animationDuration = 2000;
+        const totalNodes = 12;
+        const totalEpochTime = animationDuration * totalNodes;
+        
+        let isPaused = false;
+        let globalTime = 0;
+        let lastTimestamp = 0;
+        let stepMode = 'frame';
+        
+        // --- Node Data Store ---
+        let nodeDataStore = {};
+
+        // --- Materials ---
+        const matDefault = new THREE.LineBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.3 });
+        const matPath = new THREE.LineBasicMaterial({ color: 0xfcd34d, transparent: true, opacity: 0.9, linewidth: 2 });
+        const nodeMatDefault = new THREE.MeshBasicMaterial({ color: 0x777777, transparent: true, opacity: 0.8 });
+        const nodeMatPath = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+        const qColors = [
+            new THREE.Color(0xf59e0b), new THREE.Color(0x22d3ee), new THREE.Color(0x22c55e), new THREE.Color(0xeeeeee)
+        ];
+        const nodeGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+
+        // --- Wave Packet (Trefoil Knot) ---
+        const waveGeom = new THREE.TorusKnotGeometry(0.4, 0.1, 100, 16, 2, 3);
+        const waveMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const wavePacket = new THREE.Mesh(waveGeom, waveMat);
+
+        // --- Phase Wave ---
+        const phaseWaveGeom = new THREE.RingGeometry(0.5, 0.6, 32);
+        const phaseWaveMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+        const phaseWave = new THREE.Mesh(phaseWaveGeom, phaseWaveMat);
+
+        let toroidPathCurve;
+        const torusSegments = 288; // 72 per quadrant
+        
+        // --- Persistent Helix Trail ---
+        let helixTrail, helixGeom;
+        const helixPoints = new Float32Array((torusSegments + 1) * 3);
+        const helixColors = new Float32Array((torusSegments + 1) * 3);
+
+        // --- Hyperbolic Particle Tracer ---
+        let particleSystem, particleGeom;
+        const particleCount = 500;
+        const particleAttributes = {
+            positions: new Float32Array(particleCount * 3),
+            colors: new Float32Array(particleCount * 3),
+            alphas: new Float32Array(particleCount),
+            velocities: new Float32Array(particleCount * 3),
+            ages: new Float32Array(particleCount),
+            sizes: new Float32Array(particleCount)
+        };
+        let trailAndParticleLifespan = 1.0;
+        let particleSizeFade = true;
+        const particleSpread = 1.5;
+        const particleBaseSpeed = 3.0;
+        let phaseFrequency = 8;
+
+        // --- Node Graph Definitions (3D) ---
+        const s_v = 10, s_l6 = 10, s_l3 = 3, s_l7 = 0;
+        const nodesData = [
+            { id: 'L12_0', label: '1', pos: new THREE.Vector3( s_v,  s_v,  0), group: 'layer12' },
+            { id: 'L12_1', label: '2', pos: new THREE.Vector3( s_v, -s_v,  0), group: 'layer12' },
+            { id: 'L12_2', label: '3', pos: new THREE.Vector3(-s_v,  s_v,  0), group: 'layer12' },
+            { id: 'L12_3', label: '4', pos: new THREE.Vector3(-s_v, -s_v,  0), group: 'layer12' },
+            { id: 'L12_4', label: '5', pos: new THREE.Vector3( s_v,  0,  s_v), group: 'layer12' },
+            { id: 'L12_5', label: '6', pos: new THREE.Vector3( s_v,  0, -s_v), group: 'layer12' },
+            { id: 'L12_6', label: '7', pos: new THREE.Vector3(-s_v,  0,  s_v), group: 'layer12' },
+            { id: 'L12_7', label: '8', pos: new THREE.Vector3(-s_v,  0, -s_v), group: 'layer12' },
+            { id: 'L12_8', label: '9', pos: new THREE.Vector3( 0,  s_v,  s_v), group: 'layer12' },
+            { id: 'L12_9', label: '10', pos: new THREE.Vector3( 0,  s_v, -s_v), group: 'layer12' },
+            { id: 'L12_10', label: '11', pos: new THREE.Vector3( 0, -s_v,  s_v), group: 'layer12' },
+            { id: 'L12_11', label: '12', pos: new THREE.Vector3( 0, -s_v, -s_v), group: 'layer12' },
+            { id: 'L6_px', label: '+X', pos: new THREE.Vector3( s_l6,  0,  0), group: 'layer6' },
+            { id: 'L6_nx', label: '-X', pos: new THREE.Vector3(-s_l6,  0,  0), group: 'layer6' },
+            { id: 'L6_py', label: '+Y', pos: new THREE.Vector3(  0,  s_l6, 0), group: 'layer6' },
+            { id: 'L6_ny', label: '-Y', pos: new THREE.Vector3(  0, -s_l6, 0), group: 'layer6' },
+            { id: 'L6_pz', label: '+Z', pos: new THREE.Vector3(  0,  0,  s_l6), group: 'layer6' },
+            { id: 'L6_nz', label: '-Z', pos: new THREE.Vector3(  0,  0, -s_l6), group: 'layer6' },
+            { id: 'L7_c', label: 'C', pos: new THREE.Vector3(s_l7, s_l7, s_l7), group: 'layer7' },
+            { id: 'L3_x', label: 'I_X', pos: new THREE.Vector3( s_l3, 0, 0), group: 'layer3' },
+            { id: 'L3_y', label: 'I_Y', pos: new THREE.Vector3( 0,  s_l3, 0), group: 'layer3' },
+            { id: 'L3_z', label: 'I_Z', pos: new THREE.Vector3( 0, 0,  s_l3), group: 'layer3' },
+        ];
+        
+        const pathMap = {
+            0: { l6: 'L6_px', l3: 'L3_x' }, 1: { l6: 'L6_py', l3: 'L3_y' },
+            2: { l6: 'L6_pz', l3: 'L3_z' }, 3: { l6: 'L6_nx', l3: 'L3_x' },
+            4: { l6: 'L6_ny', l3: 'L3_y' }, 5: { l6: 'L6_nz', l3: 'L3_z' },
+            6: { l6: 'L6_px', l3: 'L3_x' }, 7: { l6: 'L6_py', l3: 'L3_y' },
+            8: { l6: 'L6_pz', l3: 'L3_z' }, 9: { l6: 'L6_nx', l3: 'L3_x' },
+            10: { l6: 'L6_ny', l3: 'L3_y' }, 11: { l6: 'L6_nz', l3: 'L3_z' },
+        };
+        
+        const l6Ids = ['L6_px', 'L6_py', 'L6_pz', 'L6_nx', 'L6_ny', 'L6_nz'];
+        const l3Ids = ['L3_x', 'L3_y', 'L3_z'];
+        const edgesData = [
+            ...Array(12).fill(0).map((_, i) => ({ from: `L12_${i}`, to: pathMap[i].l6, group: 'edges12_6' })),
+            ...Array(6).fill(0).map((_, i) => ({ from: l6Ids[i], to: l3Ids[i % 3], group: 'edges6_3' })),
+            ...Array(3).fill(0).map((_, i) => ({ from: l3Ids[i], to: 'L7_c', group: 'edges3_1' })),
+        ];
+
+        // --- Quaternion Logic ---
+        class Quaternion {
+            constructor(w = 1, x = 0, y = 0, z = 0) { this.w = w; this.x = x; this.y = y; this.z = z; }
+            multiply(q) {
+                return new Quaternion(
+                    this.w * q.w - this.x * q.x - this.y * q.y - this.z * q.z,
+                    this.w * q.x + this.x * q.w + this.y * q.z - this.z * q.y,
+                    this.w * q.y - this.x * q.z + this.y * q.w + this.z * q.x,
+                    this.w * q.z + this.x * q.y - this.y * q.x + this.z * q.w
+                );
+            }
+            normalize() {
+                const mag = Math.sqrt(this.w*this.w + this.x*this.x + this.y*this.y + this.z*this.z);
+                if (mag === 0 || isNaN(mag) || mag < 1e-9) { 
+                    this.w = 1; this.x = 0; this.y = 0; this.z = 0;
+                } else {
+                    this.w /= mag; this.x /= mag; this.y /= mag; this.z /= mag;
+                }
+                return this;
+            }
+        }
+
+        let finalQuaternion = new Quaternion(1, 0, 0, 0); 
+        let currentCycleNode = -1;
+        
+        function initializeNodeData() {
+            for (let i = 0; i < 12; i++) {
+                nodeDataStore[`L12_${i}`] = (i === 0) ? new Quaternion(0.707, 0.707, 0, 0) : new Quaternion(1, 0, 0, 0);
+            }
+            createNodeInputs();
+            createQuaternionDisplay();
+            updateQuaternionDisplay(finalQuaternion);
+        }
+
+        function createNodeInputs() {
+            inputsList.innerHTML = '';
+            for (let i = 0; i < 12; i++) {
+                const nodeId = `L12_${i}`;
+                const nodeQuat = nodeDataStore[nodeId];
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'node-input-group';
+                const nodeLabel = document.createElement('label');
+                nodeLabel.textContent = `Node ${i + 1}`;
+                groupDiv.appendChild(nodeLabel);
+                ['w', 'x', 'y', 'z'].forEach(comp => {
+                    const compDiv = document.createElement('div');
+                    compDiv.className = 'component-input';
+                    const compLabel = document.createElement('label');
+                    compLabel.setAttribute('for', `app-input-${nodeId}-${comp}`);
+                    compLabel.textContent = `${comp}:`;
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `app-input-${nodeId}-${comp}`;
+                    input.value = nodeQuat[comp].toFixed(3);
+                    input.step = 0.1;
+                    input.addEventListener('input', (e) => {
+                        let value = parseFloat(e.target.value);
+                        if (isNaN(value)) value = 0;
+                        nodeDataStore[nodeId][comp] = value;
+                    });
+                    compDiv.appendChild(compLabel);
+                    compDiv.appendChild(input);
+                    groupDiv.appendChild(compDiv);
+                });
+                inputsList.appendChild(groupDiv);
+            }
+        }
+        
+        function randomizeData() {
+            for (let i = 0; i < 12; i++) {
+                const nodeId = `L12_${i}`;
+                const q = new Quaternion(Math.random()*2-1, Math.random()*2-1, Math.random()*2-1, Math.random()*2-1);
+                q.normalize();
+                nodeDataStore[nodeId] = q;
+                document.getElementById(`app-input-${nodeId}-w`).value = q.w.toFixed(3);
+                document.getElementById(`app-input-${nodeId}-x`).value = q.x.toFixed(3);
+                document.getElementById(`app-input-${nodeId}-y`).value = q.y.toFixed(3);
+                document.getElementById(`app-input-${nodeId}-z`).value = q.z.toFixed(3);
+            }
+            resetTime();
+        }
+        
+        function createQuaternionDisplay() {
+            quaternionDisplay.innerHTML = `
+                <p><span class="q-w" id="app-q-w-val">1.000</span> +</p>
+                <p><span class="q-x" id="app-q-x-val">0.000</span> i +</p>
+                <p><span class="q-y" id="app-q-y-val">0.000</span> j +</p>
+                <p><span class="q-z" id="app-q-z-val">0.000</span> k</p>
+            `;
+        }
+        
+        function updateQuaternionDisplay(q) {
+            document.getElementById('app-q-w-val').textContent = q.w.toFixed(3);
+            document.getElementById('app-q-x-val').textContent = q.x.toFixed(3);
+            document.getElementById('app-q-y-val').textContent = q.y.toFixed(3);
+            document.getElementById('app-q-z-val').textContent = q.z.toFixed(3);
+        }
+        
+        // --- 3D Scene Setup ---
+        function initScene() {
+            scene = new THREE.Scene();
+            const aspect = container.clientWidth / container.clientHeight;
+            camera = new THREE.PerspectiveCamera(50, aspect, 0.1, 1000);
+            camera.position.set(20, 20, 20);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setClearColor(0x000000, 0);
+            container.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            
+            // Build Groups
+            allGroups.layer12 = new THREE.Group();
+            allGroups.layer6 = new THREE.Group();
+            allGroups.layer7 = new THREE.Group();
+            allGroups.layer3 = new THREE.Group();
+            allGroups.edges12_6 = new THREE.Group();
+            allGroups.edges6_3 = new THREE.Group();
+            allGroups.edges3_1 = new THREE.Group();
+            allGroups.cube_wireframe = new THREE.Group();
+            allGroups.hopf_fibration_torus = new THREE.Group();
+            Object.values(allGroups).forEach(group => scene.add(group));
+            
+            // Build Objects
+            const cubeGeom = new THREE.BoxGeometry(s_v * 2, s_v * 2, s_v * 2);
+            const cubeEdges = new THREE.EdgesGeometry(cubeGeom);
+            allGroups.cube_wireframe.add(new THREE.LineSegments(cubeEdges, new THREE.LineBasicMaterial({ color: 0x444444 })));
+
+            nodesData.forEach(data => {
+                const nodeMesh = new THREE.Mesh(nodeGeometry, nodeMatDefault.clone());
+                nodeMesh.position.copy(data.pos);
+                nodeMesh.name = data.id;
+                allObjects[data.id] = nodeMesh;
+                allGroups[data.group].add(nodeMesh);
+            });
+
+            edgesData.forEach(data => {
+                const startNode = allObjects[data.from];
+                const endNode = allObjects[data.to];
+                if (!startNode || !endNode) return;
+                const geometry = new THREE.BufferGeometry().setFromPoints([startNode.position, endNode.position]);
+                const edge = new THREE.Line(geometry, matDefault.clone());
+                edge.name = `${data.from}_${data.to}`;
+                allObjects[edge.name] = edge;
+                allGroups[data.group].add(edge);
+            });
+            
+            // Torus
+            const torusRadius = 6;
+            const torusTube = 0.1;
+            const torusGeom = new THREE.TorusGeometry(torusRadius, torusTube, 16, torusSegments);
+            const torusMat = new THREE.MeshBasicMaterial({ color: 0x3f3f46, transparent: true, opacity: 0.5 });
+            const torus = new THREE.Mesh(torusGeom, torusMat);
+            torus.rotation.x = Math.PI / 2;
+            allGroups.hopf_fibration_torus.add(torus);
+            
+            scene.add(wavePacket);
+            scene.add(phaseWave);
+
+            // Torus Path
+            const pathPoints = [];
+            for (let i = 0; i <= torusSegments; i++) {
+                const angle = (i / torusSegments) * 2 * Math.PI;
+                pathPoints.push(new THREE.Vector3(
+                    Math.cos(angle) * torusRadius, 0, -Math.sin(angle) * torusRadius
+                ));
+            }
+            toroidPathCurve = new THREE.CatmullRomCurve3(pathPoints, true);
+            
+            // --- Initialize Helix Trail ---
+            helixGeom = new THREE.BufferGeometry();
+            helixGeom.setAttribute('position', new THREE.Float32BufferAttribute(helixPoints, 3));
+            helixGeom.setAttribute('color', new THREE.Float32BufferAttribute(helixColors, 3));
+            const helixMat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 2 });
+            helixTrail = new THREE.Line(helixGeom, helixMat);
+            scene.add(helixTrail);
+            
+            // Initialize Particle System
+            particleGeom = new THREE.BufferGeometry();
+            for (let i = 0; i < particleCount; i++) {
+                particleAttributes.ages[i] = 0.0;
+            }
+            particleGeom.setAttribute('position', new THREE.Float32BufferAttribute(particleAttributes.positions, 3));
+            particleGeom.setAttribute('color', new THREE.Float32BufferAttribute(particleAttributes.colors, 3));
+            particleGeom.setAttribute('alpha', new THREE.Float32BufferAttribute(particleAttributes.alphas, 1));
+            particleGeom.setAttribute('size', new THREE.Float32BufferAttribute(particleAttributes.sizes, 1));
+            const particleMat = new THREE.PointsMaterial({
+                size: 0.2, sizeAttenuation: true, vertexColors: true,
+                transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+            });
+            particleSystem = new THREE.Points(particleGeom, particleMat);
+            scene.add(particleSystem);
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            randomButton.addEventListener('click', randomizeData);
+            playPauseButton.addEventListener('click', togglePause);
+            resetTimeButton.addEventListener('click', resetTime);
+            nextStepButton.addEventListener('click', stepAnimation);
+            trailLifespanSlider.addEventListener('input', (e) => {
+                trailAndParticleLifespan = parseFloat(e.target.value);
+                trailDurationLabel.textContent = trailAndParticleLifespan.toFixed(1);
+            });
+            sizeFadeToggle.addEventListener('change', (e) => {
+                particleSizeFade = !e.target.checked;
+            });
+            phaseFreqSlider.addEventListener('input', (e) => {
+                phaseFrequency = parseInt(e.target.value);
+                phaseFreqLabel.textContent = phaseFrequency;
+            });
+            document.querySelectorAll('input[name="app-step-mode"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    stepMode = e.target.value;
+                });
+            });
+        }
+
+        // --- Time Control Functions ---
+        function togglePause() {
+            isPaused = !isPaused;
+            if (isPaused) {
+                playPauseButton.textContent = 'Play';
+                playPauseButton.classList.add('paused');
+                nextStepButton.disabled = false;
+            } else {
+                playPauseButton.textContent = 'Pause';
+                playPauseButton.classList.remove('paused');
+                nextStepButton.disabled = true;
+                lastTimestamp = 0;
+                requestAnimationFrame(animate);
+            }
+        }
+        
+        function resetTime() {
+            globalTime = 0;
+            finalQuaternion = new Quaternion(1, 0, 0, 0);
+            currentCycleNode = -1;
+            if (isPaused) {
+                animate(lastTimestamp); 
+            }
+        }
+        
+        function stepAnimation() {
+            if (!isPaused) return;
+            const timeInNode = globalTime % animationDuration;
+
+            if (stepMode === 'frame') {
+                globalTime += 16.66;
+            } else if (stepMode === 'quadrant') {
+                const quadDuration = animationDuration / 4;
+                const currentQuad = Math.floor(timeInNode / quadDuration);
+                const nextQuadTime = (currentQuad + 1) * quadDuration;
+                globalTime = Math.floor(globalTime / animationDuration) * animationDuration + nextQuadTime;
+            } else if (stepMode === 'node') {
+                const currentNode = Math.floor(globalTime / animationDuration);
+                globalTime = (currentNode + 1) * animationDuration;
+            }
+            
+            const newTimestamp = (lastTimestamp || 0) + 16.66; 
+            animate(newTimestamp);
+        }
+
+        function onWindowResize() {
+            // Only resize if the container is visible
+            if (container.clientWidth === 0 || container.clientHeight === 0) return;
+            const aspect = container.clientWidth / container.clientHeight;
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        
+        // --- Animation Helper Vectors ---
+        const upVec = new THREE.Vector3(0, 1, 0);
+        const binormal = new THREE.Vector3();
+        const posOffset = new THREE.Vector3();
+
+        // --- Animation Loop ---
+        function animate(timestamp) {
+            if (!isPaused) {
+                requestAnimationFrame(animate);
+            }
+            
+            // Check for resize
+            if (container.clientWidth !== renderer.domElement.width || container.clientHeight !== renderer.domElement.height) {
+                onWindowResize();
+            }
+
+            if (lastTimestamp === 0) lastTimestamp = timestamp;
+            const delta = (timestamp - lastTimestamp) / 1000.0;
+            lastTimestamp = timestamp;
+            
+            if (!isPaused) {
+                globalTime += delta * 1000.0;
+            }
+
+            const timeInEpoch = globalTime % totalEpochTime;
+            const newCycleNode = Math.floor(timeInEpoch / animationDuration);
+            const progress = (timeInEpoch % animationDuration) / animationDuration; // 0-1
+
+            // --- Quaternion Compression Step ---
+            if (newCycleNode !== currentCycleNode) {
+                if (newCycleNode === 0) {
+                    finalQuaternion = new Quaternion(1, 0, 0, 0);
+                }
+                const nodeIndex = newCycleNode;
+                let transientQuat = nodeDataStore[`L12_${nodeIndex}`];
+                let quatToMultiply = new Quaternion(transientQuat.w, transientQuat.x, transientQuat.y, transientQuat.z);
+                quatToMultiply.normalize();
+                finalQuaternion = finalQuaternion.multiply(quatToMultiply);
+                finalQuaternion.normalize();
+                updateQuaternionDisplay(finalQuaternion);
+                currentCycleNode = newCycleNode;
+            }
+            
+            // --- Active Data ---
+            const activeQuat = nodeDataStore[`L12_${currentCycleNode}`] || new Quaternion(0,0,0,0);
+            const dynamicFactors = [Math.abs(activeQuat.x), Math.abs(activeQuat.y), Math.abs(activeQuat.z), Math.abs(activeQuat.w)];
+            const baseAmplitudes = [ 3, 2, 1, 0.5 ];
+
+            // --- Drawing & Highlighting ---
+            
+            // 1. Reset materials
+            Object.values(allObjects).forEach(obj => {
+                if (obj.isLine) obj.material = matDefault;
+                if (obj.isMesh) obj.material = nodeMatDefault;
+            });
+            
+            // 2. Highlight active path
+            const activePath = pathMap[currentCycleNode];
+            if (activePath) {
+                const activeNodes = [`L12_${currentCycleNode}`, activePath.l6, activePath.l3, 'L7_c'];
+                activeNodes.forEach(id => { if (allObjects[id]) allObjects[id].material = nodeMatPath; });
+                const activeEdges = [`L12_${currentCycleNode}_${activePath.l6}`, `${activePath.l6}_${activePath.l3}`, `${activePath.l3}_L7_c`];
+                activeEdges.forEach(id => { if (allObjects[id]) allObjects[id].material = matPath; });
+            }
+            
+            // 3. Update Wave System
+            const quadrant = Math.min(Math.floor(progress * 4), 3);
+            const pathPoint = toroidPathCurve.getPointAt(progress);
+            const tangent = toroidPathCurve.getTangentAt(progress);
+            
+            wavePacket.position.copy(pathPoint);
+            wavePacket.lookAt(pathPoint.clone().add(tangent));
+            wavePacket.material.color = qColors[quadrant];
+            
+            // --- 4. Update Persistent Helix Trail ---
+            
+            const orbitSpeed = (phaseFrequency * 8 * Math.PI) / animationDuration;
+            
+            const positions = helixGeom.attributes.position.array;
+            const colors = helixGeom.attributes.color.array;
+            
+            const currentPointIndex = Math.floor(progress * torusSegments);
+            const trailDurationProgress = trailAndParticleLifespan / (animationDuration / 1000);
+            const startPointIndex = Math.floor(Math.max(0, progress - trailDurationProgress) * torusSegments);
+
+            // Pre-calculate the entire helix path for the current node
+            for (let i = 0; i <= torusSegments; i++) {
+                const p = i / torusSegments; // Progress 0-1 for this point
+                const pOrbitAngle = (globalTime - (progress - p) * animationDuration) * orbitSpeed;
+                const pQuadrant = Math.min(Math.floor(p * 4), 3);
+                
+                const pAmplitude = (baseAmplitudes[pQuadrant] * dynamicFactors[pQuadrant]) * 3.0 + 0.7;
+                
+                const pPathPoint = toroidPathCurve.getPointAt(p);
+                const pTangent = toroidPathCurve.getTangentAt(p);
+                
+                binormal.crossVectors(upVec, pTangent).normalize();
+                posOffset.copy(binormal).multiplyScalar(Math.cos(pOrbitAngle) * pAmplitude);
+                posOffset.add(upVec.clone().multiplyScalar(Math.sin(pOrbitAngle) * pAmplitude));
+                
+                const pointPos = new THREE.Vector3().copy(pPathPoint).add(posOffset);
+                const pointColor = qColors[pQuadrant];
+                
+                positions[i * 3 + 0] = pointPos.x;
+                positions[i * 3 + 1] = pointPos.y;
+                positions[i * 3 + 2] = pointPos.z;
+                
+                colors[i * 3 + 0] = pointColor.r;
+                colors[i * 3 + 1] = pointColor.g;
+                colors[i * 3 + 2] = pointColor.b;
+            }
+            helixGeom.attributes.position.needsUpdate = true;
+            helixGeom.attributes.color.needsUpdate = true;
+            helixGeom.setDrawRange(startPointIndex, currentPointIndex - startPointIndex + 1);
+
+            // 5. Update Phase Wave (the orbiting ring)
+            const currentHelixPos = new THREE.Vector3(
+                positions[currentPointIndex * 3],
+                positions[currentPointIndex * 3 + 1],
+                positions[currentPointIndex * 3 + 2]
+            );
+            phaseWave.position.copy(currentHelixPos);
+            phaseWave.lookAt(pathPoint);
+            phaseWave.material.color = qColors[quadrant];
+
+            // --- 6. Update Particle Tracer ---
+            const pPositions = particleAttributes.positions;
+            const pColors = particleAttributes.colors;
+            const pAlphas = particleAttributes.alphas;
+            const pVelocities = particleAttributes.velocities;
+            const pAges = particleAttributes.ages;
+            const pSizes = particleAttributes.sizes;
+            const particleFade = (delta > 0 ? delta : 0.016) / trailAndParticleLifespan;
+            const headColor = qColors[quadrant];
+
+            for (let i = 0; i < particleCount; i++) {
+                if (pAges[i] > 0) {
+                    pAges[i] -= particleFade; 
+                    if (pAges[i] <= 0) {
+                        pAlphas[i] = 0.0;
+                    } else {
+                        pPositions[i * 3 + 0] += pVelocities[i * 3 + 0] * delta;
+                        pPositions[i * 3 + 1] += pVelocities[i * 3 + 1] * delta;
+                        pPositions[i * 3 + 2] += pVelocities[i * 3 + 2] * delta;
+                        pAlphas[i] = pAges[i];
+                        if (particleSizeFade) {
+                             pSizes[i] *= 0.98;
+                        }
+                    }
+                }
+
+                if (pAges[i] <= 0 && !isPaused) {
+                    pAges[i] = 1.0;
+                    pPositions[i * 3 + 0] = wavePacket.position.x;
+                    pPositions[i * 3 + 1] = wavePacket.position.y;
+                    pPositions[i * 3 + 2] = wavePacket.position.z;
+                    const randX = (Math.random() - 0.5) * particleSpread;
+                    const randY = (Math.random() - 0.5) * particleSpread;
+                    const randZ = (Math.random() - 0.5) * particleSpread;
+                    pVelocities[i * 3 + 0] = (finalQuaternion.x * particleBaseSpeed) + randX;
+                    pVelocities[i * 3 + 1] = (finalQuaternion.y * particleBaseSpeed) + randY;
+                    pVelocities[i * 3 + 2] = (finalQuaternion.z * particleBaseSpeed) + randZ;
+                    pColors[i * 3 + 0] = headColor.r;
+                    pColors[i * 3 + 1] = headColor.g;
+                    pColors[i * 3 + 2] = headColor.b;
+                    pAlphas[i] = 1.0;
+                    pSizes[i] = Math.max(0.1, Math.abs(finalQuaternion.w) * 1.5);
+                }
+            }
+            particleGeom.attributes.position.needsUpdate = true;
+            particleGeom.attributes.color.needsUpdate = true;
+            particleGeom.attributes.alpha.needsUpdate = true;
+            particleGeom.attributes.size.needsUpdate = true;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // --- Start ---
+        initScene();
+        initializeNodeData();
+        animate(0); // Start the loop
+
+    </script>
+
+    <!-- 
+    ========================================
+    --- SCRIPT 2: 2D TUTORIAL (D3.js) ---
+    ========================================
+    -->
+    <script id="script-tutorial">
+        // --- D3 Setup (scoped to #tutorial-pane) ---
+        const tutorialSlider = d3.select("#tutorial-phase-freq-slider");
+        const tutorialLabel = d3.select("#tutorial-phase-freq-label");
+
+        const tutorialSvgLow = d3.select("#tutorial-svg-low-fi");
+        const tutorialSvgHigh = d3.select("#tutorial-svg-high-fi");
+        
+        const tutorialSvgCodex = d3.select("#tutorial-svg-codex");
+        const tutorialSvgState = d3.select("#tutorial-viz-state").append("svg");
+        const tutorialSvgSpin = d3.select("#tutorial-viz-spin").append("svg");
+        const tutorialSvgScaler = d3.select("#tutorial-viz-scaler").append("svg");
+
+        const tutorialCalcR = d3.select("#tutorial-calc-r");
+        const tutorialCalcTotalR = d3.select("#tutorial-calc-total-r");
+        const tutorialCalcBits = d3.select("#tutorial-calc-bits");
+        const tutorialFreqIdLabel = d3.select("#tutorial-freq-id-label");
+
+        const tutorialWidth = 300; // SVG internal width
+        const tutorialHeight = 300; // SVG internal height
+        const tutorialCenter = { x: tutorialWidth / 2, y: tutorialHeight / 2 };
+        const tutorialRadius = tutorialWidth / 2 - 20;
+
+        // Base Amplitudes (Structural Compression)
+        const tutorialAmplitudes = [
+            tutorialRadius * 0.4,   // Q1 (12-node)
+            tutorialRadius * 0.25,  // Q2 (6-node)
+            tutorialRadius * 0.1,   // Q3 (3-node)
+            tutorialRadius * 0.0    // Q4 (1-node)
+        ];
+        
+        const tutorialQColors = ["#f59e0b", "#22d3ee", "#22c55e", "#eeeeee"];
+        let tutorialCodexAnimationTimer, tutorialStateAnimationTimer, tutorialScalerAnimationTimer;
+
+        // --- Drawing Function (Wave) ---
+        function tutorialDrawGraph(svg, frequency) {
+            svg.selectAll("*").remove(); // Clear SVG
+            
+            // Draw Quadrant Guides
+            svg.append("g")
+                .selectAll("line")
+                .data([0, 90, 180, 270])
+                .join("line")
+                .attr("x1", tutorialCenter.x)
+                .attr("y1", tutorialCenter.y)
+                .attr("x2", d => tutorialCenter.x + tutorialRadius * Math.cos(d * Math.PI / 180))
+                .attr("y2", d => tutorialCenter.y + tutorialRadius * Math.sin(d * Math.PI / 180))
+                .attr("stroke", "#3f3f46")
+                .attr("stroke-dasharray", "2,2");
+
+            svg.append("circle")
+                .attr("cx", tutorialCenter.x)
+                .attr("cy", tutorialCenter.y)
+                .attr("r", tutorialRadius)
+                .attr("fill", "none")
+                .attr("stroke", "#3f3f46");
+
+            // Draw Quadrant Labels
+            const labelR = tutorialRadius * 0.7;
+            svg.append("text").text("Q1 (12)")
+                .attr("x", tutorialCenter.x + labelR).attr("y", tutorialCenter.y - labelR + 10)
+                .attr("fill", tutorialQColors[0]).attr("font-size", "10px").attr("text-anchor", "middle");
+            svg.append("text").text("Q2 (6)")
+                .attr("x", tutorialCenter.x - labelR).attr("y", tutorialCenter.y - labelR + 10)
+                .attr("fill", tutorialQColors[1]).attr("font-size", "10px").attr("text-anchor", "middle");
+            svg.append("text").text("Q3 (3)")
+                .attr("x", tutorialCenter.x - labelR).attr("y", tutorialCenter.y + labelR)
+                .attr("fill", tutorialQColors[2]).attr("font-size", "10px").attr("text-anchor", "middle");
+            svg.append("text").text("Q4 (1)")
+                .attr("x", tutorialCenter.x + labelR).attr("y", tutorialCenter.y + labelR)
+                .attr("fill", tutorialQColors[3]).attr("font-size", "10px").attr("text-anchor", "middle");
+            
+            // Draw Wave Path
+            const lineGen = d3.lineRadial()
+                .angle(d => d.angle)
+                .radius(d => d.radius)
+                .curve(d3.curveCatmullRom);
+
+            // Generate points for 4 quadrants
+            let allPoints = [];
+            for (let q = 0; q < 4; q++) {
+                const quadrantPoints = d3.range(72).map(i => {
+                    const p = i / 71; 
+                    const angle = (Math.PI / 2) * (q + p);
+                    const phaseAngle = frequency * (2 * Math.PI) * p; 
+                    const amplitude = tutorialAmplitudes[q];
+                    const r = tutorialRadius + amplitude * Math.sin(phaseAngle);
+                    return { angle: angle, radius: r };
+                });
+                allPoints = [...allPoints, ...quadrantPoints];
+            }
+            
+            // Draw path segments for each quadrant color
+            for (let q = 0; q < 4; q++) {
+                const segmentPoints = allPoints.slice(q * 72, (q + 1) * 72);
+                if (q === 0) {
+                    segmentPoints.unshift({ angle: 0, radius: tutorialRadius + tutorialAmplitudes[0] * Math.sin(0) });
+                }
+
+                svg.append("path")
+                    .datum(segmentPoints)
+                    .attr("d", lineGen)
+                    .attr("transform", `translate(${tutorialCenter.x}, ${tutorialCenter.y}) rotate(-90)`)
+                    .attr("fill", "none")
+                    .attr("stroke", tutorialQColors[q])
+                    .attr("stroke-width", 2);
+            }
+        }
+        
+        // --- Drawing Function (Codex Matrix) ---
+        function tutorialDrawCodexViz(frequency) {
+            // Clear previous animation
+            if (tutorialCodexAnimationTimer) tutorialCodexAnimationTimer.stop();
+            tutorialSvgCodex.selectAll("*").remove();
+
+            const c_width = 300;
+            const c_height = 150; // Make it rectangular
+            tutorialSvgCodex.attr("viewBox", `0 0 ${c_width} ${c_height}`);
+            
+            // --- 1. Draw Wave on Left ---
+            const waveCenterX = c_height / 2; // 75
+            const waveCenterY = c_height / 2; // 75
+            const waveRadius = 50;
+            
+            tutorialSvgCodex.append("circle")
+                .attr("cx", waveCenterX)
+                .attr("cy", waveCenterY)
+                .attr("r", waveRadius)
+                .attr("fill", "none")
+                .attr("stroke", "#3f3f46");
+                
+            const wavePoint = tutorialSvgCodex.append("circle")
+                .attr("r", 5)
+                .attr("fill", "#a5f3fc"); // cyan-200
+                
+            // --- 2. Draw Matrix on Right ---
+            const matrixSize = 128; // Size of the 16x16 grid
+            const matrixStartX = 160;
+            const matrixStartY = (c_height - matrixSize) / 2; // Center it
+            const cellSize = matrixSize / 16;
+            
+            const gridData = d3.range(256).map(i => ({
+                x: i % 16,
+                y: Math.floor(i / 16)
+            }));
+            
+            const matrix = tutorialSvgCodex.append("g")
+                .attr("transform", `translate(${matrixStartX}, ${matrixStartY})`);
+            
+            const cells = matrix.selectAll("rect")
+                .data(gridData)
+                .join("rect")
+                .attr("x", d => d.x * cellSize)
+                .attr("y", d => d.y * cellSize)
+                .attr("width", cellSize - 1)
+                .attr("height", cellSize - 1)
+                .attr("fill", "#3f3f46"); // zinc-700
+                
+            // --- 3. Draw Projection Line ---
+            const projectionLine = tutorialSvgCodex.append("line")
+                .attr("stroke", "#f59e0b")
+                .attr("stroke-width", 1.5)
+                .attr("stroke-dasharray", "3,3");
+                
+            // --- 4. Animate ---
+            tutorialCodexAnimationTimer = d3.timer(elapsed => {
+                const angle = (elapsed * 0.001 * frequency) * Math.PI; // Speed based on freq
+                
+                // Update wave point
+                const wx = waveCenterX + waveRadius * Math.cos(angle - Math.PI / 2);
+                const wy = waveCenterY + waveRadius * Math.sin(angle - Math.PI / 2);
+                wavePoint.attr("cx", wx).attr("cy", wy);
+                
+                // Update "selected" cell
+                const totalCells = 256;
+                // Use sine/cosine to make selection non-linear
+                const cellIndex = Math.floor((Math.sin(angle * 0.5) + 1) / 2 * (totalCells - 1));
+                
+                cells.attr("fill", "#3f3f46"); // Reset all
+                const selectedCell = d3.select(cells.nodes()[cellIndex]);
+                selectedCell.attr("fill", "#f59e0b"); // Highlight
+                
+                // Update projection line
+                const cellX = matrixStartX + (cellIndex % 16) * cellSize + cellSize / 2;
+                const cellY = matrixStartY + Math.floor(cellIndex / 16) * cellSize + cellSize / 2;
+                
+                projectionLine
+                    .attr("x1", wx)
+                    .attr("y1", wy)
+                    .attr("x2", cellX)
+                    .attr("y2", cellY);
+            });
+        }
+        
+        // --- Draw State ID Viz ---
+        function tutorialDrawStateViz() {
+            if (tutorialStateAnimationTimer) tutorialStateAnimationTimer.stop();
+            tutorialSvgState.selectAll("*").remove();
+            
+            const s_width = 300;
+            const s_height = 100;
+            tutorialSvgState.attr("viewBox", `0 0 ${s_width} ${s_height}`);
+
+            const matrixSize = 80;
+            const matrixStartX = (s_width - matrixSize) / 2;
+            const matrixStartY = (s_height - matrixSize) / 2;
+            const cellSize = matrixSize / 16;
+
+
+            const gridData = d3.range(256).map(i => ({
+                x: i % 16,
+                y: Math.floor(i / 16)
+            }));
+
+            const cells = tutorialSvgState.append("g")
+                .attr("transform", `translate(${matrixStartX}, ${matrixStartY})`)
+                .selectAll("rect")
+                .data(gridData)
+                .join("rect")
+                .attr("x", d => d.x * cellSize)
+                .attr("y", d => d.y * cellSize)
+                .attr("width", cellSize - 0.5)
+                .attr("height", cellSize - 0.5)
+                .attr("fill", "#3f3f46");
+            
+            tutorialStateAnimationTimer = d3.timer(elapsed => {
+                const cellIndex = Math.floor((elapsed / 20) % 256);
+                cells.attr("fill", "#3f3f46");
+                d3.select(cells.nodes()[cellIndex]).attr("fill", "#f59e0b");
+            });
+        }
+        
+        // --- Draw Spin ID Viz ---
+        function tutorialDrawSpinViz() {
+            tutorialSvgSpin.selectAll("*").remove();
+            const s_width = 300;
+            const s_height = 100;
+            tutorialSvgSpin.attr("viewBox", `0 0 ${s_width} ${s_height}`);
+
+            const numLines = 8;
+            const padding = 10;
+            const y_spacing = (s_height - padding * 2) / (numLines - 1);
+            
+            const lineData = d3.range(numLines);
+
+            tutorialSvgSpin.append("g")
+                .attr("transform", `translate(20, ${padding})`)
+                .selectAll("g")
+                .data(lineData)
+                .join("g")
+                .attr("transform", (d, i) => `translate(0, ${i * y_spacing})`)
+                .each(function(d) {
+                    const g = d3.select(this);
+                    const isSelected = (d === 2);
+                    g.append("line")
+                        .attr("x1", 0)
+                        .attr("x2", s_width - 40)
+                        .attr("stroke", isSelected ? "#f59e0b" : "#3f3f46")
+                        .attr("stroke-width", isSelected ? 3 : 2);
+                    
+                    g.append("text")
+                        .text(isSelected ? `Codex ${d+1} (Active)` : `Codex ${d+1}`)
+                        .attr("x", 20)
+                        .attr("y", -3)
+                        .attr("fill", isSelected ? "#fde68a" : "#52525b")
+                        .attr("font-size", "8px")
+                        .attr("font-family", "Courier New");
+                });
+        }
+
+        // --- Draw Scaler Viz ---
+        function tutorialDrawScalerViz() {
+            if (tutorialScalerAnimationTimer) tutorialScalerAnimationTimer.stop();
+            tutorialSvgScaler.selectAll("*").remove();
+
+            const s_width = 300;
+            const s_height = 100;
+            const padding = 20;
+            tutorialSvgScaler.attr("viewBox", `0 0 ${s_width} ${s_height}`);
+
+            // Draw track
+            tutorialSvgScaler.append("rect")
+                .attr("x", padding)
+                .attr("y", s_height / 2 - 2)
+                .attr("width", s_width - padding * 2)
+                .attr("height", 4)
+                .attr("fill", "#3f3f46");
+            
+            // Draw needle
+            const needle = tutorialSvgScaler.append("rect")
+                .attr("y", s_height / 2 - 15)
+                .attr("width", 3)
+                .attr("height", 30)
+                .attr("fill", "#a5f3fc");
+                
+            const needleLabel = tutorialSvgScaler.append("text")
+                .attr("fill", "#a5f3fc")
+                .attr("font-size", "10px")
+                .attr("text-anchor", "middle")
+                .attr("y", s_height / 2 - 20);
+
+            tutorialScalerAnimationTimer = d3.timer(elapsed => {
+                const t = (Math.sin(elapsed * 0.002) + 1) / 2; // 0 to 1
+                const x = padding + (s_width - padding * 2) * t;
+                needle.attr("x", x);
+                needleLabel.attr("x", x).text(t.toFixed(4));
+            });
+        }
+
+        // --- Update Calculation Function ---
+        function tutorialUpdateAmplification(frequency) {
+            const R = BigInt(frequency);
+            const totalR = 4n * R;
+            const bits = 96n * R; 
+            
+            tutorialCalcR.text(frequency);
+            tutorialCalcTotalR.text(totalR.toString());
+            tutorialCalcBits.text(bits.toString());
+            tutorialFreqIdLabel.text(frequency);
+        }
+
+        // --- Event Listener ---
+        tutorialSlider.on("input", (event) => {
+            const freq = +event.target.value;
+            // Update all 3 sections
+            tutorialLabel.text(freq);
+            tutorialDrawGraph(tutorialSvgHigh, freq);
+            tutorialDrawCodexViz(freq);
+            tutorialUpdateAmplification(freq);
+        });
+
+        // --- Initial Draw ---
+        (function() {
+            const initialFreq = 1;
+            tutorialDrawGraph(tutorialSvgLow, 1);
+            tutorialDrawGraph(tutorialSvgHigh, initialFreq);
+            tutorialDrawCodexViz(initialFreq);
+            tutorialUpdateAmplification(initialFreq);
+            
+            tutorialDrawStateViz();
+            tutorialDrawSpinViz();
+            tutorialDrawScalerViz();
+        })();
+
+    </script>
+</body>
+</html>
