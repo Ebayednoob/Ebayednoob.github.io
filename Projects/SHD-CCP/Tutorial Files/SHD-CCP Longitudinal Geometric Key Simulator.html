@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geometric Key Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        canvas {
+            background-color: #000;
+            display: block;
+            border-radius: 0.5rem;
+            border: 1px solid #374151; /* gray-700 */
+        }
+        .info, .key-panel, .controls {
+            background-color: #1F2937; /* gray-800 */
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 1.5rem;
+            border: 1px solid #374151;
+        }
+        .controls {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.75rem 1rem;
+            align-items: center;
+        }
+        .controls label {
+            white-space: nowrap;
+            color: #D1D5DB; /* gray-300 */
+            font-weight: 600;
+        }
+        .controls select {
+            width: 100%;
+            background-color: #374151; /* gray-700 */
+            color: #F9FAFB; /* gray-50 */
+            border: 1px solid #4B5563; /* gray-600 */
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239CA3AF' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+        }
+        .controls input:disabled, .controls select:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        .controls input[type="range"]:disabled::-webkit-slider-thumb {
+            background: #4B5563; /* gray-600 */
+        }
+        .controls input[type="range"]:disabled::-moz-range-thumb {
+            background: #4B5563; /* gray-600 */
+        }
+
+        .controls input[type="range"] {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 0.5rem;
+            background: #374151; /* gray-700 */
+            border-radius: 0.25rem;
+            outline: none;
+        }
+        .controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 1.25rem;
+            height: 1.25rem;
+            background: #3B82F6; /* blue-500 */
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .controls input[type="range"]::-moz-range-thumb {
+            width: 1.25rem;
+            height: 1.25rem;
+            background: #3B82F6; /* blue-500 */
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #nodeLogContainer {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 1.5rem;
+        }
+        #nodeLogContainer canvas {
+            width: 100%; /* Make canvas responsive */
+            height: auto;
+            background-color: #000;
+            border-radius: 0.375rem;
+            border: 1px solid #374151; /* gray-700 */
+        }
+        .node-log-title {
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 600;
+            color: #D1D5DB; /* gray-300 */
+            text-align: center;
+            margin-bottom: -0.5rem; /* Pull canvas closer */
+        }
+        
+        .key-panel-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+        .key-panel-grid .span-2 { grid-column: span 2 / span 2; }
+        .key-panel-grid .span-4 { grid-column: span 4 / span 4; }
+        
+        .key-panel label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #9CA3AF; /* gray-400 */
+            margin-bottom: 0.25rem;
+        }
+        .key-panel input, .key-panel select {
+            width: 100%;
+            background-color: #374151; /* gray-700 */
+            color: #F9FAFB; /* gray-50 */
+            border: 1px solid #4B5563; /* gray-600 */
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            font-family: monospace;
+        }
+        
+        .key-panel button {
+            background-color: #3B82F6; /* blue-500 */
+            color: white;
+            font-weight: 600;
+            padding: 0.6rem 1rem;
+            border-radius: 0.375rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            width: 100%;
+        }
+        .key-panel button:hover:not(:disabled) {
+            background-color: #2563EB; /* blue-600 */
+        }
+        .key-panel button.pause {
+            background-color: #EF4444; /* red-500 */
+        }
+        .key-panel button.pause:hover:not(:disabled) {
+            background-color: #DC2626; /* red-600 */
+        }
+
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-50 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="info">
+        <h1 class="text-2xl font-bold text-white text-center">Geometric Key Simulation</h1>
+        <p class="text-sm text-gray-400 text-center mt-2">
+            Generate a 64-bit key to create a unique, static "Proof of Simulation" fingerprint.
+        </p>
+    </div>
+    
+    <!-- NEW: Key Generator Panel -->
+    <div class="key-panel">
+        <h2 class="text-xl font-semibold mb-4 text-white">Geometric Key Generator (SHD-CCP)</h2>
+        <div class="key-panel-grid">
+            <!-- Row 1 -->
+            <div>
+                <label for="keyScaler">Payload Scaler (0-65535)</label>
+                <input type="number" id="keyScaler" min="0" max="65535" value="16384">
+            </div>
+            <div>
+                <label for="keyFreqId">Freq ID (0-31)</label>
+                <input type="number" id="keyFreqId" min="0" max="31" value="8">
+            </div>
+            <div>
+                <label for="keySpinId">Spin ID (0-7)</label>
+                <input type="number" id="keySpinId" min="0" max="7" value="2">
+            </div>
+            <div>
+                <label for="keyParity">Parity (0-1)</label>
+                <select id="keyParity">
+                    <option value="0">0 (Forward)</option>
+                    <option value="1">1 (Reverse)</option>
+                </select>
+            </div>
+            <!-- Row 2 -->
+            <div>
+                <label for="keyFormId">Form ID (0-15)</label>
+                <input type="number" id="keyFormId" min="0" max="15" value="12">
+            </div>
+            <div>
+                <label for="keyAmpId">Amp ID (0-7)</label>
+                <input type="number" id="keyAmpId" min="0" max="7" value="3">
+            </div>
+            <div class="span-2">
+                <label for="keyGenButton" class="opacity-0">Generate</label>
+                <button id="keyGenButton">Generate Key</button>
+            </div>
+            <!-- Row 3: Quaternions -->
+            <div>
+                <label for="keyQuatW">Quaternion W (0-255)</label>
+                <input type="number" id="keyQuatW" min="0" max="255" value="128">
+            </div>
+            <div>
+                <label for="keyQuatX">Quaternion X (0-255)</label>
+                <input type="number" id="keyQuatX" min="0" max="255" value="128">
+            </div>
+            <div>
+                <label for="keyQuatY">Quaternion Y (0-255)</label>
+                <input type="number" id="keyQuatY" min="0" max="255" value="128">
+            </div>
+            <div>
+                <label for="keyQuatZ">Quaternion Z (0-255)</label>
+                <input type="number" id="keyQuatZ" min="0" max="255" value="128">
+            </div>
+            <!-- Row 4: Output -->
+            <div class="span-4">
+                <label for="keyOutput">Generated 64-Bit Key (16-char Hex)</label>
+                <input type="text" id="keyOutput" readonly>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NEW: Key Loader Panel -->
+    <div class="key-panel">
+        <h2 class="text-xl font-semibold mb-4 text-white">Simulation Key Loader</h2>
+        <div class="key-panel-grid">
+            <div class="span-2">
+                <label for="keyInput">Geometric Key (16-char Hex)</label>
+                <input type="text" id="keyInput" placeholder="Paste 16-char hex key...">
+            </div>
+            <div class="span-2">
+                <label for="parseKeyButton" class="opacity-0">Parse</label>
+                <button id="parseKeyButton">Parse Key & Load</button>
+            </div>
+            <div class="span-2">
+                <button id="playPauseButton">Play</button>
+            </div>
+            <div class="span-2">
+                <button id="resetButton">Reset Logs</button>
+            </div>
+            <div class="span-4">
+                <div id="keyStatus" class="text-sm text-gray-400 min-h-[1.25rem] mt-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Controls are now "Read-Only" displays -->
+    <div class="controls" id="mainControls">
+        <label for="nodeCountSlider">Node Count:</label>
+        <input type="range" id="nodeCountSlider" min="3" max="288" step="1" value="4" disabled>
+        
+        <label for="orbitalModeSelect">Orbital Mode:</label>
+        <select id="orbitalModeSelect" disabled>
+            <option value="circle">Simple Circle</option>
+            <option value="p-orbital">p-orbital (Dumbbell)</option>
+            <option value="d-orbital">d-orbital (Clover)</option>
+            <option value="shells">Valence Shells</option>
+        </select>
+        
+        <label for="shellSpacingSlider">Shell Spacing:</label>
+        <input type="range" id="shellSpacingSlider" min="0.1" max="2.0" step="0.05" value="1.0" disabled>
+
+        <label for="spinSpeedSlider">Spin Speed:</label>
+        <input type="range" id="spinSpeedSlider" min="-5" max="5" step="0.1" value="0.5" disabled>
+
+        <label for="spinRadiusSlider">Spin Radius:</label>
+        <input type="range" id="spinRadiusSlider" min="10" max="500" step="1" value="30" disabled>
+        
+        <label for="massNodeRadiusSlider">Mass Node Radius:</label>
+        <input type="range" id="massNodeRadiusSlider" min="1" max="50" step="1" value="10" disabled>
+
+        <label for="waveNumberSlider">Wave Number (k):</label>
+        <input type="range" id="waveNumberSlider" min="0.01" max="1" step="0.01" value="0.1" disabled>
+
+        <label for="waveFreqSlider">Wave Freq (w):</label>
+        <input type="range" id="waveFreqSlider" min="0.1" max="20" step="0.1" value="5" disabled>
+
+        <label for="massSlider">Mass (Amplitude):</label>
+        <input type="range" id="massSlider" min="0" max="10" step="0.1" value="3" disabled>
+
+        <label for="zoomSlider">Zoom (Manual):</label>
+        <input type="range" id="zoomSlider" min="1" max="5" step="0.1" value="1">
+    </div>
+
+    <canvas id="waveCanvas"></canvas>
+    
+    <h3 class="text-lg font-semibold mt-4 mb-0 text-white">Accretion Disk Log (X-axis)</h3>
+    <canvas id="logCanvasX"></canvas>
+    
+    <h3 class="text-lg font-semibold mt-4 mb-0 text-white">Time Cycle Log (Y-axis)</h3>
+    <canvas id="logCanvasY"></canvas>
+    
+    <div id="nodeLogContainer"></div>
+
+    <!-- REMOVED: Program Editor -->
+
+
+    <script type="module">
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const logCanvasX = document.getElementById('logCanvasX');
+        const logCtxX = logCanvasX.getContext('2d');
+        const logCanvasY = document.getElementById('logCanvasY');
+        const logCtxY = logCanvasY.getContext('2d');
+        
+        const nodeLogContainer = document.getElementById('nodeLogContainer');
+        let nodeLogContexts = []; 
+
+        let width = Math.min(1000, window.innerWidth - 32);
+        width = Math.max(width, 300); 
+        let height = width; 
+        
+        canvas.width = width;
+        canvas.height = height;
+
+        let logHeight = 150;
+        logCanvasX.width = width;
+        logCanvasX.height = logHeight;
+        logCanvasY.width = width;
+        logCanvasY.height = logHeight;
+
+        // --- Configurable Parameters ---
+        let params = {
+            numEmitters: 4,
+            gridSize: 25, 
+            spinSpeed: 0.5,
+            spinRadius: 30,
+            massNodeRadius: 10,
+            waveNumber: 0.1,
+            waveFreq: 5,
+            amplitude: 3,
+            dampening: 0.1,
+            zoom: 1.0,
+            orbitalMode: 'circle',
+            shellSpacing: 1.0,
+            frustrationX: 0.0, // NEW: From Quaternion Y
+            frustrationY: 0.0  // NEW: From Quaternion Z
+        };
+
+        // --- Sliders (now "read-outs") ---
+        const nodeCountSlider = document.getElementById('nodeCountSlider');
+        const orbitalModeSelect = document.getElementById('orbitalModeSelect');
+        const shellSpacingSlider = document.getElementById('shellSpacingSlider');
+        const spinSpeedSlider = document.getElementById('spinSpeedSlider');
+        const spinRadiusSlider = document.getElementById('spinRadiusSlider');
+        const massNodeRadiusSlider = document.getElementById('massNodeRadiusSlider');
+        const waveNumberSlider = document.getElementById('waveNumberSlider');
+        const waveFreqSlider = document.getElementById('waveFreqSlider');
+        const massSlider = document.getElementById('massSlider');
+        const zoomSlider = document.getElementById('zoomSlider');
+
+        // Zoom slider is the only one with a listener
+        zoomSlider.oninput = (e) => { params.zoom = parseFloat(e.target.value); };
+        
+        // --- NEW: Key Generator Inputs ---
+        const keyScaler = document.getElementById('keyScaler');
+        const keyFreqId = document.getElementById('keyFreqId');
+        const keySpinId = document.getElementById('keySpinId');
+        const keyParity = document.getElementById('keyParity');
+        const keyFormId = document.getElementById('keyFormId');
+        const keyAmpId = document.getElementById('keyAmpId');
+        const keyGenButton = document.getElementById('keyGenButton');
+        const keyQuatW = document.getElementById('keyQuatW');
+        const keyQuatX = document.getElementById('keyQuatX');
+        const keyQuatY = document.getElementById('keyQuatY');
+        const keyQuatZ = document.getElementById('keyQuatZ');
+        const keyOutput = document.getElementById('keyOutput');
+        
+        // --- NEW: Key Loader Inputs ---
+        const keyInput = document.getElementById('keyInput');
+        const parseKeyButton = document.getElementById('parseKeyButton');
+        const keyStatus = document.getElementById('keyStatus');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const resetButton = document.getElementById('resetButton');
+
+
+        // --- Simulation State ---
+        let isPlaying = false;
+        let localTime = 0.0;  // Physics time
+        let lastTimestamp = 0;
+
+        // --- Key Generator Logic ---
+        keyGenButton.onclick = () => {
+            try {
+                // Read all values, ensuring they are integers for bitwise ops
+                const scaler = BigInt(Math.round(Number(keyScaler.value))) & 0xFFFFn; // 16 bits
+                const freqId = BigInt(Math.round(Number(keyFreqId.value))) & 0x1Fn;   // 5 bits
+                const spinId = BigInt(Math.round(Number(keySpinId.value))) & 0x7n;    // 3 bits
+                const formId = BigInt(Math.round(Number(keyFormId.value))) & 0xFn;    // 4 bits
+                const ampId = BigInt(Math.round(Number(keyAmpId.value))) & 0x7n;     // 3 bits
+                const parity = BigInt(Math.round(Number(keyParity.value))) & 0x1n;    // 1 bit
+                const quatW = BigInt(Math.round(Number(keyQuatW.value))) & 0xFFn;    // 8 bits
+                const quatX = BigInt(Math.round(Number(keyQuatX.value))) & 0xFFn;    // 8 bits
+                const quatY = BigInt(Math.round(Number(keyQuatY.value))) & 0xFFn;    // 8 bits
+                const quatZ = BigInt(Math.round(Number(keyQuatZ.value))) & 0xFFn;    // 8 bits
+
+                // Pack into a 64-bit BigInt
+                // Order from MSB (bit 63) to LSB (bit 0)
+                let key64 = 0n;
+                key64 |= (scaler << 48n);
+                key64 |= (freqId << 43n);
+                key64 |= (spinId << 40n);
+                key64 |= (formId << 36n);
+                key64 |= (ampId  << 33n);
+                key64 |= (parity << 32n);
+                key64 |= (quatW  << 24n);
+                key64 |= (quatX  << 16n);
+                key64 |= (quatY  << 8n);
+                key64 |= (quatZ);
+
+                // Format as 16-char hex string
+                keyOutput.value = key64.toString(16).padStart(16, '0').toUpperCase();
+                keyStatus.innerText = "Key generated successfully!";
+                keyStatus.style.color = "#6EE7B7"; // emerald-300
+            } catch (e) {
+                keyStatus.innerText = `Error generating key: ${e.message}`;
+                keyStatus.style.color = "#F87171"; // red-400
+            }
+        };
+
+        // --- Key Parser Logic ---
+        parseKeyButton.onclick = () => {
+            const hexKey = keyInput.value.trim();
+            if (hexKey.length !== 16) {
+                keyStatus.innerText = "Error: Key must be 16 hex characters.";
+                keyStatus.style.color = "#F87171"; // red-400
+                return;
+            }
+
+            try {
+                const key64 = BigInt('0x' + hexKey);
+                
+                // Unpack the 64-bit BigInt
+                const unpacked = {
+                    scaler: (key64 >> 48n) & 0xFFFFn,
+                    freqId: (key64 >> 43n) & 0x1Fn,
+                    spinId: (key64 >> 40n) & 0x7n,
+                    formId: (key64 >> 36n) & 0xFn,
+                    ampId:  (key64 >> 33n) & 0x7n,
+                    parity: (key64 >> 32n) & 0x1n,
+                    quatW:  (key64 >> 24n) & 0xFFn,
+                    quatX:  (key64 >> 16n) & 0xFFn,
+                    quatY:  (key64 >> 8n) & 0xFFn,
+                    quatZ:  key64 & 0xFFn
+                };
+                
+                setParamsFromKey(unpacked);
+                
+                keyStatus.innerText = "Key loaded. Press Play to run simulation.";
+                keyStatus.style.color = "#6EE7B7"; // emerald-300
+                resetLogs(); // Clear logs for new simulation
+
+            } catch (e) {
+                keyStatus.innerText = `Error parsing key: ${e.message}`;
+                keyStatus.style.color = "#F87171"; // red-400
+            }
+        };
+        
+        // --- NEW: Form & Freq ID Lookup Tables ---
+        const freqIdTable = [
+            {w: 1.0, k: 0.1}, {w: 1.0, k: 0.5}, {w: 1.0, k: 1.0}, {w: 3.0, k: 0.2},
+            {w: 3.0, k: 0.6}, {w: 5.0, k: 0.1}, {w: 5.0, k: 0.4}, {w: 5.0, k: 0.8},
+            {w: 7.0, k: 0.2}, {w: 7.0, k: 0.5}, {w: 7.0, k: 0.9}, {w: 9.0, k: 0.3},
+            {w: 9.0, k: 0.7}, {w: 11.0, k: 0.4}, {w: 11.0, k: 1.0}, {w: 13.0, k: 0.5},
+            {w: 13.0, k: 0.8}, {w: 15.0, k: 0.2}, {w: 15.0, k: 0.6}, {w: 15.0, k: 0.9},
+            {w: 17.0, k: 0.3}, {w: 17.0, k: 0.7}, {w: 17.0, k: 1.0}, {w: 19.0, k: 0.4},
+            {w: 19.0, k: 0.8}, {w: 20.0, k: 0.1}, {w: 20.0, k: 0.3}, {w: 20.0, k: 0.5},
+            {w: 20.0, k: 0.7}, {w: 20.0, k: 0.8}, {w: 20.0, k: 0.9}, {w: 20.0, k: 1.0}
+        ]; // 32 entries
+        
+        const formIdTable = [
+            {mode: 'circle', nodes: 32}, {mode: 'circle', nodes: 64}, {mode: 'circle', nodes: 128}, {mode: 'circle', nodes: 288},
+            {mode: 'p-orbital', nodes: 32}, {mode: 'p-orbital', nodes: 64}, {mode: 'p-orbital', nodes: 128}, {mode: 'p-orbital', nodes: 288},
+            {mode: 'd-orbital', nodes: 32}, {mode: 'd-orbital', nodes: 64}, {mode: 'd-orbital', nodes: 128}, {mode: 'd-orbital', nodes: 288},
+            {mode: 'shells', nodes: 32}, {mode: 'shells', nodes: 64}, {mode: 'shells', nodes: 128}, {mode: 'shells', nodes: 288}
+        ]; // 16 entries
+        
+
+        // --- NEW: Set simulation params from unpacked key data ---
+        function setParamsFromKey(data) {
+            // Payload Scaler (16 bits) -> Mass (Amplitude)
+            params.amplitude = (Number(data.scaler) / 65535) * 10.0;
+            
+            // Freq ID (5 bits) -> Freq/WaveNumber
+            const freqs = freqIdTable[Number(data.freqId)];
+            params.waveFreq = freqs.w;
+            params.waveNumber = freqs.k;
+            
+            // Spin ID (3 bits) -> Spin Speed
+            let spinSpeed = (Number(data.spinId) / 7) * 5.0;
+            
+            // Parity (1 bit) -> Spin Direction
+            if (data.parity === 1n) {
+                spinSpeed *= -1;
+            }
+            params.spinSpeed = spinSpeed;
+            
+            // Form ID (4 bits) -> Orbital Mode & Node Count
+            const form = formIdTable[Number(data.formId)];
+            if (params.numEmitters !== form.nodes) {
+                params.numEmitters = form.nodes;
+                setupEmittersAndLogs(); // Rebuild for new node count
+            }
+            params.orbitalMode = form.mode;
+
+            // Amp ID (3 bits) -> Mass Node Radius
+            params.massNodeRadius = 1 + (Number(data.ampId) / 7) * 49;
+            
+            // Quaternion (32 bits) -> Spatial/Frustration
+            // W (8 bits) -> Spin Radius
+            params.spinRadius = 10 + (Number(data.quatW) / 255) * 490;
+            // X (8 bits) -> Shell Spacing
+            params.shellSpacing = 0.1 + (Number(data.quatX) / 255) * 1.9;
+            // Y (8 bits) -> Frustration X
+            params.frustrationX = (Number(data.quatY) - 127.5) / 127.5; // Map 0-255 to -1.0 to +1.0
+            // Z (8 bits) -> Frustration Y
+            params.frustrationY = (Number(data.quatZ) - 127.5) / 127.5; // Map 0-255 to -1.0 to +1.0
+            
+            // Update the "read-only" sliders to show the new state
+            updateSliderReadouts();
+        }
+        
+        // --- NEW: Function to update all disabled sliders ---
+        function updateSliderReadouts() {
+            nodeCountSlider.value = params.numEmitters;
+            orbitalModeSelect.value = params.orbitalMode;
+            shellSpacingSlider.value = params.shellSpacing;
+            spinSpeedSlider.value = params.spinSpeed;
+            spinRadiusSlider.value = params.spinRadius;
+            massNodeRadiusSlider.value = params.massNodeRadius;
+            waveNumberSlider.value = params.waveNumber;
+            waveFreqSlider.value = params.waveFreq;
+            massSlider.value = params.amplitude;
+            // zoomSlider is manual, so we don't set it
+        }
+
+        // --- Simplified Playback Functions ---
+        function playPause() {
+            if (isPlaying) {
+                isPlaying = false;
+                playPauseButton.innerText = 'Play';
+                playPauseButton.classList.remove('pause');
+            } else {
+                isPlaying = true;
+                playPauseButton.innerText = 'Pause';
+                playPauseButton.classList.add('pause');
+                lastTimestamp = performance.now();
+                requestAnimationFrame(animate);
+            }
+        }
+
+        function resetLogs() {
+            // Stop simulation
+            if (isPlaying) {
+                playPause();
+            }
+            
+            // Reset *only* logs and physics time
+            localTime = 0.0;
+            logX = [];
+            logY = [];
+            nodeLogs.forEach(log => log.length = 0);
+            
+            keyStatus.innerText = "Logs reset. Ready to run simulation.";
+            keyStatus.style.color = "#9CA3AF"; // gray-400
+            
+            // Redraw to show cleared logs
+            draw();
+        }
+        
+        playPauseButton.onclick = playPause;
+        resetButton.onclick = resetLogs;
+        
+        // --- Removed old program/record/keyframe functions ---
+
+
+        // --- The 'Mass Node' and 'Sphere of Influence' ---
+        const center = { x: width / 2, y: height / 2 };
+        let sphereRadius = Math.min(width, height) * 0.35; 
+
+        let particleGrid = [];
+        let logParticle = null; 
+        let emitters = [];
+        let logX = []; 
+        let logY = []; 
+        let nodeLogs = []; 
+
+        function distance(x1, y1, x2, y2) {
+            return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+        }
+        
+        function setupEmittersAndLogs() {
+            emitters = [];
+            for (let i = 0; i < params.numEmitters; i++) {
+                emitters.push({});
+            }
+
+            nodeLogs = Array.from({ length: params.numEmitters }, () => []);
+
+            nodeLogContainer.innerHTML = ''; 
+            nodeLogContexts = [];
+            
+            const logsToShow = Math.min(params.numEmitters, 12);
+            
+            if (params.numEmitters > 12) {
+                nodeLogContainer.innerHTML = `<p class="text-gray-400 text-center col-span-2">Showing first 12 of ${params.numEmitters} node logs for clarity.</p>`;
+            }
+            
+            const nodeLogHeight = 80;
+            for (let i = 0; i < logsToShow; i++) {
+                const title = document.createElement('h4');
+                title.className = 'node-log-title';
+                title.innerText = `Node ${i + 1} Log`;
+
+                const nodeCanvas = document.createElement('canvas');
+                nodeCanvas.className = 'node-log-canvas';
+                nodeCanvas.width = width / 2; 
+                nodeCanvas.height = nodeLogHeight;
+                
+                const container = document.createElement('div');
+                container.appendChild(title);
+                container.appendChild(nodeCanvas);
+                
+                nodeLogContainer.appendChild(container);
+                nodeLogContexts.push(nodeCanvas.getContext('2d'));
+            }
+            
+            logCanvasX.width = width;
+            logCanvasX.height = logHeight;
+            logCanvasY.width = width;
+            logCanvasY.height = logHeight;
+        }
+
+        function setupParticles() {
+            particleGrid = [];
+            let closestDist = Infinity;
+            let closestParticle = null;
+            
+            sphereRadius = Math.min(width, height) * 0.35;
+            
+            for (let i = 0; i <= params.gridSize; i++) {
+                particleGrid[i] = [];
+                for (let j = 0; j <= params.gridSize; j++) {
+                    const x = (i / params.gridSize) * width;
+                    const y = (j / params.gridSize) * height;
+                    const p = { homeX: x, homeY: y, x: x, y: y };
+                    particleGrid[i][j] = p;
+
+                    const logPointX = center.x + sphereRadius;
+                    const logPointY = center.y;
+                    const d = distance(x, y, logPointX, logPointY);
+                    if (d < closestDist) {
+                        closestDist = d;
+                        closestParticle = p;
+                    }
+                }
+            }
+            logParticle = closestParticle;
+        }
+
+        // --- UPDATE FUNCTION (Simplified) ---
+        function update(realDeltaTime) {
+            // 1. Advance physics clock if playing
+            if (isPlaying) {
+                // Calculate Local Time dilation
+                const timeDilation = 1.0 / (1.0 + params.amplitude * 0.1 + params.waveFreq * 0.05);
+                const physicsDeltaTime = realDeltaTime * timeDilation;
+                localTime += physicsDeltaTime; 
+            }
+            // Parameters (params) are STATIC. They do not update here.
+
+            // 2. Update Emitter Positions (uses localTime for physics)
+            const t = localTime * params.spinSpeed; 
+            const r = params.spinRadius; 
+            const num = params.numEmitters;
+
+            // Frustration factors from Quaternion
+            const frustX = params.frustrationX;
+            const frustY = params.frustrationY;
+
+            if (params.orbitalMode === 'circle') {
+                for (let i = 0; i < num; i++) {
+                    const angle = t + (i * (Math.PI * 2) / num);
+                    const cos_a = Math.cos(angle);
+                    const sin_a = Math.sin(angle);
+                    // Apply frustration: distort the circle into an ellipse
+                    emitters[i].x = center.x + r * (cos_a + frustX * sin_a);
+                    emitters[i].y = center.y + r * (sin_a + frustY * cos_a);
+                }
+            } else if (params.orbitalMode === 'p-orbital') {
+                const baseAngle = t * 0.5; 
+                const cos_base = Math.cos(baseAngle);
+                const sin_base = Math.sin(baseAngle);
+                for (let i = 0; i < num; i++) {
+                    const node_t = t + (i * Math.PI * 2 / num);
+                    let local_x = r * Math.cos(node_t);
+                    let local_y = r * Math.sin(2 * node_t) / 2;
+                    // Apply frustration
+                    local_x += r * frustX * Math.sin(node_t);
+                    local_y += r * frustY * Math.cos(2 * node_t);
+                    emitters[i].x = center.x + (local_x * cos_base - local_y * sin_base);
+                    emitters[i].y = center.y + (local_x * sin_base + local_y * cos_base);
+                }
+            } else if (params.orbitalMode === 'd-orbital') {
+                const baseAngle = t * 0.25; 
+                const cos_base = Math.cos(baseAngle);
+                const sin_base = Math.sin(baseAngle);
+                for (let i = 0; i < num; i++) {
+                    const node_t = t + (i * Math.PI * 2 / num);
+                    const local_r = r * (Math.cos(2 * node_t) + frustX); // Frustration adds to radius
+                    let local_x = local_r * Math.cos(node_t);
+                    let local_y = local_r * Math.sin(node_t);
+                    local_y += r * frustY * Math.sin(node_t); // Frustration distorts Y
+                    emitters[i].x = center.x + (local_x * cos_base - local_y * sin_base);
+                    emitters[i].y = center.y + (local_x * sin_base + local_y * cos_base);
+                }
+            } else if (params.orbitalMode === 'shells') {
+                const shell_max_nodes = [3, 5, 8, 13, 21, 34, 55, 89, 144, 233]; 
+                const shell_base_radii = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+                const shell_speeds = [1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0.05];
+                let nodesPlaced = 0;
+                let nodeIndex = 0;
+                for (let shell = 0; shell < shell_max_nodes.length; shell++) {
+                    if (nodesPlaced >= num) break;
+                    let nodesInThisShell = Math.min(num - nodesPlaced, shell_max_nodes[shell]);
+                    const r_shell = r * shell_base_radii[shell] * params.shellSpacing;
+                    const t_shell = t * shell_speeds[shell];
+                    for (let i = 0; i < nodesInThisShell; i++, nodeIndex++) {
+                        const angle = t_shell + (i * (Math.PI * 2) / nodesInThisShell);
+                        const cos_a = Math.cos(angle);
+                        const sin_a = Math.sin(angle);
+                        // Apply frustration: distort the shell
+                        emitters[nodeIndex].x = center.x + r_shell * (cos_a + frustX * sin_a * (shell+1)*0.2);
+                        emitters[nodeIndex].y = center.y + r_shell * (sin_a + frustY * cos_a * (shell+1)*0.2);
+                    }
+                    nodesPlaced += nodesInThisShell;
+                }
+            }
+
+            // 3. Update Particle Positions (Physics)
+            const physicsTime = localTime; 
+            for (let i = 0; i <= params.gridSize; i++) {
+                for (let j = 0; j <= params.gridSize; j++) {
+                    const p = particleGrid[i][j];
+                    let totalDisplacement = { x: 0, y: 0 };
+                    emitters.forEach((e, index) => {
+                        const dx = p.homeX - e.x;
+                        const dy = p.homeY - e.y;
+                        const dist = Math.sqrt(dx*dx + dy*dy) + 0.1; 
+                        const falloff = (dist * 0.05 + 1);
+                        const baseAmplitude = params.amplitude / falloff;
+                        const waveValue = baseAmplitude * Math.sin(params.waveNumber * dist - params.waveFreq * physicsTime);
+                        const unitX = dx / dist;
+                        const unitY = dy / dist;
+                        const displacementX = unitX * waveValue;
+                        const displacementY = unitY * waveValue;
+                        totalDisplacement.x += displacementX;
+                        totalDisplacement.y += displacementY;
+                        if (p === logParticle && isPlaying && index < 12) { 
+                            const magnitude = Math.sqrt(displacementX*displacementX + displacementY*displacementY) * Math.sign(waveValue);
+                            if(nodeLogs[index]) {
+                                nodeLogs[index].push(magnitude);
+                                if (nodeLogs[index].length > width + 50) {
+                                    nodeLogs[index].shift();
+                                }
+                            }
+                        }
+                    });
+
+                    // Dampening
+                    const distFromCenter = distance(p.homeX, p.homeY, center.x, center.y);
+                    if (distFromCenter > sphereRadius) {
+                        totalDisplacement.x *= params.dampening;
+                        totalDisplacement.y *= params.dampening;
+                    }
+
+                    // "Wrapping" effect (Vortex)
+                    if (distFromCenter < sphereRadius * 1.2 && distFromCenter > params.massNodeRadius) {
+                        const vortexStrength = params.amplitude * 0.5 * (1.0 - (distFromCenter / (sphereRadius * 1.2)));
+                        const dx_center = p.homeX - center.x;
+                        const dy_center = p.homeY - center.y;
+                        const perp_x = -dy_center / (distFromCenter + 0.1); 
+                        const perp_y =  dx_center / (distFromCenter + 0.1); 
+                        totalDisplacement.x += perp_x * vortexStrength;
+                        totalDisplacement.y += perp_y * vortexStrength;
+                    }
+
+                    p.x = p.homeX + totalDisplacement.x; 
+                    p.y = p.homeY + totalDisplacement.y;
+                }
+            }
+
+            // 4. Update Main Logs
+            if (logParticle && isPlaying) {
+                const logDispX = logParticle.x - logParticle.homeX;
+                const logDispY = logParticle.y - logParticle.homeY;
+                logX.push(logDispX);
+                logY.push(logDispY);
+                if (logX.length > width + 50) logX.shift();
+                if (logY.length > width + 50) logY.shift();
+            }
+        }
+
+        // --- DRAW FUNCTION ---
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, width, height);
+            
+            ctx.save();
+            ctx.translate(center.x, center.y); 
+            ctx.scale(params.zoom, params.zoom); 
+            ctx.translate(-center.x, -center.y); 
+
+            // Grid Lines
+            ctx.strokeStyle = '#1F2937'; 
+            ctx.lineWidth = 1 / params.zoom; 
+            for (let i = 0; i <= params.gridSize; i++) {
+                ctx.beginPath();
+                for (let j = 0; j <= params.gridSize; j++) {
+                    const p = particleGrid[i][j];
+                    if (j === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+                ctx.beginPath();
+                for (let j = 0; j <= params.gridSize; j++) {
+                    const p = particleGrid[j][i]; 
+                    if (j === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                }
+                ctx.stroke();
+            }
+
+            // Sphere of Influence
+            ctx.strokeStyle = '#4B5563'; 
+            ctx.lineWidth = 2 / params.zoom; 
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, sphereRadius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Mass Node (Black Hole)
+            ctx.fillStyle = '#000000'; 
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, params.massNodeRadius, 0, Math.PI * 2); 
+            ctx.fill();
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1 / params.zoom; 
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, params.massNodeRadius, 0, Math.PI * 2); 
+            ctx.stroke();
+
+            // Emitters
+            emitters.forEach(e => {
+                ctx.beginPath();
+                const emitterRadius = Math.max(1 / params.zoom, 4 / params.zoom); 
+                ctx.arc(e.x, e.y, emitterRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFFFFF'; 
+                ctx.fill();
+            });
+            
+            ctx.restore();
+
+            drawMainLogs();
+            drawNodeLogs();
+        }
+        
+        // --- Log Drawing Functions (Unchanged) ---
+        function drawSingleLog(logCtx, logData, canvasHeight, maxDisplacement) {
+            const canvasWidth = logCtx.canvas.width;
+            logCtx.fillStyle = '#000';
+            logCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            const logCenter = canvasHeight / 2;
+            
+            // Log Boundaries
+            logCtx.strokeStyle = '#1F2937'; 
+            logCtx.lineWidth = 1;
+            logCtx.beginPath();
+            logCtx.moveTo(0, canvasHeight * 0.1);
+            logCtx.lineTo(canvasWidth, canvasHeight * 0.1);
+            logCtx.stroke();
+            logCtx.beginPath();
+            logCtx.moveTo(0, canvasHeight * 0.9);
+            logCtx.lineTo(canvasWidth, canvasHeight * 0.9);
+            logCtx.stroke();
+            // Center line
+            logCtx.beginPath();
+            logCtx.strokeStyle = '#374151'; 
+            logCtx.lineWidth = 1;
+            logCtx.moveTo(0, logCenter);
+            logCtx.lineTo(canvasWidth, logCenter);
+            logCtx.stroke();
+            // Log data
+            logCtx.beginPath();
+            logCtx.strokeStyle = '#3B82F6'; 
+            logCtx.lineWidth = 2;
+            
+            let dataScale = 1.0;
+            if (maxDisplacement > 0.01) { 
+                dataScale = (canvasHeight * 0.4) / maxDisplacement;
+            }
+
+            for (let i = 0; i < canvasWidth; i++) {
+                const logIndex = logData.length - 1 - i;
+                if (logIndex < 0) break;
+                const value = logData[logIndex] * dataScale; 
+                const x = canvasWidth - 1 - i;
+                const y = logCenter - value; 
+                if (i === 0) logCtx.moveTo(x, y);
+                else logCtx.lineTo(x, y);
+            }
+            logCtx.stroke();
+        }
+
+        function drawMainLogs() {
+            const recentLogX = logX.slice(-width);
+            const recentLogY = logY.slice(-width);
+            const maxDispX = Math.max(0.1, ...recentLogX.map(Math.abs));
+            const maxDispY = Math.max(0.1, ...recentLogY.map(Math.abs));
+            drawSingleLog(logCtxX, logX, logHeight, maxDispX);
+            drawSingleLog(logCtxY, logY, logHeight, maxDispY);
+        }
+
+        function drawNodeLogs() {
+            const logsToShow = Math.min(params.numEmitters, 12);
+            if (logsToShow === 0) return;
+            const defaultMaxDisp = Math.max(0.1, params.amplitude / (params.numEmitters * 0.5 + 1));
+            for(let i = 0; i < logsToShow; i++) {
+                if(nodeLogContexts[i] && nodeLogs[i]) {
+                    const recentLog = nodeLogs[i].slice(-width);
+                    const maxDisp = Math.max(0.1, ...recentLog.map(Math.abs), defaultMaxDisp);
+                    drawSingleLog(nodeLogContexts[i], nodeLogs[i], 80, maxDisp);
+                }
+            }
+        }
+        
+        // --- Main Animation Loop (Simplified) ---
+        function animate(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const realDeltaTime = (timestamp - lastTimestamp) * 0.001;
+            lastTimestamp = timestamp;
+
+            // Only update physics if playing
+            if (isPlaying) {
+                update(realDeltaTime);
+            }
+            
+            draw(); // Always draw
+
+            if (isPlaying) {
+                requestAnimationFrame(animate);
+            }
+        }
+
+        // Handle window resize
+        window.onresize = () => {
+            width = Math.min(1000, window.innerWidth - 32);
+            width = Math.max(width, 300); 
+            height = width;
+            
+            canvas.width = width;
+            canvas.height = height;
+            center.x = width / 2;
+            center.y = height / 2;
+
+            logHeight = 150; 
+            
+            logX = [];
+            logY = [];
+            setupParticles();
+            setupEmittersAndLogs(); 
+        };
+
+        // Start
+        setupParticles();
+        setupEmittersAndLogs();
+        updateSliderReadouts(); // Set initial slider disabled states
+        draw(); 
+
+    </script>
+</body>
+</html>
