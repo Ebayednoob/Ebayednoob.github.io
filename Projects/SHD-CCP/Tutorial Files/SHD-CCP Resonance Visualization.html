@@ -1,0 +1,3741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHD-CCP Resonance Visualization</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* gray-900 */
+            color: #d1d5db; /* gray-300 */
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+        }
+        #scene-container {
+            flex-grow: 1;
+            height: 100%;
+            min-height: 100vh;
+            position: relative; /* For text sprites */
+            display: flex; /* Use flex to manage children */
+            flex-direction: column; /* Stack tabs and content */
+        }
+        #controls {
+            width: 380px; /* Increased width */
+            flex-shrink: 0;
+            background-color: #1f2937; /* gray-800 */
+            padding: 1.5rem;
+            overflow-y: auto;
+            border-left: 1px solid #374151; /* gray-700 */
+        }
+        .control-group {
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #374151; /* gray-700 */
+            padding-bottom: 1.5rem;
+        }
+        .control-group:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.5rem;
+        }
+        h2 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #9ca3af; /* gray-400 */
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex; /* For info button */
+            justify-content: space-between; /* For info button */
+            align-items: center; /* For info button */
+        }
+        label, .label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #d1d5db; /* gray-300 */
+        }
+        input[type="range"], select, textarea {
+            width: 100%;
+            cursor: pointer;
+            background-color: #374151; /* gray-700 */
+            color: #d1d5db; /* gray-300 */
+            border: 1px solid #4b5563; /* gray-600 */
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+        }
+        select {
+             -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239ca3af' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpath d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+        textarea {
+            min-height: 100px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .readout {
+            font-family: monospace;
+            font-size: 0.875rem;
+            color: #fff;
+            background-color: #111827; /* gray-900 */
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #374151; /* gray-700 */
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #3b82f6; /* blue-500 */
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        #resonance-graph {
+            width: 100%;
+            height: 100px;
+            background-color: #111827;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+        }
+        
+        /* Tab Styles */
+        #view-tabs {
+            display: flex;
+            background-color: #1f2937; /* gray-800 */
+            border-bottom: 1px solid #374151; /* gray-700 */
+            flex-shrink: 0;
+            overflow-x: auto; /* Allow tabs to scroll on small screens */
+        }
+        .tab-btn {
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            color: #9ca3af; /* gray-400 */
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap; /* Prevent tabs from wrapping */
+        }
+        .tab-btn.active {
+            color: #ffffff;
+            border-bottom: 2px solid #3b82f6; /* blue-500 */
+        }
+        #main-content-area {
+            flex-grow: 1;
+            position: relative; /* For child containers */
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .tab-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: none; /* All start hidden */
+        }
+        .tab-content.visible {
+            display: block; /* Show the active one */
+        }
+        #json-container, #dfm-container {
+            background-color: #111827; /* gray-900 */
+            color: #c9d1d9;
+            font-family: 'Inter', sans-serif;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        #json-output {
+            white-space: pre;
+            font-size: 0.875rem;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /* DFM Tab Styles */
+        .dfm-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 1200px) { /* Adjust for smaller screens */
+            .dfm-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        .dfm-state-window {
+            background-color: #1f2937; /* gray-800 */
+            border: 1px solid #374151; /* gray-700 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            transition: all 0.3s ease;
+            opacity: 0.5;
+        }
+        .dfm-state-window.active {
+            opacity: 1.0;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); /* blue-500 */
+            border-color: #3b82f6;
+        }
+        .dfm-state-window h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.75rem;
+        }
+        .dfm-state-output {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #111827;
+            padding: 0.75rem;
+            border-radius: 0.25rem;
+            min-height: 50px;
+            color: #a5f3fc; /* cyan-200 */
+            white-space: pre-wrap; /* Wrap long content */
+            word-break: break-all;
+        }
+        .dfm-controls {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            font-weight: 500;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:disabled {
+            background-color: #374151;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+        .btn-blue {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-blue:hover:not(:disabled) {
+            background-color: #2563eb;
+        }
+        .btn-gray {
+            background-color: #4b5563;
+            color: white;
+        }
+        .btn-gray:hover:not(:disabled) {
+            background-color: #374151;
+        }
+        #dfm-generated-packet {
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-family: 'Courier New', Courier, monospace;
+            color: #f0abfc; /* fuchsia-300 */
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        /* Tooltip & Info Drawer Styles */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            border-bottom: 1px dotted #9ca3af;
+        }
+        .tooltip .tooltip-text {
+            visibility: hidden;
+            width: 300px;
+            background-color: #111827;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 10;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -150px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: normal;
+            border: 1px solid #374151;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        .info-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #4b5563;
+            color: #d1d5db;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            margin-left: 0.5rem;
+            flex-shrink: 0;
+        }
+        .info-drawer {
+            display: none;
+            background-color: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-top: 0.5rem; /* Space it from the grid */
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        .info-drawer h4 {
+            font-weight: 600;
+            color: #fff;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+        }
+        .info-drawer code {
+            background-color: #111827;
+            color: #a5f3fc;
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .info-drawer p {
+            margin-bottom: 0.75rem;
+        }
+        
+        /* Panmagic Bits (Tab 4) Styles */
+        #panmagic-container.visible {
+            display: grid;
+            grid-template-columns: 2fr 1fr; /* 2/3 for viz, 1/3 for grids */
+            gap: 1rem;
+            padding: 1rem; /* Add padding to the whole tab */
+            background-color: #0c111a; /* Darker bg */
+            height: 100%;
+        }
+        #panmagic-left-col {
+            display: grid;
+            grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); /* 50/50 split */
+            gap: 1rem;
+            height: 100%;
+            min-height: 0; /* Fix for flexbox overflow */
+        }
+        #panmagic-2d-view {
+            background: #111827;
+            border-radius: 0.5rem;
+            border: 1px solid #374151;
+            position: relative; /* For canvas */
+            min-height: 0;
+        }
+        #temporal-graph-container {
+            background: #111827;
+            border-radius: 0.5rem;
+            border: 1px solid #374151;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #temporal-canvas {
+            flex-grow: 1;
+            width: 100%;
+            height: 100%;
+            min-height: 100px; /* Ensure it has some height */
+        }
+        
+        #panmagic-canvas { 
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #panmagic-grid-container {
+            width: 100%; /* Full width of its column */
+            padding: 0.5rem; /* Reduced padding */
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: repeat(3, min-content); /* Fit content */
+            gap: 0.5rem;
+            overflow-y: auto;
+            background-color: #1f2937; /* gray-800 */
+            border-left: 1px solid #374151; /* gray-700 */
+            border-radius: 0.5rem; /* Added */
+        }
+        .panmagic-square {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            border: 2px solid #4b5563; /* gray-600 */
+            border-radius: 0.25rem;
+            transition: border-color 0.3s;
+            aspect-ratio: 1/1; /* Ensure squares are square */
+        }
+        .panmagic-square.active {
+            border-color: #3b82f6; /* blue-500 */
+            box-shadow: 0 0 10px #3b82f6;
+        }
+        .panmagic-square .cell {
+            width: 100%;
+            padding-bottom: 100%; /* Aspect ratio 1:1 */
+            position: relative;
+            /* background-color is set by JS */
+            border: 1px solid #1f2937; /* gray-800 */
+            transition: background-color 0.1s, box-shadow 0.1s; /* Added for highlight */
+        }
+        
+        /* Class for cells with saved data */
+        .panmagic-square .cell.has-data {
+            box-shadow: inset 0 0 0 2px #3b82f6; /* Blue inner border */
+        }
+        
+        /* Class for the single active cell */
+        .panmagic-square .cell.active-cell {
+            /* background-color is set by JS */
+            box-shadow: 0 0 8px #fff, inset 0 0 0 2px #fff;
+            z-index: 10;
+        }
+        .panmagic-square-label {
+            font-family: monospace;
+            font-size: 0.875rem; /* Smaller label */
+            font-weight: 600;
+            color: #fff;
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+        /* NEW: Usage stats text */
+        .usage-stats {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            text-align: center;
+            margin-top: -0.25rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* NEW: Temporal Legend Grid */
+        .legend-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.5rem;
+        }
+        .legend-grid .legend-item {
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            margin-bottom: 0; /* Override */
+        }
+        .legend-grid .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 0.5rem;
+            border: 1px solid #9ca3af;
+        }
+        /* NEW: Temporal Graph Toggle */
+        .temporal-graph-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            margin-bottom: 0.5rem;
+        }
+        .temporal-graph-header .toggle-pair {
+            margin-bottom: 0; /* Override default margin */
+        }
+
+
+        /* Panmagic Editor (Tab 5) Styles */
+        /* FIX: Changed #editor-container to #editor-container.visible */
+        #editor-container.visible {
+            display: flex;
+            flex-direction: row;
+            overflow-y: auto;
+            height: 100%;
+        }
+        #editor-controls {
+            width: 384px; /* 24rem */
+            flex-shrink: 0;
+            padding: 1.5rem;
+            background-color: #111827; /* gray-900 */
+            overflow-y: auto;
+            border-right: 1px solid #374151;
+        }
+        #editor-grid-display {
+            flex-grow: 1;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #editor-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            border: 1px solid #4b5563;
+            width: 100%;
+            max-width: 60vh; /* Limit max size */
+            aspect-ratio: 1 / 1;
+        }
+        #editor-grid .cell {
+            width: 100%;
+            padding-bottom: 100%;
+            position: relative;
+            background-color: #374151;
+            border: 1px solid #1f2937;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #editor-grid .cell:hover {
+            background-color: #4b5563;
+        }
+        #editor-grid .cell.has-data {
+            background-color: #1f2937;
+            box-shadow: inset 0 0 0 2px #3b82f6; /* Blue inner border */
+        }
+        #editor-grid .cell.active-edit {
+            background-color: #ffffff;
+            box-shadow: 0 0 10px #ffffff;
+            z-index: 10;
+        }
+        
+        /* Toggle Button Pair (for Cell Selection) */
+        .toggle-pair {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .toggle-pair .label-text {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #d1d5db;
+        }
+        .toggle-pair .switch {
+            margin: 0 0.5rem;
+        }
+        
+        /* Time Chain Controls */
+        .time-chain-controls {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .time-chain-controls .btn {
+            font-size: 1.125rem; /* Bigger icons */
+            padding: 0.5rem;
+        }
+        
+        /* 3D Time Tab */
+        #time-chain-container {
+            background-color: #0c111a;
+            position: relative; /* For CSS2D Renderer */
+            height: 100%;
+            width: 100%;
+        }
+
+        /* NEW: FPS Blocker */
+        #blocker {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 100;
+        }
+        #blocker:hover {
+            background-color: rgba(0,0,0,0.7);
+        }
+
+    </style>
+    <!-- Import Maps for three.js -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+
+    <div id="scene-container">
+        <!-- New Tab Bar -->
+        <div id="view-tabs">
+            <button id="btn-3d" class="tab-btn active">3D Visualization</button>
+            <button id="btn-json" class="tab-btn">Codex JSON</button>
+            <button id="btn-dfm" class="tab-btn">DFM</button>
+            <button id="btn-panmagic" class="tab-btn">Panmagic Bits</button>
+            <button id="btn-editor" class="tab-btn">Panmagic Editor</button>
+            <button id="btn-time-chain" class="tab-btn">3D Time</button> <!-- NEW TAB -->
+        </div>
+        
+        <!-- Main Content Area -->
+        <div id="main-content-area">
+            <!-- 3D Canvas Container -->
+            <div id="canvas-3d-container" class="tab-content visible"></div>
+            
+            <!-- JSON "Codex" Container -->
+            <div id="json-container" class="tab-content">
+                <pre><code id="json-output">{"message": "Structural Form ID must be > 3 to generate a codex."}</code></pre>
+            </div>
+
+            <!-- DFM Container -->
+            <div id="dfm-container" class="tab-content">
+                <div class="control-group">
+                    <h2>DFM Controls</h2>
+                    <div class="dfm-controls">
+                        <button id="dfm-run" class="btn btn-blue">Run Simulation</button>
+                        <button id="dfm-step" class="btn btn-gray">Step</button>
+                        <button id="dfm-reset" class="btn btn-gray">Reset</button>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h2>
+                        <span class="tooltip">DFM State Machine (S0 &rarr; S1 &rarr; S2)
+                            <span class="tooltip-text">A 3-step Deterministic Finite Machine (DFM) simulation. Each state (S0, S1, S2) processes one part of the SHD-CCP packet in sequence.</span>
+                        </span>
+                        <button class="info-btn" data-drawer="dfm-state-info">(?)</button>
+                    </h2>
+                    <!-- New Info Drawer for DFM State -->
+                    <div id="dfm-state-info" class="info-drawer">
+                        <h4>DFM Conceptual Breakdown</h4>
+                        <p>This simulates a "neuro-symbolic" process. The DFM provides a rigid, predictable <strong>structure</strong> (S0 &rarr; S1 &rarr; S2), while the <strong>data</strong> it processes is dynamic (the quaternion/metadata values from the main controller).</p>
+                        
+                        <h4>Mathematical Breakdown (Translation Layer)</h4>
+                        <p>A DFM is defined by $(\Sigma, S, s_0, \delta, F)$:</p>
+                        <ul class="list-disc list-inside ml-4">
+                            <li><strong>S (States):</strong> {S0, S1, S2}</li>
+                            <li><strong>$\Sigma$ (Alphabet):</strong> The set of input symbols defined in the "Alphabet" box.</li>
+                            <li><strong>s_0 (Start State):</strong> S0</li>
+                            <li><strong>$\delta$ (Transition):</strong> In this simple model, the transition is linear: `S0 &rarr; S1`, `S1 &rarr; S2`, `S2 &rarr; S0`. A random symbol from $\Sigma$ is "consumed" to trigger this transition.</li>
+                            <li><strong>F (Accept States):</strong> S2</li>
+                        </ul>
+                        
+                        <h4>Computational Breakdown (Down to Binary)</h4>
+                        <p>This shows the translation from a symbolic packet to machine code:</p>
+                        <ol class="list-decimal list-inside ml-4">
+                            <li><strong>Symbolic Layer (Here):</strong> `[{"Freq": 12}, {"Amp": 5}, {"Spin": 3}]`</li>
+                            <li><strong>Translation Layer:</strong> The DFM builds this sequence. A *real* packet would concatenate these values.</li>
+                            <li><strong>Binary Layer (Machine):</strong> The machine processes this as raw bits from the 64-bit packet.
+                                <ul class="list-disc list-inside ml-6">
+                                    <li>`Freq ID 12` (5 bits) = `01100`</li>
+                                    <li>`Amp ID 5` (4 bits) = `0101`</li>
+                                    <li>`Spin Class 3` (3 bits) = `011`</li>
+                                </ul>
+                            </li>
+                        </ol>
+                    </div>
+                    
+                    <div class="dfm-grid">
+                        <!-- State S0 -->
+                        <div id="dfm-state-s0" class="dfm-state-window active">
+                            <h3>State S0 (Start)</h3>
+                            <label for="s0-module">Packet Module</label>
+                            <select id="s0-module" class="mb-2">
+                                <option value="none">None</option>
+                                <option value="quat">Central Quaternion</option>
+                                <option value="freq" selected>Frequency ID</option>
+                                <option value="amp">Amplitude ID</option>
+                                <option value="struct">Structural Form ID</option>
+                                <option value="spin">Spin Class ID</option>
+                                <option value="payload">Payload Scaler</option>
+                            </select>
+                            <div id="s0-output" class="dfm-state-output">...</div>
+                        </div>
+                        <!-- State S1 -->
+                        <div id="dfm-state-s1" class="dfm-state-window">
+                            <h3>State S1</h3>
+                            <label for="s1-module">Packet Module</label>
+                            <select id="s1-module" class="mb-2">
+                                <option value="none">None</option>
+                                <option value="quat">Central Quaternion</option>
+                                <option value="freq">Frequency ID</option>
+                                <option value="amp" selected>Amplitude ID</option>
+                                <option value="struct">Structural Form ID</option>
+                                <option value="spin">Spin Class ID</option>
+                                <option value="payload">Payload Scaler</option>
+                            </select>
+                            <div id="s1-output" class="dfm-state-output">...</div>
+                        </div>
+                        <!-- State S2 -->
+                        <div id="dfm-state-s2" class="dfm-state-window">
+                            <h3>State S2 (Accept)</h3>
+                            <label for="s2-module">Packet Module</label>
+                            <select id="s2-module" class="mb-2">
+                                <option value="none">None</option>
+                                <option value="quat">Central Quaternion</option>
+                                <option value="freq">Frequency ID</option>
+                                <option value="amp">Amplitude ID</option>
+                                <option value="struct">Structural Form ID</option>
+                                <option value="spin" selected>Spin Class ID</option>
+                                <option value="payload">Payload Scaler</option>
+                            </select>
+                            <div id="s2-output" class="dfm-state-output">...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h2>
+                        <span class="tooltip">Generated Packet
+                            <span class="tooltip-text">The final 3-part sequence built by the DFM. It shows the value of the packet module that was "captured" during each state's transition.</span>
+                        </span>
+                        <button class="info-btn" data-drawer="dfm-packet-info">(?)</button>
+                    </h2>
+                    <!-- New Info Drawer for Packet -->
+                    <div id="dfm-packet-info" class="info-drawer">
+                        <h4>How the Packet is Determined</h4>
+                        <p>This window shows the result of one full S0&rarr;S1&rarr;S2 simulation run.</p>
+                        <ol class="list-decimal list-inside ml-4">
+                            <li>When the DFM "steps" into a state (e.g., <strong>S0</strong>), it checks which module you assigned to it (e.g., <strong>Frequency ID</strong>).</li>
+                            <li>It instantly reads that module's <strong>current value</strong> from the main SHD-CCP Controller (the panel on the right).</li>
+                            <li>This "captured" value is added to the packet.</li>
+                            <li>The DFM then transitions to the next state.</li>
+                        </ol>
+                        <p><strong>Example:</strong><br>
+                        1. <strong>S0</strong> is assigned <code>Frequency ID</code>. It steps, reads the slider value: <strong>12</strong>.<br>
+                        2. <strong>S1</strong> is assigned <code>Amplitude ID</code>. It steps, reads the slider value: <strong>5</strong>.<br>
+                        3. <strong>S2</strong> is assigned <code>Spin Class ID</code>. It steps, reads the slider value: <strong>3</strong>.<br>
+                        <strong>Final Packet:</strong> `[{"Freq": 12}, {"Amp": 5}, {"Spin": 3}]`
+                        </p>
+                    </div>
+                    <div id="dfm-generated-packet">[]</div>
+                </div>
+
+                <div class="control-group">
+                    <h2>
+                        <span class="tooltip">Alphabet
+                            <span class="tooltip-text">The set of valid input symbols for the DFM. In this simulation, a random symbol is chosen from this list to trigger each state transition.</span>
+                        </span>
+                        <button class="info-btn" data-drawer="dfm-alphabet-info">(?)</button>
+                    </h2>
+                     <!-- New Info Drawer for Alphabet -->
+                    <div id="dfm-alphabet-info" class="info-drawer">
+                        <h4>How the Alphabet is Used</h4>
+                        <p>In a traditional DFM, the alphabet (e.g., "0,1") defines the *only* valid inputs. The machine reads a string (like "1001") and validates it.</p>
+                        <p>This simulation is a <strong>generative model</strong>, so it's used differently:</p>
+                        <ol class="list-decimal list-inside ml-4">
+                            <li>When a state (e.g., S0) is active, it "consumes" a <strong>random symbol</strong> from this list (e.g., 'k').</li>
+                            <li>This symbol acts as the <strong>trigger</strong> for the state to perform its action (process its packet module) and transition to the next state (S1).</li>
+                            <li>In this simple linear model, the specific symbol doesn't change the *destination* (it always goes S0&rarr;S1), but it simulates the "consumption" of an input symbol that is part of a language.</li>
+                        </ol>
+                    </div>
+                    <p class="text-sm text-gray-400 mb-2">Define the simulation alphabet, separated by commas.</p>
+                    <textarea id="dfm-alphabet">a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z</textarea>
+                </div>
+            </div>
+
+            <!-- Panmagic Bits (Visualization) Container -->
+            <!-- MODIFIED: New grid layout -->
+            <div id="panmagic-container" class="tab-content p-4">
+                <div id="panmagic-left-col">
+                    <div id="panmagic-2d-view">
+                        <canvas id="panmagic-canvas"></canvas>
+                    </div>
+                    <!-- NEW Temporal Graph Container -->
+                    <div id="temporal-graph-container" class="flex flex-col">
+                         <div class="temporal-graph-header">
+                            <h2 class="text-base font-semibold text-white mb-2 flex-shrink-0">
+                                <span>Temporal Codex Graph (72 Packets)</span> <!-- CHANGED -->
+                                <button class="info-btn" data-drawer="temporal-legend-info">(?)</button> <!-- NEW -->
+                            </h2>
+                            <!-- NEW GRAPH TOGGLE -->
+                            <div class="toggle-pair">
+                                <span class="label-text text-xs">Grid</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="temporal-graph-toggle" checked>
+                                    <span class="slider"></span>
+                                </label>
+                                <span class="label-text text-xs">Ring</span>
+                            </div>
+                         </div>
+                         <p class="text-xs text-gray-400 mb-4 flex-shrink-0">
+                            Node Color = Active Hexagon. Blue Border = Has Codex Data. White Border = Current Time Step.
+                         </p>
+                         <!-- NEW Legend Drawer -->
+                         <div id="temporal-legend-info" class="info-drawer">
+                            <h4>Temporal Node Color Legend</h4>
+                            <p>Node color indicates which 3D Hexagon Zone (1-12) was active for that packet.</p>
+                            <div class="legend-grid">
+                                <!-- This will be populated by JS -->
+                            </div>
+                         </div>
+                        <canvas id="temporal-canvas"></canvas>
+                    </div>
+                </div>
+                <div id="panmagic-grid-container">
+                    <!-- 6 Panmagic Squares will be generated here by JS -->
+                </div>
+            </div>
+            
+            <!-- Panmagic Editor Container -->
+            <!-- FIX: Removed inline style="display:flex; ..." -->
+            <div id="editor-container" class="tab-content">
+                <!-- New Sub-Control Panel (Left) -->
+                <div id="editor-controls" class="w-96 flex-shrink-0 p-6 bg-gray-900 overflow-y-auto">
+                    <h2 class="text-lg font-semibold text-white mb-4">Panmagic Codex Editor</h2>
+                    <div class="control-group">
+                        <label for="edit-square-select">1. Select Square to Edit</label>
+                        <select id="edit-square-select">
+                            <option value="0">+X Axis</option>
+                            <option value="1">-X Axis</option>
+                            <option value="2">+Y Axis</option>
+                            <option value="3">-Y Axis</option>
+                            <option value="4">+Z Axis</option>
+                            <option value="5">-Z Axis</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <h3 class="text-base font-medium text-white mb-2">2. Select Cell (Click Grid)</h3>
+                        <div class="slider-label">
+                            <label>Selected:</label>
+                            <span id="editor-selected-cell" class="readout">(0, 0)</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <h3 class="text-base font-medium text-white mb-2">3. Edit Data</h3>
+                        <label for="edit-data-type">Data Type</label>
+                        <select id="edit-data-type" class="mb-4">
+                            <option value="string">String</option>
+                            <option value="integer">Integer</option>
+                            <option value="float">Float</option>
+                            <option value="packet_ptr">Packet Pointer (ID)</option>
+                        </select>
+                        <label for="edit-data-value">Value</label>
+                        <textarea id="edit-data-value" rows="4"></textarea>
+                    </div>
+                    <button id="editor-save-btn" class="btn btn-blue w-full">Save Data to Codex</button>
+                </div>
+                <!-- Grid Container (Right) -->
+                <div id="editor-grid-display" class="flex-grow p-4 flex items-center justify-center">
+                    <div id="editor-grid" class="shadow-2xl">
+                        <!-- The 8x8 editor grid will be generated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW 3D Time Chain Container -->
+            <div id="time-chain-container" class="tab-content">
+                <!-- This will be the 2nd 3D canvas -->
+                <div id="blocker">
+                    Click to Enter FPS Mode
+                </div>
+                <div class="absolute top-4 left-4 z-10">
+                    <button id="time-control-toggle" class="btn btn-gray">Switch to FPS Mode</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="controls">
+        <h1>SHD-CCP Controller</h1>
+        <p class="text-sm text-gray-400 mb-6">Control the 64-bit packet metadata and observe the "Vacuum Energy" resonance.</p>
+        
+        <!-- NEW Time Chain Controls -->
+        <div class="control-group">
+            <h2>Time Chain (72 Packets)</h2> <!-- CHANGED -->
+            <div class="mb-4">
+                <label for="rotation-algo-select-timechain">Generation Algorithm</label>
+                <select id="rotation-algo-select-timechain">
+                    <option value="trefoil">Trefoil Knot Path</option>
+                    <option value="torus_2_3">Torus Knot (2,3)</option>
+                    <option value="torus_3_4">Torus Knot (3,4)</option>
+                    <option value="figure_eight">Figure-Eight Knot Path</option>
+                    <option value="elliptical">Elliptical Orbit (Original)</option>
+                    <option value="scan">3D Axis Scan</option>
+                </select>
+            </div>
+            <button id="generate-chain-btn" class="btn btn-blue w-full mb-4">Generate Time Chain</button>
+            <div class="mb-3">
+                <div class="slider-label">
+                    <label for="time-step-slider">Time Step</label>
+                    <span id="time-step-readout" class="readout">0</span>
+                </div>
+                <input type="range" id="time-step-slider" min="0" max="71" value="0" step="1"> <!-- CHANGED -->
+            </div>
+            <div class="time-chain-controls">
+                <button id="chain-reset" class="btn btn-gray w-full" title="Reset (Stop)">❚❚</button>
+                <button id="chain-prev" class="btn btn-gray w-full" title="Previous">&lt;</button>
+                <button id="chain-play-pause" class="btn btn-gray w-full" title="Play/Pause">▶</button>
+                <button id="chain-next" class="btn btn-gray w-full" title="Next">&gt;</button>
+            </div>
+        </div>
+        
+        <!-- Central Quaternion Controls -->
+        <div class="control-group">
+            <h2>Central Quaternion Sphere</h2>
+            <div class="toggle-label">
+                <span class="font-medium text-gray-300">Show Central Sphere</span>
+                <label class="switch">
+                    <input type="checkbox" id="show-sphere-toggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-label">
+                <span class="font-medium text-gray-300">Global Inverse Polarity</span>
+                <label class="switch">
+                    <input type="checkbox" id="inverse-polarity-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            
+            <div class="mb-3">
+                <div class="slider-label">
+                    <label for="quat-w-slider">W</label>
+                    <span id="quat-w-readout" class="readout">1.00</span>
+                </div>
+                <input type="range" id="quat-w-slider" min="-1" max="1" value="1" step="0.01">
+            </div>
+            <div class="mb-3">
+                <div class="slider-label">
+                    <label for="quat-x-slider">X</label>
+                    <span id="quat-x-readout" class="readout">0.00</span>
+                </div>
+                <input type="range" id="quat-x-slider" min="-1" max="1" value="0" step="0.01">
+            </div>
+            <div class="mb-3">
+                <div class="slider-label">
+                    <label for="quat-y-slider">Y</label>
+                    <span id="quat-y-readout" class="readout">0.00</span>
+                </div>
+                <input type="range" id="quat-y-slider" min="-1" max="1" value="0" step="0.01">
+            </div>
+            <div class="mb-3">
+                <div class="slider-label">
+                    <label for="quat-z-slider">Z</label>
+                    <span id="quat-z-readout" class="readout">0.00</span>
+                </div>
+                <input type="range" id="quat-z-slider" min="-1" max="1" value="0" step="0.01">
+            </div>
+        </div>
+
+        <!-- NEW Cell Selection Algorithm -->
+        <div class="control-group">
+            <h2>Trail/Codex Algorithm</h2>
+            <p class="text-xs text-gray-400 mb-4">
+                Controls trail color/size (in 3D Viz) and cell selection (in Panmagic Codex).
+            </p>
+            <!-- Row Control -->
+            <div class="toggle-pair">
+                <span class="label-text">Row/Color: Metadata</span>
+                <label class="switch">
+                    <input type="checkbox" id="row-control-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="label-text">Algorithm</span>
+            </div>
+            <div id="row-algo-control" class="mb-4 hidden">
+                <label for="y-algo-select">Quaternion Algorithm (Row/Color)</label>
+                <select id="y-algo-select">
+                    <option value="algo1">(|w| + |x|) * 4</option>
+                    <option value="algo2">(|y| + |z|) * 4</option>
+                    <option value="algo3">|w * y| * 8</option>
+                    <option value="algo4">|x - z| * 8</option>
+                    <option value="algo5">(|w|+|x|+|y|+|z|) * 2</option>
+                </select>
+            </div>
+
+            <!-- Column Control -->
+            <div class="toggle-pair">
+                <span class="label-text">Col/Size: Metadata</span>
+                <label class="switch">
+                    <input type="checkbox" id="col-control-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="label-text">Algorithm</span>
+            </div>
+            <div id="col-algo-control" class="mb-4 hidden">
+                <label for="x-algo-select">Quaternion Algorithm (Col/Size)</label>
+                <select id="x-algo-select">
+                    <option value="algo1">(|w| + |x|) * 4</option>
+                    <option value="algo2">(|y| + |z|) * 4</option>
+                    <option value="algo3">|w * y| * 8</option>
+                    <option value="algo4">|x - z| * 8</option>
+                    <option value="algo5">(|w|+|x|+|y|+|z|) * 2</option>
+                </select>
+            </div>
+        </div>
+        <!-- END NEW GROUP -->
+
+        <!-- Lattice Visualization Controls -->
+        <div class="control-group">
+            <h2>Lattice Visualization</h2>
+            <div class="toggle-label">
+                <span class="font-medium text-gray-300">Show Lattice Nodes</span>
+                <label class="switch">
+                    <input type="checkbox" id="show-lattice-nodes-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-label">
+                <span class="font-medium text-gray-300">Show Node Trails</span>
+                <label class="switch">
+                    <input type="checkbox" id="show-node-trails-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-label">
+                <span class="font-medium text-gray-300">Show Octant Helpers</span>
+                <label class="switch">
+                    <input type="checkbox" id="show-octants-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="mb-3">
+                <div class="slider-label">
+                    <label for="trail-persist-slider">Trail Persistence (sec)</label>
+                    <span id="trail-persist-readout" class="readout">10</span>
+                </div>
+                <input type="range" id="trail-persist-slider" min="1" max="30" value="10" step="1">
+            </div>
+        </div>
+
+        <!-- 5 Packet Node Controls -->
+        <div class="control-group">
+            <h2>SHD-CCP Metadata Nodes</h2>
+            <div class="mb-4">
+                <div class="slider-label">
+                    <label for="freq-slider">Frequency ID (5 bits)</label>
+                    <span id="freq-readout" class="readout">0</span>
+                </div>
+                <input type="range" id="freq-slider" min="0" max="31" value="0" step="1">
+            </div>
+            <div class="mb-4">
+                <div class="slider-label">
+                    <label for="amp-slider">Amplitude ID (4 bits)</label>
+                    <span id="amp-readout" class="readout">0</span>
+                </div>
+                <input type="range" id="amp-slider" min="0" max="15" value="0" step="1">
+            </div>
+            <div class="mb-4">
+                <div class="slider-label">
+                    <label for="struct-slider">Structural Form ID (4 bits)</label>
+                    <span id="struct-readout" class="readout">0</span>
+                </div>
+                <input type="range" id="struct-slider" min="0" max="15" value="0" step="1">
+            </div>
+            <div class="mb-4">
+                <div class="slider-label">
+                    <label for="spin-slider">Spin Class ID (3 bits)</label>
+                    <span id="spin-readout" class="readout">0</span>
+                </div>
+                <input type="range" id="spin-slider" min="0" max="7" value="0" step="1">
+            </div>
+            <div class="mb-4">
+                <div class="slider-label">
+                    <label for="payload-slider">Payload Scaler (16 bits)</label>
+                    <span id="payload-readout" class="readout">0</span>
+                </div>
+                <input type="range" id="payload-slider" min="0" max="65535" value="0" step="100">
+            </div>
+        </div>
+
+        <!-- Resonance Readout & Graph -->
+        <div class="control-group">
+            <h2>Resonance Function</h2>
+            <p class="text-xs text-gray-400 mb-4">Resonance occurs when Quaternion Magnitude matches the Target Resonance value.</p>
+            <div class="flex justify-between items-center text-sm mb-2">
+                <span class="text-gray-400">Quat. Magnitude:</span>
+                <span id="quat-mag-readout" class="readout">1.00</span>
+            </div>
+            <div class="flex justify-between items-center text-sm">
+                <span class="text-gray-400">Target Resonance:</span>
+                <span id="target-res-readout" class="readout">0.00</span>
+            </div>
+            <canvas id="resonance-graph"></canvas>
+            <p class="text-xs text-gray-500 mt-2 text-center">R(f, a) = (a/15) * (16(f/31)⁵ - 20(f/31)³ + 5(f/31))</p>
+        </div>
+        
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js'; 
+
+        // --- Main Scene (Tab 1) ---
+        let scene, camera, renderer, controls, labelRenderer;
+        let centralSphereGroup, rhombicDodecahedron, packetNodesGroup, spinVector;
+        let latticeNodesGroup, trailPoints, trailGeometry;
+        let graphCanvas, graphCtx;
+        
+        let latticeScaffolding, centralLines;
+        let neighborLattice;
+        let activeHexIndex = -1; 
+        
+        // --- Octant Helpers ---
+        let octantPlanes;
+        let octantMarkers = [];
+        
+        // --- Panmagic Scene (Tab 4) ---
+        let panmagicCanvas, panmagicCtx; 
+        let temporalCanvas, temporalCtx; 
+        let panmagicGrids = []; 
+        let panmagicGridCells = []; // [squareIndex][row][col]
+        const CUBE_AXES = [
+            new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+            new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+            new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
+        ];
+        const AXIS_COLORS = ["#f87171", "#b91c1c", "#60a5fa", "#2563eb", "#34d399", "#059669"]; // +X, -X, +Y, -Y, +Z, -Z
+        const CUBE_AXIS_LABELS = ["+X Axis", "-X Axis", "+Y Axis", "-Y Axis", "+Z Axis", "-Z Axis"];
+        
+        let activeSquareIndex = -1;
+        let activeCell = { x: 0, y: 0, color: "#ffffff" };
+        let lastActiveCell = { sq: -1, x: -1, y: -1 };
+        
+        const CUBE_AXIS_TO_SQUARE_MAP = [3, 2, 0, 5, 1, 4]; // +X, -X, +Y, -Y, +Z, -Z
+        const LATTICE_VEC_TO_TRI_MAP = [6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5];
+
+        // --- Panmagic Editor (Tab 5) ---
+        let editorGrid, editorControls;
+        let editorGridCells = []; 
+        let panmagicCodexData = {}; 
+        let activeEditorSquare = 0;
+        let activeEditorCell = { r: 0, c: 0 };
+
+        // --- 3D Time Chain Scene (Tab 6) ---
+        let timeScene, timeCamera, timeRenderer, timeControlsOrbit, timeControlsFPS, timeRaycaster; 
+        let timeChainGroups = []; // 72 packet groups
+        let activeStepBox; 
+        const timeChainMouse = new THREE.Vector2();
+        let timeChainControlMode = 'orbit'; 
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false; 
+        let velocity = new THREE.Vector3(); 
+        let prevTime = performance.now(); 
+        let dodecaGeo, dodecaMat; // NEW: Reusable geo/mat for dodeca highlight
+
+        // --- UI Elements ---
+        let canvas3dContainer, jsonContainer, dfmContainer, panmagicContainer, editorContainer, timeChainContainer; 
+        let btn3D, btnJSON, btnDFM, btnPanmagic, btnEditor, btnTimeChain, jsonOutputEl;
+        let temporalGraphToggle;
+        
+        // --- DFM State ---
+        let dfmCurrentState = 0; 
+        let dfmGeneratedPacket = [];
+        const dfmStateWindows = [];
+        const dfmStateOutputs = [];
+        const dfmModuleSelectors = [];
+        let dfmAlphabet = [];
+        let dfmRunInterval = null;
+
+        // --- Shared Control Variables ---
+        const rawQuat = { w: 1, x: 0, y: 0, z: 0 }; 
+        const quat = { w: 1, x: 0, y: 0, z: 0 };    
+        let inversePolarity = false;
+        
+        let frequencyId = 0;
+        let amplitudeId = 0;
+        let structuralFormId = 0;
+        let spinClassId = 0; 
+        let payloadScaler = 0; 
+        
+        // --- Time Chain State ---
+        let timeChainQuats = []; // Array of 72 full packet objects
+        let currentTimeStep = 0;
+        let isPlaying = false;
+        let playInterval = null;
+        let currentAlgorithm = 'trefoil';
+        // ---
+        
+        // --- Temporal Graph View State ---
+        let temporalGraphView = 'ring'; // 'grid' or 'ring'
+        
+        // --- Codex Algorithm Control ---
+        let rowControlMode = 'metadata'; // 'metadata' or 'algorithm'
+        let colControlMode = 'metadata'; // 'metadata' or 'algorithm'
+        const TRAIL_COLORS = [
+            new THREE.Color(0xff0000), new THREE.Color(0xffa500), new THREE.Color(0xffff00),
+            new THREE.Color(0x00ff00), new THREE.Color(0x00ffff), new THREE.Color(0x0000ff),
+            new THREE.Color(0x8b00ff), new THREE.Color(0xffffff)
+        ]; // 8 Colors for 8 rows (0-7)
+        const TRAIL_COLORS_HEX = [
+            "#ff0000", "#ffa500", "#ffff00", "#00ff00", "#00ffff", "#0000ff", "#8b00ff", "#ffffff"
+        ];
+        
+        // --- Node definitions ---
+        const NODE_DEFINITIONS = [
+            { name: "Freq", color: 0x3b82f6 }, { name: "Amp", color: 0x10b981 },
+            { name: "Struct", color: 0xef4444 }, { name: "Spin", color: 0xeab308 },
+            { name: "Payload", color: 0x8b5cf6 }, { name: "Node 6", color: 0xdb2777 },
+            { name: "Node 7", color: 0x14b8a6 }, { name: "Node 8", color: 0x0ea5e9 },
+            { name: "Node 9", color: 0x65a30d }, { name: "Node 10", color: 0xd97706 },
+            { name: "Node 11", color: 0x7c3aed }, { name: "Node 12", color: 0x64748b },
+            { name: "Node 13", color: 0xec4899 }, { name: "Node 14", color: 0x06b6d4 },
+            { name: "Node 15", color: 0x84cc16 }, { name: "Node 16", color: 0xf97316 },
+        ];
+        
+        // --- Metadata Bit Colors ---
+        const METADATA_COLORS = {
+            quat: new THREE.Color(0xffffff), // White
+            payload: new THREE.Color(0xf87171), // Red-400
+            freq: new THREE.Color(0x3b82f6), // Blue-500
+            spin: new THREE.Color(0x10b981), // Green-500
+            amp: new THREE.Color(0xeab308), // Yellow-500
+            struct: new THREE.Color(0x8b5cf6), // Violet-500
+            unused: new THREE.Color(0x4b5563) // gray-600
+        };
+
+        let targetResonance = 0;
+        let quatMagnitude = 1;
+        
+        let showLatticeNodes = false;
+        let showNodeTrails = false;
+        let trailPersistence = 10; 
+        let trailPointData = []; 
+        
+        const MAX_TRAIL_POINTS = 50000; 
+        
+        canvas3dContainer = document.getElementById('canvas-3d-container');
+        jsonContainer = document.getElementById('json-container');
+        dfmContainer = document.getElementById('dfm-container');
+        panmagicContainer = document.getElementById('panmagic-container');
+        editorContainer = document.getElementById('editor-container'); 
+        timeChainContainer = document.getElementById('time-chain-container'); // New
+        btn3D = document.getElementById('btn-3d');
+        btnJSON = document.getElementById('btn-json');
+        btnDFM = document.getElementById('btn-dfm');
+        btnPanmagic = document.getElementById('btn-panmagic');
+        btnEditor = document.getElementById('btn-editor'); 
+        btnTimeChain = document.getElementById('btn-time-chain'); // New
+        jsonOutputEl = document.getElementById('json-output');
+
+        const HEX_NODE_COLORS = [
+            0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0x00ffff, 0xff00ff,
+            0xff8000, 0x0080ff, 0x80ff00, 0x8000ff, 0xff0080, 0x00ff80
+        ].map(c => new THREE.Color(c));
+        
+        const HEX_NODE_COLORS_HEX = [ // Hex string versions for 2D canvas
+            "#ff0000", "#00ff00", "#0000ff", "#ffff00", "#00ffff", "#ff00ff",
+            "#ff8000", "#0080ff", "#80ff00", "#8000ff", "#ff0080", "#00ff80"
+        ];
+
+        const LATTICE_VECTORS = [
+            new THREE.Vector3(1, 1, 0), new THREE.Vector3(-1, 1, 0), new THREE.Vector3(1, -1, 0), new THREE.Vector3(-1, -1, 0),
+            new THREE.Vector3(1, 0, 1), new THREE.Vector3(-1, 0, 1), new THREE.Vector3(1, 0, -1), new THREE.Vector3(-1, 0, -1),
+            new THREE.Vector3(0, 1, 1), new THREE.Vector3(0, -1, 1), new THREE.Vector3(0, 1, -1), new THREE.Vector3(0, -1, -1)
+        ].map(v => v.normalize()); 
+        
+        const LATTICE_POSITION_SCALE = 5; 
+
+
+        function init() {
+            // Set default visible tab
+            canvas3dContainer.classList.add('visible');
+
+            // --- Init Main 3D Scene (Tab 1) ---
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827);
+            camera = new THREE.PerspectiveCamera(75, canvas3dContainer.clientWidth / canvas3dContainer.clientHeight, 0.1, 1000);
+            camera.position.set(0, 5, 20);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(canvas3dContainer.clientWidth, canvas3dContainer.clientHeight);
+            canvas3dContainer.appendChild(renderer.domElement);
+            
+            labelRenderer = new CSS2DRenderer();
+            labelRenderer.setSize(canvas3dContainer.clientWidth, canvas3dContainer.clientHeight);
+            labelRenderer.domElement.style.position = 'absolute';
+            labelRenderer.domElement.style.top = '0px';
+            labelRenderer.domElement.style.pointerEvents = 'none';
+            canvas3dContainer.appendChild(labelRenderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 5;
+            controls.maxDistance = 50;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            createRhombicDodecahedron();
+            createCentralSphere();
+            createPacketNodes();
+            createTrailSystem();
+            createLatticeScaffolding();
+            createCentralLines();
+            createNeighborLattice();
+            createOctantHelpers();
+            
+            // --- Init Panmagic 2D Scene (Tab 4) ---
+            initPanmagic2DView();
+            
+            // --- Init Panmagic 2D Grids (Viz Tab 4) ---
+            initPanmagicGrids();
+            
+            // --- Init Temporal Graph (Tab 4) ---
+            initTemporalGraph();
+            
+            // --- Init Panmagic Editor (Tab 5) ---
+            initPanmagicEditor();
+
+            // --- Init 3D Time Chain Scene (Tab 6) ---
+            initTimeChainScene();
+
+            // --- Init Other UI ---
+            graphCanvas = document.getElementById('resonance-graph');
+            graphCtx = graphCanvas.getContext('2d');
+            window.addEventListener('resize', onWindowResize); 
+            setupControls();
+            setupTabs();
+            setupDFM();
+            
+            // --- NEW: Add FPS keyboard listeners ---
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            
+            // Read initial slider values into rawQuat
+            const quatWSlider = document.getElementById('quat-w-slider');
+            const quatXSlider = document.getElementById('quat-x-slider');
+            const quatYSlider = document.getElementById('quat-y-slider');
+            const quatZSlider = document.getElementById('quat-z-slider');
+            
+            rawQuat.w = parseFloat(quatWSlider.value);
+            rawQuat.x = parseFloat(quatXSlider.value);
+            rawQuat.y = parseFloat(quatYSlider.value);
+            rawQuat.z = parseFloat(quatZSlider.value);
+            
+            applyPolarity(); 
+            
+            updateResonanceFunction();
+            drawResonanceGraph();
+            
+            // Generate a default time chain on load
+            generateTimeChain();
+            
+            onWindowResize();
+            animate();
+        }
+        
+        // --- Panmagic Scene (Tab 4) ---
+        function initPanmagic2DView() {
+            panmagicCanvas = document.getElementById('panmagic-canvas');
+            panmagicCtx = panmagicCanvas.getContext('2d');
+        }
+        
+        // --- Temporal Graph (Tab 4) ---
+        function initTemporalGraph() {
+            temporalCanvas = document.getElementById('temporal-canvas');
+            temporalCtx = temporalCanvas.getContext('2d');
+            temporalGraphToggle = document.getElementById('temporal-graph-toggle'); 
+            
+            temporalGraphToggle.addEventListener('change', (e) => {
+                temporalGraphView = e.target.checked ? 'ring' : 'grid';
+                drawTemporalGraph(); // Redraw immediately
+            });
+            
+            const legendContainer = document.querySelector('#temporal-legend-info .legend-grid');
+            for (let i = 0; i < 12; i++) {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.innerHTML = `
+                    <div class="legend-color" style="background-color: ${HEX_NODE_COLORS_HEX[i]}"></div>
+                    <span>Zone ${i + 1}</span>
+                `;
+                legendContainer.appendChild(item);
+            }
+        }
+
+        function drawPanmagic2DView() {
+            if (!panmagicCtx) return;
+            
+            const canvas = panmagicCtx.canvas;
+            if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
+            
+            const w = canvas.width = canvas.clientWidth;
+            const h = canvas.height = canvas.clientHeight;
+            const ctx = panmagicCtx;
+            
+            ctx.fillStyle = '#111827'; 
+            ctx.fillRect(0, 0, w, h);
+            
+            const center = { x: w / 2, y: h / 2 };
+            const r = Math.min(w, h) * 0.45; 
+            const r_inner = r * 0.5; 
+            const r_mid = r * 0.866; 
+
+            ctx.strokeStyle = '#9ca3af'; 
+            ctx.lineWidth = 1;
+
+            const points = {
+                center: [], mid: [], outer: []
+            };
+
+            for (let i = 0; i < 6; i++) {
+                const angle = (i / 6) * Math.PI * 2; 
+                const angle_mid = ((i + 0.5) / 6) * Math.PI * 2; 
+                
+                points.center.push({ x: center.x + r_inner * Math.cos(angle), y: center.y + r_inner * Math.sin(angle) });
+                points.mid.push({ x: center.x + r_mid * Math.cos(angle_mid), y: center.y + r_mid * Math.sin(angle_mid) });
+                points.outer.push({ x: center.x + r * Math.cos(angle), y: center.y + r * Math.sin(angle) });
+            }
+
+            const triangles = [];
+            for (let i = 0; i < 6; i++) {
+                const next = (i + 1) % 6;
+                triangles.push([center, points.center[i], points.center[next]]);
+                triangles.push([points.mid[i], points.outer[i], points.outer[next]]);
+            }
+
+            triangles.forEach((tri, i) => {
+                const mappedIndex = LATTICE_VEC_TO_TRI_MAP[activeHexIndex];
+                if (i === mappedIndex) {
+                    ctx.fillStyle = '#FFFFFF'; 
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2;
+                } else {
+                    ctx.fillStyle = '#FEF08A'; 
+                    ctx.strokeStyle = '#9ca3af';
+                    ctx.lineWidth = 1;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(tri[0].x, tri[0].y);
+                ctx.lineTo(tri[1].x, tri[1].y);
+                ctx.lineTo(tri[2].x, tri[2].y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            const squares = [
+                [points.center[0], points.mid[0], points.outer[1], points.center[1]], 
+                [points.center[1], points.mid[1], points.outer[2], points.center[2]], 
+                [points.center[2], points.mid[2], points.outer[3], points.center[3]], 
+                [points.center[3], points.mid[3], points.outer[4], points.center[4]], 
+                [points.center[4], points.mid[4], points.outer[5], points.center[5]], 
+                [points.center[5], points.mid[5], points.outer[0], points.center[0]], 
+            ];
+            
+            squares.forEach((sq, i) => {
+                const mappedIndex = CUBE_AXIS_TO_SQUARE_MAP[activeSquareIndex];
+                if (i === mappedIndex) {
+                    ctx.fillStyle = '#FFFFFF'; 
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2;
+                } else {
+                    ctx.fillStyle = '#F87171'; 
+                    ctx.strokeStyle = '#9ca3af'; 
+                    ctx.lineWidth = 1;
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(sq[0].x, sq[0].y);
+                ctx.lineTo(sq[1].x, sq[1].y);
+                ctx.lineTo(sq[2].x, sq[2].y);
+                ctx.lineTo(sq[3].x, sq[3].y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+        
+        // --- NEW Master Graph Function ---
+        function drawTemporalGraph() {
+            if (temporalGraphView === 'ring') {
+                drawTemporalGraph_RingView();
+            } else {
+                drawTemporalGraph_GridView();
+            }
+        }
+        
+        // --- NEW: Old Grid View Logic ---
+        function drawTemporalGraph_GridView() {
+            if (!temporalCtx) return;
+            
+            const canvas = temporalCtx.canvas;
+            if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
+            
+            const w = canvas.width = canvas.clientWidth;
+            const h = canvas.height = canvas.clientHeight;
+            const ctx = temporalCtx;
+
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, w, h);
+
+            const cols = 12; 
+            const rows = 6;
+            const cellWidth = w / cols;
+            const cellHeight = h / rows;
+            const nodeR = Math.min(cellWidth, cellHeight) * 0.35;
+
+            for (let i = 0; i < 72; i++) { // FIX: 72
+                const packet = timeChainQuats[i];
+                if (!packet) continue; 
+                
+                const c = i % cols;
+                const r = Math.floor(i / cols);
+                
+                const nodeX = c * cellWidth + cellWidth / 2;
+                const nodeY = r * cellHeight + cellHeight / 2;
+
+                // --- Set Color (based on active hexagon) ---
+                const color = HEX_NODE_COLORS_HEX[packet.activeHexIndex % HEX_NODE_COLORS_HEX.length];
+                ctx.fillStyle = color || "#4b5563";
+                
+                // --- Draw node circle ---
+                ctx.beginPath();
+                ctx.arc(nodeX, nodeY, nodeR, 0, 2 * Math.PI);
+                ctx.fill();
+
+                // --- Check for Codex Data Highlight ---
+                // FIX: Re-calculate row/col values LIVE instead of using stale packet data
+                const rowVal = (rowControlMode === 'metadata') 
+                    ? packet.spinClassId 
+                    : calculateCoordinateFromAlgo(document.getElementById('y-algo-select').value, packet.w, packet.x, packet.y, packet.z);
+                
+                const colVal = (colControlMode === 'metadata') 
+                    ? (packet.frequencyId + packet.amplitudeId) % 8 
+                    : calculateCoordinateFromAlgo(document.getElementById('x-algo-select').value, packet.w, packet.x, packet.y, packet.z);
+                
+                const sqKey = `sq_${packet.activeSquareIndex}`; 
+                const cellKey = `cell_${colVal}_${rowVal}`;
+                
+                const hasData = (panmagicCodexData[sqKey] && panmagicCodexData[sqKey][cellKey]);
+                
+                if (hasData) {
+                    ctx.strokeStyle = "#3b82f6"; // blue-500
+                    ctx.lineWidth = 2;
+                    ctx.stroke(); // Draw blue border
+                }
+
+                // --- Check for Current Time Step Highlight ---
+                if (i === currentTimeStep) {
+                    ctx.strokeStyle = "#FFFFFF"; // White
+                    ctx.lineWidth = 3;
+                    ctx.stroke(); // Draw white border (overwrites blue if both)
+                }
+            }
+        }
+        
+        // --- NEW: Renamed Ring View Logic ---
+        function drawTemporalGraph_RingView() {
+            if (!temporalCtx) return;
+            
+            const canvas = temporalCtx.canvas;
+            if (canvas.clientWidth === 0 || canvas.clientHeight === 0) return;
+            
+            const w = canvas.width = canvas.clientWidth;
+            const h = canvas.height = canvas.clientHeight;
+            const ctx = temporalCtx;
+
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(0, 0, w, h);
+
+            const cols = 12; // 12 nodes per ring
+            const rows = 6;  // 6 rings
+            const cellWidth = w / cols;
+            const cellHeight = h / rows;
+            const nodeR = Math.min(w,h) * 0.035; // Make radius relative to canvas size
+
+            for (let r = 0; r < rows; r++) { // For each of the 6 graphs (rings)
+                const cx = w / 2; // Center all rings
+                const cy = h / 2;
+                const R = (Math.min(w,h) * 0.45) - (r * (Math.min(w,h) * 0.08)); // Rings go from outside in
+
+                // Draw ring label
+                ctx.fillStyle = AXIS_COLORS[r] || "#9ca3af";
+                ctx.font = "bold 12px monospace";
+                ctx.textAlign = "center";
+                ctx.fillText(CUBE_AXIS_LABELS[r], cx, cy - R - nodeR - 5);
+
+                for (let c = 0; c < cols; c++) { // 12 nodes for this graph
+                    const packetIndex = r * cols + c;
+                    const packet = timeChainQuats[packetIndex];
+                    if (!packet) continue; 
+
+                    const angle = (c / cols) * Math.PI * 2 - (Math.PI / 2); // Start at top
+                    const nodeX = cx + R * Math.cos(angle);
+                    const nodeY = cy + R * Math.sin(angle);
+
+                    // --- Set Color (based on active hexagon) ---
+                    const color = HEX_NODE_COLORS_HEX[packet.activeHexIndex % HEX_NODE_COLORS_HEX.length];
+                    ctx.fillStyle = color || "#4b5563";
+
+                    // 5. Draw line from center
+                    ctx.strokeStyle = "#374151"; // gray-700
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(nodeX, nodeY);
+                    ctx.stroke();
+                    
+                    // 6. Draw node circle
+                    ctx.beginPath();
+                    ctx.arc(nodeX, nodeY, nodeR, 0, 2 * Math.PI);
+                    ctx.fill();
+
+                    // --- 7. Check for Codex Data Highlight ---
+                    // FIX: Re-calculate row/col values LIVE instead of using stale packet data
+                    const rowVal = (rowControlMode === 'metadata') 
+                        ? packet.spinClassId 
+                        : calculateCoordinateFromAlgo(document.getElementById('y-algo-select').value, packet.w, packet.x, packet.y, packet.z);
+                    
+                    const colVal = (colControlMode === 'metadata') 
+                        ? (packet.frequencyId + packet.amplitudeId) % 8 
+                        : calculateCoordinateFromAlgo(document.getElementById('x-algo-select').value, packet.w, packet.x, packet.y, packet.z);
+
+                    const sqKey = `sq_${packet.activeSquareIndex}`; // Use packet's active square
+                    const cellKey = `cell_${colVal}_${rowVal}`;
+                    
+                    const hasData = (panmagicCodexData[sqKey] && panmagicCodexData[sqKey][cellKey]);
+                    
+                    if (hasData) {
+                        ctx.strokeStyle = "#3b82f6"; // blue-500
+                        ctx.lineWidth = 2;
+                        ctx.stroke(); // Draw blue border
+                    }
+
+                    // --- 8. Check for Current Time Step Highlight ---
+                    if (packetIndex === currentTimeStep) {
+                        ctx.strokeStyle = "#FFFFFF"; // White
+                        ctx.lineWidth = 3;
+                        ctx.stroke(); // Draw white border (overwrites blue if both)
+                    }
+                }
+            }
+        }
+        
+        function initPanmagicGrids() {
+            const container = document.getElementById('panmagic-grid-container');
+            const labels = ["+X Axis", "-X Axis", "+Y Axis", "-Y Axis", "+Z Axis", "-Z Axis"];
+            
+            panmagicGridCells = []; // Reset
+            for (let i = 0; i < 6; i++) {
+                const squareWrapper = document.createElement('div');
+                const label = document.createElement('div');
+                label.className = 'panmagic-square-label';
+                label.textContent = labels[i];
+                
+                const stats = document.createElement('p');
+                stats.className = 'usage-stats';
+                stats.id = `usage-stats-${i}`;
+                stats.textContent = '0 / 64 Used';
+                
+                const square = document.createElement('div');
+                square.className = 'panmagic-square';
+                square.id = `panmagic-square-${i}`;
+                
+                let cells = [];
+                for (let r = 0; r < 8; r++) {
+                    let rowCells = [];
+                    for (let c = 0; c < 8; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell';
+                        
+                        const bitIndex = r * 8 + c;
+                        // Color-code the cell backgrounds based on bit allocation
+                        if (bitIndex < 32) {
+                            cell.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'; // Quat (white-ish)
+                        } else if (bitIndex < 48) { 
+                            cell.style.backgroundColor = 'rgba(248, 113, 113, 0.2)'; // Payload
+                        } else if (bitIndex < 52) { 
+                            cell.style.backgroundColor = 'rgba(139, 92, 246, 0.2)'; // Struct
+                        } else if (bitIndex < 56) { 
+                            cell.style.backgroundColor = 'rgba(234, 179, 8, 0.2)'; // Amp
+                        } else if (bitIndex < 59) { 
+                            cell.style.backgroundColor = 'rgba(16, 185, 129, 0.2)'; // Spin
+                        } else if (bitIndex < 64) { 
+                            cell.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'; // Freq
+                        } else { 
+                            cell.style.backgroundColor = '#374151'; // Unused
+                        }
+                        
+                        square.appendChild(cell);
+                        rowCells.push(cell);
+                    }
+                    cells.push(rowCells);
+                }
+                
+                squareWrapper.appendChild(label);
+                squareWrapper.appendChild(stats); // NEW
+                squareWrapper.appendChild(square);
+                container.appendChild(squareWrapper);
+                panmagicGrids.push(square);
+                panmagicGridCells.push(cells); // Add to our cell tracker
+            }
+        }
+        
+        // --- Panmagic Editor (Tab 5) ---
+        function initPanmagicEditor() {
+            editorGrid = document.getElementById('editor-grid');
+            
+            editorGridCells = [];
+            for (let r = 0; r < 8; r++) {
+                const row = [];
+                for (let c = 0; c < 8; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.addEventListener('click', () => onEditorCellClick(r, c));
+                    editorGrid.appendChild(cell);
+                    row.push(cell);
+                }
+                editorGridCells.push(row);
+            }
+            
+            document.getElementById('edit-square-select').addEventListener('input', (e) => {
+                activeEditorSquare = parseInt(e.target.value);
+                loadEditorGridData(activeEditorSquare);
+                onEditorCellClick(0, 0); 
+            });
+            
+            document.getElementById('editor-save-btn').addEventListener('click', onSaveDataClick);
+            
+            loadEditorGridData(0);
+            onEditorCellClick(0, 0);
+        }
+        
+        function loadEditorGridData(squareIndex) {
+            const squareKey = `sq_${squareIndex}`;
+            const squareData = panmagicCodexData[squareKey] || {};
+            
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const cellKey = `cell_${c}_${r}`;
+                    const cellEl = editorGridCells[r][c];
+                    if (squareData[cellKey]) {
+                        cellEl.classList.add('has-data');
+                    } else {
+                        cellEl.classList.remove('has-data');
+                    }
+                    cellEl.classList.remove('active-edit');
+                }
+            }
+        }
+        
+        function onEditorCellClick(r, c) {
+            activeEditorCell = { r, c };
+            document.getElementById('editor-selected-cell').textContent = `(${c}, ${r})`;
+            
+            for (let ir = 0; ir < 8; ir++) {
+                for (let ic = 0; ic < 8; ic++) {
+                    editorGridCells[ir][ic].classList.remove('active-edit');
+                }
+            }
+            editorGridCells[r][c].classList.add('active-edit');
+            
+            const squareKey = `sq_${activeEditorSquare}`;
+            const cellKey = `cell_${c}_${r}`;
+            const data = panmagicCodexData[squareKey]?.[cellKey] || { type: 'string', value: '' };
+            
+            document.getElementById('edit-data-type').value = data.type;
+            document.getElementById('edit-data-value').value = data.value;
+        }
+
+        function onSaveDataClick() {
+            const sqIdx = activeEditorSquare;
+            const { r, c } = activeEditorCell;
+            const type = document.getElementById('edit-data-type').value;
+            let value = document.getElementById('edit-data-value').value;
+            
+            switch (type) {
+                case 'integer': value = parseInt(value) || 0; break;
+                case 'float': value = parseFloat(value) || 0.0; break;
+            }
+            
+            if (!panmagicCodexData[`sq_${sqIdx}`]) {
+                panmagicCodexData[`sq_${sqIdx}`] = {};
+            }
+            
+            if (value === '') {
+                delete panmagicCodexData[`sq_${sqIdx}`][`cell_${c}_${r}`];
+                editorGridCells[r][c].classList.remove('has-data');
+            } else {
+                panmagicCodexData[`sq_${sqIdx}`][`cell_${c}_${r}`] = { type, value };
+                editorGridCells[r][c].classList.add('has-data');
+            }
+            
+            updateCodexJSON();
+            // Update the 3D time chain visualization
+            updateAllTimeChainVisuals(); 
+            // Update the 2D temporal graph
+            drawTemporalGraph();
+            // Update the Panmagic Bits grid data
+            updatePanmagicGridData();
+        }
+        
+        // --- 3D Time Chain Scene (Tab 6) ---
+        function initTimeChainScene() {
+            timeScene = new THREE.Scene();
+            timeScene.background = new THREE.Color(0x111827);
+            
+            timeCamera = new THREE.PerspectiveCamera(60, timeChainContainer.clientWidth / timeChainContainer.clientHeight, 0.1, 1000);
+            timeCamera.position.set(0, 0, 10); // Look straight on
+            
+            timeRenderer = new THREE.WebGLRenderer({ antialias: true });
+            timeRenderer.setSize(timeChainContainer.clientWidth, timeChainContainer.clientHeight);
+            timeChainContainer.appendChild(timeRenderer.domElement);
+            
+            // --- NEW: FPS and Orbit Controls ---
+            timeControlsOrbit = new OrbitControls(timeCamera, timeRenderer.domElement);
+            timeControlsOrbit.enableDamping = true;
+            timeControlsOrbit.dampingFactor = 0.1;
+            
+            timeControlsFPS = new PointerLockControls(timeCamera, timeRenderer.domElement);
+            timeScene.add(timeControlsFPS.getObject());
+
+            const blocker = document.getElementById('blocker');
+            const toggleBtn = document.getElementById('time-control-toggle');
+
+            toggleBtn.addEventListener('click', () => {
+                if (timeChainControlMode === 'orbit') {
+                    timeChainControlMode = 'fps';
+                    toggleBtn.textContent = 'Switch to Orbit Mode';
+                    blocker.style.display = 'flex';
+                    timeControlsOrbit.enabled = false;
+                } else {
+                    timeChainControlMode = 'orbit';
+                    toggleBtn.textContent = 'Switch to FPS Mode';
+                    blocker.style.display = 'none';
+                    timeControlsFPS.unlock();
+                    timeControlsOrbit.enabled = true;
+                }
+            });
+
+            blocker.addEventListener('click', () => {
+                if (timeChainControlMode === 'fps') {
+                    // --- FIX: Wrap in try/catch ---
+                    try {
+                        timeControlsFPS.lock();
+                    } catch (e) {
+                        console.error("Could not lock pointer:", e);
+                        blocker.innerHTML = "Pointer Lock failed. Click to try again.";
+                    }
+                    // --- END FIX ---
+                }
+            });
+
+            timeControlsFPS.addEventListener('lock', () => {
+                blocker.style.display = 'none';
+            });
+
+            timeControlsFPS.addEventListener('unlock', () => {
+                if (timeChainControlMode === 'fps') { // Only show if we're still in FPS mode
+                    blocker.style.display = 'flex';
+                }
+            });
+            // --- END NEW CONTROLS ---
+
+            const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+            timeScene.add(ambient);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            dirLight.position.set(5, 10, 7);
+            timeScene.add(dirLight);
+
+            // --- 6x12=72 Grid of Packet Groups ---
+            const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1); // Small bit cube
+            const spacing = 1.0; 
+            const cols = 12;
+            const rows = 6;
+            const offset_x = -((cols - 1) * spacing) / 2; // -5.5
+            const offset_y = -((rows - 1) * spacing) / 2; // -2.5
+            
+            const bitSpacing = 0.11; 
+            const bitOffset = -((8 - 1) * bitSpacing) / 2; // -0.385
+            
+            // --- NEW: Reusable Geo/Mat for Dodecahedron Highlight ---
+            const dodecaScale = 0.3;
+            const s = dodecaScale * Math.sqrt(2) / 2;
+            const vertices = [
+                new THREE.Vector3( dodecaScale,  0,  0), new THREE.Vector3(-dodecaScale,  0,  0),
+                new THREE.Vector3( 0,  dodecaScale,  0), new THREE.Vector3( 0, -dodecaScale,  0),
+                new THREE.Vector3( 0,  0,  dodecaScale), new THREE.Vector3( 0,  0, -dodecaScale),
+                new THREE.Vector3( s,  s,  s), new THREE.Vector3( s,  s, -s), new THREE.Vector3( s, -s,  s),
+                new THREE.Vector3( s, -s, -s), new THREE.Vector3(-s,  s,  s), new THREE.Vector3(-s,  s, -s),
+                new THREE.Vector3(-s, -s,  s), new THREE.Vector3(-s, -s, -s)
+            ];
+            const lines = [];
+            lines.push(vertices[6], vertices[0]); lines.push(vertices[6], vertices[2]); lines.push(vertices[6], vertices[4]);
+            lines.push(vertices[7], vertices[0]); lines.push(vertices[7], vertices[2]); lines.push(vertices[7], vertices[5]);
+            lines.push(vertices[8], vertices[0]); lines.push(vertices[8], vertices[3]); lines.push(vertices[8], vertices[4]);
+            lines.push(vertices[9], vertices[0]); lines.push(vertices[9], vertices[3]); lines.push(vertices[9], vertices[5]);
+            lines.push(vertices[10], vertices[1]); lines.push(vertices[10], vertices[2]); lines.push(vertices[10], vertices[4]);
+            lines.push(vertices[11], vertices[1]); lines.push(vertices[11], vertices[2]); lines.push(vertices[11], vertices[5]);
+            lines.push(vertices[12], vertices[1]); lines.push(vertices[12], vertices[3]); lines.push(vertices[12], vertices[4]);
+            lines.push(vertices[13], vertices[1]); lines.push(vertices[13], vertices[3]); lines.push(vertices[13], vertices[5]);
+            dodecaGeo = new THREE.BufferGeometry().setFromPoints(lines);
+            dodecaMat = new THREE.LineBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0.7, wireframe: true });
+            // --- END NEW ---
+            
+            timeChainGroups = [];
+            
+            for (let i = 0; i < 72; i++) { // 12x6
+                const x = (i % cols);
+                const y = Math.floor(i / cols);
+                const z = 0;
+                
+                const packetGroup = new THREE.Group();
+                packetGroup.userData.index = i; 
+                packetGroup.position.set(
+                    x * spacing + offset_x,
+                    y * spacing + offset_y,
+                    z
+                );
+                
+                // 1. Create 64 bit-cubes
+                let bitCubes = [];
+                for (let j = 0; j < 64; j++) {
+                    const c = j % 8;
+                    const r = Math.floor(j / 8);
+                    
+                    const bitMat = new THREE.MeshStandardMaterial({
+                        color: 0x374151, // Start dim
+                        emissive: 0x000000,
+                        transparent: true,
+                        opacity: 0.2
+                    });
+                    
+                    const bitCube = new THREE.Mesh(geo, bitMat);
+                    bitCube.position.set(
+                        c * bitSpacing + bitOffset,
+                        (7-r) * bitSpacing + bitOffset, // Invert Y for 0,0 at top-left
+                        0.05 // Place on the Z+ face of the group
+                    );
+                    packetGroup.add(bitCube);
+                    bitCubes.push(bitCube);
+                }
+                packetGroup.userData.bitCubes = bitCubes;
+                
+                // 2. Create invisible bounding box for raycasting
+                const boundsGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+                const boundsMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, wireframe: true });
+                const boundsBox = new THREE.Mesh(boundsGeo, boundsMat);
+                boundsBox.name = "raycastTarget";
+                packetGroup.add(boundsBox);
+
+                // 3. Create the "Exact Cell" Highlight (Torus)
+                const dataHighlightGeo = new THREE.TorusGeometry(0.5, 0.03, 8, 32); 
+                const dataHighlightMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.8 });
+                const dataHighlight = new THREE.Mesh(dataHighlightGeo, dataHighlightMat);
+                dataHighlight.rotation.x = Math.PI / 2; 
+                dataHighlight.position.z = 0.05;
+                dataHighlight.visible = false;
+                packetGroup.userData.dataHighlight = dataHighlight;
+                packetGroup.add(dataHighlight);
+
+                // 4. --- NEW: Create the "Page" Highlight (Dodecahedron) ---
+                const pageHighlight = new THREE.LineSegments(dodecaGeo, dodecaMat.clone());
+                pageHighlight.visible = false;
+                packetGroup.userData.pageHighlight = pageHighlight;
+                packetGroup.add(pageHighlight);
+                // --- END NEW ---
+
+                // Store references
+                packetGroup.userData.cube = boundsBox; 
+                
+                timeScene.add(packetGroup);
+                timeChainGroups.push(packetGroup);
+            }
+            
+            // 5. Create the Active Step highlight box
+            const boxGeo = new THREE.BoxGeometry(spacing, spacing, spacing);
+            const boxMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.9 });
+            activeStepBox = new THREE.Mesh(boxGeo, boxMat);
+            if (timeChainGroups.length > 0) {
+                activeStepBox.position.copy(timeChainGroups[0].position);
+            }
+            timeScene.add(activeStepBox);
+            
+            // Click handler
+            timeRaycaster = new THREE.Raycaster();
+            timeRenderer.domElement.addEventListener('click', onTimeCubeClick);
+        }
+        
+        function onTimeCubeClick(event) {
+            // Only raycast if in orbit mode
+            if (timeChainControlMode !== 'orbit') return;
+            
+            // Calculate mouse position in normalized device coordinates
+            const rect = timeRenderer.domElement.getBoundingClientRect();
+            timeChainMouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            timeChainMouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            timeRaycaster.setFromCamera(timeChainMouse, timeCamera);
+            const intersects = timeRaycaster.intersectObjects(timeChainGroups, true); 
+
+            let clickedGroup = null;
+            if (intersects.length > 0) {
+                let obj = intersects[0].object;
+                while (obj.parent) {
+                    if (obj.userData.index !== undefined) {
+                        clickedGroup = obj;
+                        break;
+                    }
+                    obj = obj.parent;
+                }
+            }
+
+            if (clickedGroup) {
+                const index = clickedGroup.userData.index;
+                
+                // Load this packet
+                loadPacketFromTimeChain(index);
+                
+                // Switch back to main 3D viz tab
+                btn3D.click();
+            }
+        }
+        
+        // This just moves the highlight box
+        function updateTimeChainHighlights() {
+            if (!timeChainContainer.classList.contains('visible') || !timeChainGroups[currentTimeStep]) return;
+            
+            const group = timeChainGroups[currentTimeStep];
+            activeStepBox.position.copy(group.position);
+        }
+
+        // --- NEW: Helper to get bit value and color ---
+        function getPacketBitStrings(packet) {
+            // Convert quaternion floats (-1 to 1) to 8-bit unsigned integers (0-255)
+            const w_bin = (Math.floor(((packet.w + 1) / 2) * 255)).toString(2).padStart(8, '0');
+            const x_bin = (Math.floor(((packet.x + 1) / 2) * 255)).toString(2).padStart(8, '0');
+            const y_bin = (Math.floor(((packet.y + 1) / 2) * 255)).toString(2).padStart(8, '0');
+            const z_bin = (Math.floor(((packet.z + 1) / 2) * 255)).toString(2).padStart(8, '0');
+            const q_str = w_bin + x_bin + y_bin + z_bin; // 32 bits
+            
+            const payload_str = packet.payloadScaler.toString(2).padStart(16, '0');
+            const struct_str = packet.structuralFormId.toString(2).padStart(4, '0');
+            const amp_str = packet.amplitudeId.toString(2).padStart(4, '0');
+            const spin_str = packet.spinClassId.toString(2).padStart(3, '0');
+            const freq_str = packet.frequencyId.toString(2).padStart(5, '0');
+            
+            // Order: Quat (32), Payload (16), Struct (4), Amp (4), Spin (3), Freq (5)
+            // Total: 32 + 16 + 4 + 4 + 3 + 5 = 64 bits
+            return q_str + payload_str + struct_str + amp_str + spin_str + freq_str;
+        }
+
+        // --- NEW: Helper to get bit color by index ---
+        function getBitInfo(index, bitString) {
+            const value = bitString[index] || '0';
+            let color;
+
+            if (index < 32) { color = METADATA_COLORS.quat; }
+            else if (index < 48) { color = METADATA_COLORS.payload; }
+            else if (index < 52) { color = METADATA_COLORS.struct; }
+            else if (index < 56) { color = METADATA_COLORS.amp; }
+            else if (index < 59) { color = METADATA_COLORS.spin; }
+            else if (index < 64) { color = METADATA_COLORS.freq; }
+            else { color = METADATA_COLORS.unused; }
+            
+            return { value, color };
+        }
+
+        // --- MODIFIED: This updates all 72 cubes AND their 64 bits ---
+        function updateAllTimeChainVisuals() {
+            // FIX: Remove tab visibility check
+            if (!timeChainGroups.length || !timeChainQuats.length) return; 
+            
+            for (let i = 0; i < 72; i++) { // FIX: 72
+                const packetGroup = timeChainGroups[i];
+                const packet = timeChainQuats[i];
+                if (!packet || !packetGroup) continue; 
+
+                // FIX: Added 'pageHighlight'
+                const { bitCubes, dataHighlight, pageHighlight } = packetGroup.userData;
+                if (!bitCubes) continue; // Safety check
+                
+                const bitString = getPacketBitStrings(packet);
+
+                // 1. Update all 64 bit-cubes
+                for (let j = 0; j < 64; j++) {
+                    const bitCube = bitCubes[j];
+                    const { value, color } = getBitInfo(j, bitString);
+                    
+                    if (value === '1') {
+                        bitCube.material.color.set(color);
+                        bitCube.material.emissive.set(color);
+                        bitCube.material.emissiveIntensity = 0.5;
+                        bitCube.material.opacity = 0.9;
+                    } else {
+                        bitCube.material.color.set(0x374151);
+                        bitCube.material.emissive.set(0x000000);
+                        bitCube.material.opacity = 0.2;
+                    }
+                }
+
+                // 2. Set Rotation
+                tempQHelper.set(packet.x, packet.y, packet.z, packet.w).normalize();
+                packetGroup.setRotationFromQuaternion(tempQHelper);
+                
+                // 3. Get Row/Col values by re-calculating LIVE
+                // FIX: Re-calculate row/col values LIVE
+                const rowVal = (rowControlMode === 'metadata') 
+                    ? packet.spinClassId 
+                    : calculateCoordinateFromAlgo(document.getElementById('y-algo-select').value, packet.w, packet.x, packet.y, packet.z);
+                
+                const colVal = (colControlMode === 'metadata') 
+                    ? (packet.frequencyId + packet.amplitudeId) % 8 
+                    : calculateCoordinateFromAlgo(document.getElementById('x-algo-select').value, packet.w, packet.x, packet.y, packet.z);
+                
+                // 4. Set Data Highlight
+                const sqKey = `sq_${packet.activeSquareIndex}`; // Use packet's OWN active square
+                const cellKey = `cell_${colVal}_${rowVal}`;
+                const hasData = (panmagicCodexData[sqKey] && panmagicCodexData[sqKey][cellKey]);
+                dataHighlight.visible = hasData;
+
+                // 5. --- NEW: Set Page Highlight ---
+                const pageHasData = (panmagicCodexData[sqKey] && Object.keys(panmagicCodexData[sqKey]).length > 0);
+                pageHighlight.visible = pageHasData;
+                // --- END NEW ---
+            }
+        }
+
+
+        // --- 3D Object Creation (Main Scene) ---
+        function createRhombicDodecahedron() {
+            rhombicDodecahedron = new THREE.Group();
+            latticeNodesGroup = new THREE.Group();
+            latticeNodesGroup.visible = false; 
+
+            const hexRadius = 2.5;
+            const hexPoints = [];
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i + (Math.PI / 6);
+                hexPoints.push(new THREE.Vector2(Math.cos(angle) * hexRadius, Math.sin(angle) * hexRadius));
+            }
+            const hexShape = new THREE.Shape(hexPoints);
+            const hexGeo = new THREE.ShapeGeometry(hexShape);
+            
+            const lineMaterial = new THREE.LineBasicMaterial({ 
+                color: 0x3b82f6, 
+                transparent: true, 
+                opacity: 0.3 
+            });
+
+            LATTICE_VECTORS.forEach((v_norm, index) => {
+                const hexGroup = new THREE.Group();
+                const edges = new THREE.EdgesGeometry(hexGeo);
+                const material = lineMaterial.clone();
+                const line = new THREE.LineSegments(edges, material);
+                
+                line.userData.material = material; 
+                line.userData.index = index;
+                
+                hexGroup.add(line);
+                hexGroup.position.copy(v_norm).multiplyScalar(LATTICE_POSITION_SCALE);
+                hexGroup.lookAt(0, 0, 0);
+                
+                const labelDiv = document.createElement('div');
+                labelDiv.textContent = index + 1;
+                labelDiv.style.color = 'rgba(255, 255, 255, 0.1)';
+                labelDiv.style.fontSize = '2.5rem';
+                labelDiv.style.fontWeight = 'bold';
+                labelDiv.style.pointerEvents = 'none';
+                labelDiv.style.textShadow = '0 0 2px rgba(0,0,0,0.5)';
+                labelDiv.style.transform = 'translate(-50%, -50%)'; 
+                const numberLabel = new CSS2DObject(labelDiv);
+                numberLabel.position.set(0, 0, 0.1); 
+                hexGroup.add(numberLabel);
+                
+                rhombicDodecahedron.add(hexGroup);
+                
+                const nodeViz = createEquilibriumNode(HEX_NODE_COLORS[index]); // Use hex colors
+                nodeViz.position.copy(hexGroup.position);
+                nodeViz.rotation.copy(hexGroup.rotation);
+                latticeNodesGroup.add(nodeViz);
+            });
+            
+            scene.add(rhombicDodecahedron);
+            scene.add(latticeNodesGroup);
+        }
+
+        function createLatticeScaffolding() {
+            latticeScaffolding = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: 0xffa500, transparent: true, opacity: 0.2 });
+            const s = LATTICE_POSITION_SCALE * Math.sqrt(2) / 2; 
+            
+            const vertices = [
+                new THREE.Vector3( LATTICE_POSITION_SCALE,  0,  0), new THREE.Vector3(-LATTICE_POSITION_SCALE,  0,  0),
+                new THREE.Vector3( 0,  LATTICE_POSITION_SCALE,  0), new THREE.Vector3( 0, -LATTICE_POSITION_SCALE,  0),
+                new THREE.Vector3( 0,  0,  LATTICE_POSITION_SCALE), new THREE.Vector3( 0,  0, -LATTICE_POSITION_SCALE),
+                new THREE.Vector3( s,  s,  s), new THREE.Vector3( s,  s, -s),
+                new THREE.Vector3( s, -s,  s), new THREE.Vector3( s, -s, -s),
+                new THREE.Vector3(-s,  s,  s), new THREE.Vector3(-s,  s, -s),
+                new THREE.Vector3(-s, -s,  s), new THREE.Vector3(-s, -s, -s)
+            ];
+            
+            const lines = [];
+            lines.push(vertices[6], vertices[0]); lines.push(vertices[6], vertices[2]); lines.push(vertices[6], vertices[4]);
+            lines.push(vertices[7], vertices[0]); lines.push(vertices[7], vertices[2]); lines.push(vertices[7], vertices[5]);
+            lines.push(vertices[8], vertices[0]); lines.push(vertices[8], vertices[3]); lines.push(vertices[8], vertices[4]);
+            lines.push(vertices[9], vertices[0]); lines.push(vertices[9], vertices[3]); lines.push(vertices[9], vertices[5]);
+            lines.push(vertices[10], vertices[1]); lines.push(vertices[10], vertices[2]); lines.push(vertices[10], vertices[4]);
+            lines.push(vertices[11], vertices[1]); lines.push(vertices[11], vertices[2]); lines.push(vertices[11], vertices[5]);
+            lines.push(vertices[12], vertices[1]); lines.push(vertices[12], vertices[3]); lines.push(vertices[12], vertices[4]);
+            lines.push(vertices[13], vertices[1]); lines.push(vertices[13], vertices[3]); lines.push(vertices[13], vertices[5]);
+            
+            const geometry = new THREE.BufferGeometry().setFromPoints(lines);
+            latticeScaffolding.add(new THREE.LineSegments(geometry, material));
+            scene.add(latticeScaffolding);
+        }
+
+        function createCentralLines() {
+            centralLines = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.1 });
+            
+            LATTICE_VECTORS.forEach(v => {
+                const points = [ new THREE.Vector3(0, 0, 0), v.clone().multiplyScalar(LATTICE_POSITION_SCALE) ];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                centralLines.add(new THREE.Line(geometry, material));
+            });
+            scene.add(centralLines);
+        }
+
+        function createNeighborLattice() {
+            const scaledVectors = LATTICE_VECTORS.map(v => v.clone().multiplyScalar(LATTICE_POSITION_SCALE));
+            const points = [];
+            const material = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.15 });
+            const NEIGHBOR_DIST = LATTICE_POSITION_SCALE * Math.sqrt(2); 
+
+            for (let i = 0; i < scaledVectors.length; i++) {
+                for (let j = i + 1; j < scaledVectors.length; j++) {
+                    const dist = scaledVectors[i].distanceTo(scaledVectors[j]);
+                    if (Math.abs(dist - NEIGHBOR_DIST) < 0.01) {
+                        points.push(scaledVectors[i]);
+                        points.push(scaledVectors[j]);
+                    }
+                }
+            }
+            
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            neighborLattice = new THREE.LineSegments(geometry, material);
+            scene.add(neighborLattice);
+        }
+
+        function createOctantHelpers() {
+            octantPlanes = new THREE.Group();
+            const planeSize = 8;
+            const planeOpacity = 0.2;
+
+            const planeGeoXY = new THREE.PlaneGeometry(planeSize, planeSize);
+            const planeMatXY = new THREE.MeshBasicMaterial({ color: 0x3b82f6, opacity: planeOpacity, transparent: true, side: THREE.DoubleSide });
+            const planeXY = new THREE.Mesh(planeGeoXY, planeMatXY);
+
+            const planeGeoXZ = new THREE.PlaneGeometry(planeSize, planeSize);
+            const planeMatXZ = new THREE.MeshBasicMaterial({ color: 0x10b981, opacity: planeOpacity, transparent: true, side: THREE.DoubleSide });
+            const planeXZ = new THREE.Mesh(planeGeoXZ, planeMatXZ);
+            planeXZ.rotation.x = Math.PI / 2;
+
+            const planeGeoYZ = new THREE.PlaneGeometry(planeSize, planeSize);
+            const planeMatYZ = new THREE.MeshBasicMaterial({ color: 0xef4444, opacity: planeOpacity, transparent: true, side: THREE.DoubleSide });
+            const planeYZ = new THREE.Mesh(planeGeoYZ, planeMatYZ);
+            planeYZ.rotation.y = Math.PI / 2;
+            
+            octantPlanes.add(planeXY, planeXZ, planeYZ);
+            octantPlanes.visible = false;
+            scene.add(octantPlanes);
+            
+            const markerScale = LATTICE_POSITION_SCALE * Math.sqrt(2) / 2; 
+            const markerSize = 0.5;
+
+            const squareGeo = new THREE.PlaneGeometry(markerSize, markerSize);
+            const outlineGeo = new THREE.EdgesGeometry(squareGeo);
+
+            for (let i = 0; i < 8; i++) {
+                const x = (i & 1) ? 1 : -1;
+                const y = (i & 2) ? 1 : -1;
+                const z = (i & 4) ? 1 : -1;
+                
+                const squareMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x4b5563, 
+                    emissive: 0x000000, 
+                    transparent: true, 
+                    opacity: 0.8, 
+                    side: THREE.DoubleSide 
+                });
+                const outlineMat = new THREE.LineBasicMaterial({ color: 0x9ca3af });
+
+                const markerSquare = new THREE.Mesh(squareGeo, squareMat);
+                markerSquare.name = "markerSquare";
+                const markerOutline = new THREE.LineSegments(outlineGeo, outlineMat);
+                markerOutline.name = "markerOutline"; 
+
+                const markerGroup = new THREE.Group();
+                markerGroup.add(markerSquare);
+                markerGroup.add(markerOutline);
+
+                markerGroup.position.set(x * markerScale, y * markerScale, z * markerScale);
+                markerGroup.lookAt(0, 0, 0); 
+                
+                markerGroup.visible = false; 
+                octantMarkers.push(markerGroup);
+                scene.add(markerGroup);
+            }
+        }
+
+
+        function createEquilibriumNode(color) {
+            const group = new THREE.Group();
+            const nodeScale = 1.0; 
+            const rotation = Math.PI / 4;
+            const cos = Math.cos(rotation) * nodeScale;
+            const sin = Math.sin(rotation) * nodeScale;
+
+            const lineMatW = new THREE.LineBasicMaterial({ color: 0x3b82f6 });
+            const lineMatX = new THREE.LineBasicMaterial({ color: 0xef4444 });
+            const lineMatY = new THREE.LineBasicMaterial({ color: 0x10b981 });
+            const lineMatZ = new THREE.LineBasicMaterial({ color: 0x8b5cf6 });
+
+            const endW = new THREE.Vector3(cos, sin, 0);
+            const endX = new THREE.Vector3(-sin, cos, 0);
+            const endY = new THREE.Vector3(-cos, -sin, 0);
+            const endZ = new THREE.Vector3(sin, -cos, 0);
+
+            const lineGeoW = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), endW]);
+            const lineGeoX = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), endX]);
+            const lineGeoY = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), endY]);
+            const lineGeoZ = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), endZ]);
+
+            const lineW = new THREE.Line(lineGeoW, lineMatW);
+            const lineX = new THREE.Line(lineGeoX, lineMatX);
+            const lineY = new THREE.Line(lineGeoY, lineMatY);
+            const lineZ = new THREE.Line(lineGeoZ, lineMatZ);
+            
+            lineW.name = "w_axis";
+            lineX.name = "x_axis";
+            lineY.name = "y_axis";
+            lineZ.name = "z_axis";
+            group.add(lineW, lineX, lineY, lineZ);
+            
+            const nodeGeo = new THREE.SphereGeometry(0.1, 16, 8);
+            const nodeMat = new THREE.MeshBasicMaterial({ color: color });
+            const resultantNode = new THREE.Mesh(nodeGeo, nodeMat);
+            resultantNode.name = "resultantNode";
+            group.add(resultantNode);
+            
+            return group;
+        }
+
+        function createCentralSphere() {
+            centralSphereGroup = new THREE.Group();
+            
+            const geo = new THREE.SphereGeometry(2, 32, 16);
+            const wireframeGeo = new THREE.WireframeGeometry(geo);
+            const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.2 });
+            const wireframe = new THREE.LineSegments(wireframeGeo, mat);
+            centralSphereGroup.add(wireframe);
+
+            const flashMat = new THREE.MeshStandardMaterial({ 
+                color: 0xffffff, transparent: true, opacity: 0,
+                emissive: 0xccddff, emissiveIntensity: 0,
+                side: THREE.DoubleSide
+            });
+            const flashSphere = new THREE.Mesh(geo, flashMat);
+            flashSphere.name = "flashSphere";
+            centralSphereGroup.add(flashSphere);
+
+            spinVector = new THREE.ArrowHelper(
+                new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0),
+                3, 0xff0000, 0.5, 0.3
+            );
+            centralSphereGroup.add(spinVector);
+            scene.add(centralSphereGroup);
+        }
+
+        function createPacketNodes() {
+            if (packetNodesGroup) {
+                packetNodesGroup.traverse(child => {
+                    if (child.isMesh) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                    if (child.isLineSegments) {
+                        child.geometry.dispose();
+                        child.material.dispose();
+                    }
+                    if (child.isCSS2DObject) {
+                        child.element.remove();
+                    }
+                });
+                scene.remove(packetNodesGroup);
+            }
+
+            packetNodesGroup = new THREE.Group();
+            const radius = 15;
+            const numNodes = structuralFormId + 1;
+            const wirePoints = [];
+
+            for (let i = 0; i < numNodes; i++) {
+                const angle = (i / numNodes) * Math.PI * 2;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                const pos = new THREE.Vector3(x, 0, z);
+                const nodeDef = NODE_DEFINITIONS[i % NODE_DEFINITIONS.length];
+
+                const geo = new THREE.SphereGeometry(0.5, 32, 16);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: nodeDef.color,
+                    emissive: nodeDef.color,
+                    emissiveIntensity: 0.5
+                });
+                const sphere = new THREE.Mesh(geo, mat);
+                sphere.position.copy(pos);
+                packetNodesGroup.add(sphere);
+                
+                const labelDiv = document.createElement('div');
+                labelDiv.className = 'text-xs text-white font-mono p-1 rounded';
+                labelDiv.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                labelDiv.textContent = nodeDef.name;
+                const label = new CSS2DObject(labelDiv);
+                label.position.set(x, 0.8, z);
+                packetNodesGroup.add(label);
+
+                wirePoints.push(pos);
+            }
+            
+            if (numNodes > 1) {
+                wirePoints.push(wirePoints[0]);
+                const wireGeo = new THREE.BufferGeometry().setFromPoints(wirePoints);
+                const wireMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.5 });
+                const wire = new THREE.LineSegments(wireGeo, wireMat);
+                packetNodesGroup.add(wire);
+            }
+            scene.add(packetNodesGroup);
+        }
+
+        function createTrailSystem() {
+            trailGeometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(MAX_TRAIL_POINTS * 3);
+            const colors = new Float32Array(MAX_TRAIL_POINTS * 4); // x,y,z,a
+            
+            trailGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            trailGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
+            
+            // Note: size is now global on the material, color is per-vertex
+            const trailMaterial = new THREE.PointsMaterial({
+                size: 0.1, 
+                vertexColors: true, 
+                transparent: true, 
+                depthWrite: false
+            });
+            
+            trailPoints = new THREE.Points(trailGeometry, trailMaterial);
+            trailPoints.visible = false;
+            scene.add(trailPoints);
+        }
+
+        // --- Controls and UI ---
+
+        function setupControls() {
+            // --- Readouts ---
+            const quatWReadout = document.getElementById('quat-w-readout');
+            const quatXReadout = document.getElementById('quat-x-readout');
+            const quatYReadout = document.getElementById('quat-y-readout');
+            const quatZReadout = document.getElementById('quat-z-readout');
+            const freqReadout = document.getElementById('freq-readout');
+            const ampReadout = document.getElementById('amp-readout');
+            const structReadout = document.getElementById('struct-readout');
+            const spinReadout = document.getElementById('spin-readout');
+            const payloadReadout = document.getElementById('payload-readout');
+            const quatMagReadout = document.getElementById('quat-mag-readout');
+            const targetResReadout = document.getElementById('target-res-readout');
+            const trailPersistReadout = document.getElementById('trail-persist-readout');
+            
+            // --- Sliders ---
+            const quatWSlider = document.getElementById('quat-w-slider');
+            const quatXSlider = document.getElementById('quat-x-slider');
+            const quatYSlider = document.getElementById('quat-y-slider');
+            const quatZSlider = document.getElementById('quat-z-slider');
+            const freqSlider = document.getElementById('freq-slider');
+            const ampSlider = document.getElementById('amp-slider');
+            const structSlider = document.getElementById('struct-slider');
+            const spinSlider = document.getElementById('spin-slider');
+            const payloadSlider = document.getElementById('payload-slider');
+            
+            // --- Toggles & Selects ---
+            const inversePolarityToggle = document.getElementById('inverse-polarity-toggle'); 
+            
+            // --- NEW Time Chain ---
+            const generateChainBtn = document.getElementById('generate-chain-btn');
+            const timeStepSlider = document.getElementById('time-step-slider');
+            const timeStepReadout = document.getElementById('time-step-readout');
+            const chainReset = document.getElementById('chain-reset');
+            const chainPrev = document.getElementById('chain-prev');
+            const chainPlayPause = document.getElementById('chain-play-pause');
+            const chainNext = document.getElementById('chain-next');
+            const rotationAlgoSelect = document.getElementById('rotation-algo-select-timechain'); // FIX: Use correct ID
+            
+            // --- Cell Selection ---
+            const rowControlToggle = document.getElementById('row-control-toggle');
+            const colControlToggle = document.getElementById('col-control-toggle');
+            const rowAlgoControl = document.getElementById('row-algo-control');
+            const colAlgoControl = document.getElementById('col-algo-control');
+            
+            // --- Lattice Toggles ---
+            const showSphereToggle = document.getElementById('show-sphere-toggle');
+            const showLatticeNodesToggle = document.getElementById('show-lattice-nodes-toggle');
+            const showNodeTrailsToggle = document.getElementById('show-node-trails-toggle');
+            const trailPersistSlider = document.getElementById('trail-persist-slider');
+            const showOctantsToggle = document.getElementById('show-octants-toggle'); 
+
+            const sliders = [
+                { el: quatWSlider, readout: quatWReadout, key: 'w' },
+                { el: quatXSlider, readout: quatXReadout, key: 'x' },
+                { el: quatYSlider, readout: quatYReadout, key: 'y' },
+                { el: quatZSlider, readout: quatZReadout, key: 'z' },
+            ];
+
+            sliders.forEach(s => {
+                s.el.addEventListener('input', (e) => { 
+                    rawQuat[s.key] = parseFloat(e.target.value); 
+                    pauseTimeChain(); // Stop playback
+                    applyPolarity(); 
+                    
+                    // --- NEW: Save data to current step ---
+                    saveMetadataToCurrentStep(); 
+                });
+            });
+
+            // --- Metadata Sliders ---
+            freqSlider.addEventListener('input', (e) => {
+                frequencyId = parseInt(e.target.value);
+                freqReadout.textContent = frequencyId;
+                updateResonanceFunction();
+                saveMetadataToCurrentStep(); // Save on change
+            });
+            ampSlider.addEventListener('input', (e) => {
+                amplitudeId = parseInt(e.target.value);
+                ampReadout.textContent = amplitudeId;
+                updateResonanceFunction();
+                saveMetadataToCurrentStep(); // Save on change
+            });
+            structSlider.addEventListener('input', (e) => {
+                structuralFormId = parseInt(e.target.value);
+                structReadout.textContent = structuralFormId;
+                createPacketNodes();
+                updateCodexJSON(); 
+                saveMetadataToCurrentStep(); // Save on change
+            });
+            spinSlider.addEventListener('input', (e) => {
+                spinClassId = parseInt(e.target.value);
+                spinReadout.textContent = spinClassId;
+                saveMetadataToCurrentStep(); // Save on change
+            });
+            payloadSlider.addEventListener('input', (e) => {
+                payloadScaler = parseInt(e.target.value);
+                payloadReadout.textContent = payloadScaler;
+                saveMetadataToCurrentStep(); // Save on change
+            });
+
+            // --- Time Chain Listeners ---
+            generateChainBtn.addEventListener('click', generateTimeChain);
+            timeStepSlider.addEventListener('input', (e) => {
+                pauseTimeChain();
+                const step = parseInt(e.target.value);
+                loadPacketFromTimeChain(step);
+            });
+            chainReset.addEventListener('click', () => {
+                pauseTimeChain();
+                loadPacketFromTimeChain(0);
+            });
+            chainPrev.addEventListener('click', () => {
+                pauseTimeChain();
+                let step = (currentTimeStep - 1 + 72) % 72; // Use 72
+                loadPacketFromTimeChain(step);
+            });
+            chainNext.addEventListener('click', () => {
+                pauseTimeChain();
+                let step = (currentTimeStep + 1) % 72; // Use 72
+                loadPacketFromTimeChain(step);
+            });
+            chainPlayPause.addEventListener('click', () => {
+                if (isPlaying) {
+                    pauseTimeChain();
+                } else {
+                    playTimeChain();
+                }
+            });
+            rotationAlgoSelect.addEventListener('change', (e) => {
+                currentAlgorithm = e.target.value;
+            });
+
+            // --- Global Toggles ---
+            inversePolarityToggle.addEventListener('change', (e) => {
+                inversePolarity = e.target.checked;
+                applyPolarity();
+            });
+            
+            // --- Cell Selection Listeners ---
+            rowControlToggle.addEventListener('change', (e) => {
+                rowControlMode = e.target.checked ? 'algorithm' : 'metadata';
+                rowAlgoControl.classList.toggle('hidden', !e.target.checked);
+                updateAllTimeChainVisuals(); // Update data highlights
+                drawTemporalGraph(); // Update 2D graph
+            });
+            colControlToggle.addEventListener('change', (e) => {
+                colControlMode = e.target.checked ? 'algorithm' : 'metadata';
+                colAlgoControl.classList.toggle('hidden', !e.target.checked);
+                updateAllTimeChainVisuals(); // Update data highlights
+                drawTemporalGraph(); // Update 2D graph
+            });
+            // Add listeners to algo dropdowns too
+            document.getElementById('y-algo-select').addEventListener('change', () => {
+                updateAllTimeChainVisuals();
+                drawTemporalGraph();
+            });
+            document.getElementById('x-algo-select').addEventListener('change', () => {
+                updateAllTimeChainVisuals();
+                drawTemporalGraph();
+            });
+
+
+            // --- Lattice Toggle Listeners ---
+            showSphereToggle.addEventListener('change', (e) => {
+                centralSphereGroup.visible = e.target.checked;
+            });
+            showLatticeNodesToggle.addEventListener('change', (e) => {
+                showLatticeNodes = e.target.checked;
+                latticeNodesGroup.visible = showLatticeNodes;
+            });
+            showNodeTrailsToggle.addEventListener('change', (e) => {
+                showNodeTrails = e.target.checked;
+                trailPoints.visible = showNodeTrails;
+                if (!showNodeTrails) {
+                    trailPointData = [];
+                }
+            });
+            trailPersistSlider.addEventListener('input', (e) => {
+                trailPersistence = parseFloat(e.target.value);
+                trailPersistReadout.textContent = trailPersistence.toFixed(0);
+            });
+            showOctantsToggle.addEventListener('change', (e) => {
+                const isVisible = e.target.checked;
+                if (octantPlanes) octantPlanes.visible = isVisible;
+                octantMarkers.forEach(m => m.visible = isVisible);
+            });
+
+            // --- Init Readouts ---
+            freqReadout.textContent = freqSlider.value;
+            ampReadout.textContent = ampSlider.value;
+            structReadout.textContent = structSlider.value;
+            spinReadout.textContent = spinSlider.value;
+            payloadReadout.textContent = payloadSlider.value;
+            quatMagReadout.textContent = quatMagnitude.toFixed(2);
+            targetResReadout.textContent = targetResonance.toFixed(2);
+            trailPersistReadout.textContent = trailPersistence.toFixed(0);
+        }
+
+        // --- NEW Time Chain Functions ---
+        
+        // --- NEW: Function to save current slider data to the active time step ---
+        function saveMetadataToCurrentStep() {
+            if (!timeChainQuats[currentTimeStep]) return; // Safety check
+            
+            const packet = timeChainQuats[currentTimeStep];
+            
+            // Save Quat (raw, pre-polarity)
+            packet.w = rawQuat.w;
+            packet.x = rawQuat.x;
+            packet.y = rawQuat.y;
+            packet.z = rawQuat.z;
+            
+            // Save Metadata
+            packet.frequencyId = frequencyId;
+            packet.amplitudeId = amplitudeId;
+            packet.structuralFormId = structuralFormId;
+            packet.spinClassId = spinClassId;
+            packet.payloadScaler = payloadScaler;
+            
+            // Re-calculate derived highlight data for this packet
+            const { newSquareIndex, newActiveHexIndex } = getPacketHighlightIndices(packet);
+            packet.activeSquareIndex = newSquareIndex;
+            packet.activeHexIndex = newActiveHexIndex;
+
+            // Update the 3D grid visualization
+            updateAllTimeChainVisuals(); 
+            // Update the 2D temporal graph
+            drawTemporalGraph();
+        }
+        
+        function playTimeChain() {
+            if (isPlaying) return;
+            isPlaying = true;
+            document.getElementById('chain-play-pause').textContent = "❚❚";
+            document.getElementById('generate-chain-btn').disabled = true;
+            document.getElementById('rotation-algo-select-timechain').disabled = true;
+            playInterval = setInterval(() => {
+                let step = (currentTimeStep + 1) % 72; // Use 72
+                loadPacketFromTimeChain(step);
+            }, 250); 
+        }
+        
+        function pauseTimeChain() {
+            if (!isPlaying) return;
+            isPlaying = false;
+            document.getElementById('chain-play-pause').textContent = "▶";
+            document.getElementById('generate-chain-btn').disabled = false;
+            document.getElementById('rotation-algo-select-timechain').disabled = false;
+            clearInterval(playInterval);
+            playInterval = null;
+        }
+
+        // MODIFIED: Now loads ALL data from the time chain packet
+        function loadPacketFromTimeChain(step) {
+            if (!timeChainQuats[step]) return;
+            
+            currentTimeStep = step;
+            const packet = timeChainQuats[step];
+            
+            // --- Load Quat ---
+            rawQuat.w = packet.w;
+            rawQuat.x = packet.x;
+            rawQuat.y = packet.y;
+            rawQuat.z = packet.z;
+            
+            // Update quat sliders
+            document.getElementById('quat-w-slider').value = rawQuat.w;
+            document.getElementById('quat-x-slider').value = rawQuat.x;
+            document.getElementById('quat-y-slider').value = rawQuat.y;
+            document.getElementById('quat-z-slider').value = rawQuat.z;
+            
+            // --- Load Metadata ---
+            frequencyId = packet.frequencyId;
+            amplitudeId = packet.amplitudeId;
+            structuralFormId = packet.structuralFormId;
+            spinClassId = packet.spinClassId;
+            payloadScaler = packet.payloadScaler;
+            
+            // Update metadata sliders & readouts
+            document.getElementById('freq-slider').value = frequencyId;
+            document.getElementById('freq-readout').textContent = frequencyId;
+            document.getElementById('amp-slider').value = amplitudeId;
+            document.getElementById('amp-readout').textContent = amplitudeId;
+            document.getElementById('struct-slider').value = structuralFormId;
+            document.getElementById('struct-readout').textContent = structuralFormId;
+            document.getElementById('spin-slider').value = spinClassId;
+            document.getElementById('spin-readout').textContent = spinClassId;
+            document.getElementById('payload-slider').value = payloadScaler;
+            document.getElementById('payload-readout').textContent = payloadScaler;
+            
+            // --- Update Time Step Slider ---
+            document.getElementById('time-step-slider').value = step;
+            document.getElementById('time-step-readout').textContent = step;
+            
+            // --- Apply Polarity and Update ---
+            applyPolarity();
+            createPacketNodes(); // Recreate nodes based on new struct ID
+            updateResonanceFunction(); // Update graph
+            
+            // --- Update Visuals ---
+            // (This will be handled by the main animate loop,
+            // but we can call it once to force an immediate update)
+            updateAllTimeChainVisuals(); 
+            drawTemporalGraph(); 
+            updatePanmagicGridData(); 
+        }
+        
+        // NEW Helper function for pre-calculating highlights
+        function getPacketHighlightIndices(packet) {
+            const q = packet;
+            // Use global helpers to avoid creating new objects
+            tempQHelper.set(q.x, q.y, q.z, q.w).normalize();
+            tempVecHelper.set(q.x, q.y, q.z).normalize();
+            const spinAxis = tempVecHelper.lengthSq() > 0.0001 ? tempVecHelper : tempVecHelper.set(0, 1, 0);
+            pointerVec.copy(spinAxis).applyQuaternion(tempQHelper); // Get world direction
+            
+            // Get Active Square Index (1 of 6)
+            let maxDotSquare = -Infinity;
+            let newSquareIndex = 0;
+            CUBE_AXES.forEach((axis, i) => {
+                const dot = pointerVec.dot(axis);
+                if (dot > maxDotSquare) {
+                    maxDotSquare = dot;
+                    newSquareIndex = i;
+                }
+            });
+            
+            // Get Active Hexagon Index (1 of 12)
+            let maxDotHex = -Infinity;
+            let newActiveHexIndex = 0;
+            LATTICE_VECTORS.forEach((v, idx) => {
+                const dot = pointerVec.dot(v);
+                if (dot > maxDotHex) {
+                    maxDotHex = dot;
+                    newActiveHexIndex = idx;
+                }
+            });
+            
+            return { newSquareIndex, newActiveHexIndex };
+        }
+
+        // MODIFIED: Now pre-calculates highlights AND saves default metadata
+        function generateTimeChain() {
+            pauseTimeChain();
+            const algo = document.getElementById('rotation-algo-select-timechain').value; 
+            timeChainQuats = [];
+            const tempQuat = {};
+            const qh = new THREE.Quaternion(); // Helper
+            const axisX = new THREE.Vector3(1,0,0);
+            const axisY = new THREE.Vector3(0,1,0);
+            const axisZ = new THREE.Vector3(0,0,1);
+            const axisDiag = new THREE.Vector3(1,1,1).normalize();
+
+            // Get *current* metadata to save as default for this chain
+            const defaultFreq = parseInt(document.getElementById('freq-slider').value);
+            const defaultAmp = parseInt(document.getElementById('amp-slider').value);
+            const defaultStruct = parseInt(document.getElementById('struct-slider').value);
+            const defaultSpin = parseInt(document.getElementById('spin-slider').value);
+            const defaultPayload = parseInt(document.getElementById('payload-slider').value);
+            
+            for (let i = 0; i < 72; i++) { // Use 72
+                const time = (i / 71) * 10.0; // Use 71 (0 to 71 is 72 steps)
+                
+                switch (algo) {
+                    case 'trefoil': {
+                        const t = time * 0.4 * (Math.PI / 2); // Scaled time
+                        tempQuat.x = Math.sin(t) + 2 * Math.sin(2 * t);
+                        tempQuat.y = Math.cos(t) - 2 * Math.cos(2 * t);
+                        tempQuat.z = -Math.sin(3 * t);
+                        tempQuat.w = Math.cos(3 * t); 
+                        const mag = Math.sqrt(tempQuat.x*tempQuat.x + tempQuat.y*tempQuat.y + tempQuat.z*tempQuat.z + tempQuat.w*tempQuat.w) || 1;
+                        tempQuat.x /= mag;
+                        tempQuat.y /= mag;
+                        tempQuat.z /= mag;
+                        tempQuat.w /= mag;
+                        break;
+                    }
+                    case 'torus_2_3': {
+                        const t = time * 0.5 * (Math.PI / 2);
+                        const r = Math.cos(2 * t) + 2;
+                        tempQuat.x = r * Math.cos(3 * t);
+                        tempQuat.y = r * Math.sin(3 * t);
+                        tempQuat.z = Math.sin(2 * t);
+                        tempQuat.w = Math.cos(t * 0.5);
+                        const mag = 3.5; 
+                        tempQuat.x /= mag;
+                        tempQuat.y /= mag;
+                        tempQuat.z /= mag;
+                        tempQuat.w /= mag;
+                        break;
+                    }
+                    case 'torus_3_4': {
+                        const t = time * 0.4 * (Math.PI / 2);
+                        const r = Math.cos(3 * t) + 2;
+                        tempQuat.x = r * Math.cos(4 * t);
+                        tempQuat.y = r * Math.sin(4 * t);
+                        tempQuat.z = Math.sin(3 * t);
+                        tempQuat.w = Math.cos(t); 
+                        const mag = 3.5; 
+                        tempQuat.x /= mag;
+                        tempQuat.y /= mag;
+                        tempQuat.z /= mag;
+                        tempQuat.w /= mag;
+                        break;
+                    }
+                    case 'figure_eight': {
+                         const t = time * 0.5 * (Math.PI / 2);
+                         tempQuat.x = (2 + Math.cos(2 * t)) * Math.cos(3 * t);
+                         tempQuat.y = (2 + Math.cos(2 * t)) * Math.sin(3 * t);
+                         tempQuat.z = Math.sin(4 * t);
+                         tempQuat.w = Math.cos(t);
+                         const mag = 4.0;
+                         tempQuat.x /= mag;
+                         tempQuat.y /= mag;
+                         tempQuat.z /= mag;
+                         tempQuat.w /= mag;
+                        break;
+                    }
+                    case 'scan': {
+                        const phase = i / 71; // 0 to 1
+                        if (phase < 0.25) { 
+                            const t = (phase / 0.25) * Math.PI * 2;
+                            qh.setFromAxisAngle(axisX, t);
+                        } else if (phase < 0.5) { 
+                            const t = ((phase - 0.25) / 0.25) * Math.PI * 2;
+                            qh.setFromAxisAngle(axisY, t);
+                        } else if (phase < 0.75) { 
+                            const t = ((phase - 0.5) / 0.25) * Math.PI * 2;
+                            qh.setFromAxisAngle(axisZ, t);
+                        } else { 
+                            const t = ((phase - 0.75) / 0.25) * Math.PI * 2;
+                            qh.setFromAxisAngle(axisDiag, t);
+                        }
+                        tempQuat.x = qh.x;
+                        tempQuat.y = qh.y;
+                        tempQuat.z = qh.z;
+                        tempQuat.w = qh.w;
+                        break;
+                    }
+                    case 'elliptical':
+                    default:
+                        const t = time;
+                        tempQuat.w = Math.sin(t * 0.3) * Math.cos(t * 0.1);
+                        tempQuat.x = Math.sin(t * 0.5) * Math.cos(t * 0.2);
+                        tempQuat.y = Math.sin(t * 0.7) * Math.cos(t * 0.3);
+                        tempQuat.z = Math.sin(t * 0.9) * Math.cos(t * 0.4);
+                        break;
+                }
+                
+                // Pre-calculate highlights
+                const { newSquareIndex, newActiveHexIndex } = getPacketHighlightIndices(tempQuat);
+                
+                // Save the full packet with default metadata
+                timeChainQuats.push({ 
+                    w: tempQuat.w, x: tempQuat.x, y: tempQuat.y, z: tempQuat.z,
+                    activeSquareIndex: newSquareIndex, 
+                    activeHexIndex: newActiveHexIndex,
+                    frequencyId: defaultFreq,
+                    amplitudeId: defaultAmp,
+                    structuralFormId: defaultStruct,
+                    spinClassId: defaultSpin,
+                    payloadScaler: defaultPayload,
+                });
+            }
+            
+            loadPacketFromTimeChain(0);
+            updateAllTimeChainVisuals();
+            drawTemporalGraph(); // Redraw graph
+            
+            const btn = document.getElementById('generate-chain-btn');
+            const originalText = "Generate Time Chain";
+            btn.textContent = "Chain Generated!";
+            btn.disabled = true;
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 1000);
+        }
+        
+        // --- End Time Chain Functions ---
+
+        function applyPolarity() {
+            if (inversePolarity) {
+                quat.w = -rawQuat.w;
+                quat.x = -rawQuat.x;
+                quat.y = -rawQuat.y;
+                quat.z = -rawQuat.z;
+            } else {
+                quat.w = rawQuat.w;
+                quat.x = rawQuat.x;
+                quat.y = rawQuat.y;
+                quat.z = rawQuat.z;
+            }
+            
+            document.getElementById('quat-w-readout').textContent = quat.w.toFixed(2);
+            document.getElementById('quat-x-readout').textContent = quat.x.toFixed(2);
+            document.getElementById('quat-y-readout').textContent = quat.y.toFixed(2);
+            document.getElementById('quat-z-readout').textContent = quat.z.toFixed(2);
+        }
+        
+        function setupTabs() {
+            const tabs = [
+                { btn: btn3D, container: canvas3dContainer },
+                { btn: btnJSON, container: jsonContainer },
+                { btn: btnDFM, container: dfmContainer },
+                { btn: btnPanmagic, container: panmagicContainer },
+                { btn: btnEditor, container: editorContainer }, 
+                { btn: btnTimeChain, container: timeChainContainer } // New
+            ];
+            
+            tabs.forEach(tab => {
+                tab.btn.addEventListener('click', () => {
+                    // Check if we are stopping playback
+                    if(tab.btn.id !== 'btn-time-chain' && isPlaying) {
+                        pauseTimeChain();
+                    }
+                    
+                    tabs.forEach(t => {
+                        t.container.classList.remove('visible');
+                        t.btn.classList.remove('active');
+                    });
+                    
+                    tab.container.classList.add('visible');
+                    tab.btn.classList.add('active');
+                    
+                    // NEW: Update grids when switching to time tab
+                    if (tab.btn.id === 'btn-time-chain') {
+                        updateAllTimeChainVisuals();
+                    }
+                     // NEW: Update graph when switching to panmagic tab
+                    if (tab.btn.id === 'btn-panmagic') {
+                        drawTemporalGraph();
+                        updatePanmagicGridData();
+                    }
+                    
+                    onWindowResize(); 
+                });
+            });
+        }
+
+        // --- DFM Simulation Logic ---
+        function setupDFM() {
+            dfmStateWindows.push(document.getElementById('dfm-state-s0'));
+            dfmStateWindows.push(document.getElementById('dfm-state-s1'));
+            dfmStateWindows.push(document.getElementById('dfm-state-s2'));
+            
+            dfmStateOutputs.push(document.getElementById('s0-output'));
+            dfmStateOutputs.push(document.getElementById('s1-output'));
+            dfmStateOutputs.push(document.getElementById('s2-output'));
+            
+            dfmModuleSelectors.push(document.getElementById('s0-module'));
+            dfmModuleSelectors.push(document.getElementById('s1-module'));
+            dfmModuleSelectors.push(document.getElementById('s2-module'));
+
+            document.getElementById('dfm-run').addEventListener('click', runDFMSimulation);
+            document.getElementById('dfm-step').addEventListener('click', () => stepDFMSimulation(false));
+            document.getElementById('dfm-reset').addEventListener('click', resetDFMSimulation);
+            
+            document.querySelectorAll('.info-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const drawerId = btn.dataset.drawer;
+                    const drawer = document.getElementById(drawerId);
+                    if (drawer) {
+                        drawer.style.display = (drawer.style.display === 'block') ? 'none' : 'block';
+                    }
+                });
+            });
+            
+            resetDFMSimulation();
+        }
+
+        function resetDFMSimulation() {
+            if (dfmRunInterval) {
+                clearInterval(dfmRunInterval);
+                dfmRunInterval = null;
+                document.getElementById('dfm-run').textContent = "Run Simulation";
+            }
+            dfmCurrentState = 0;
+            dfmGeneratedPacket = [];
+            updateDFMVisuals();
+            document.getElementById('dfm-generated-packet').textContent = "[]";
+            dfmStateOutputs.forEach(output => output.textContent = "...");
+            
+            // Re-enable buttons
+            document.getElementById('dfm-step').disabled = false;
+            document.getElementById('dfm-reset').disabled = false;
+        }
+
+        function runDFMSimulation() {
+            if (dfmRunInterval) {
+                clearInterval(dfmRunInterval);
+                dfmRunInterval = null;
+                document.getElementById('dfm-run').textContent = "Run Simulation";
+                document.getElementById('dfm-step').disabled = false;
+                document.getElementById('dfm-reset').disabled = false;
+            } else {
+                resetDFMSimulation();
+                document.getElementById('dfm-run').textContent = "Stop";
+                document.getElementById('dfm-step').disabled = true;
+                document.getElementById('dfm-reset').disabled = true;
+                
+                dfmRunInterval = setInterval(() => {
+                    stepDFMSimulation(true);
+                    if (dfmCurrentState === 0) { // Completed one full cycle
+                        clearInterval(dfmRunInterval);
+                        dfmRunInterval = null;
+                        document.getElementById('dfm-run').textContent = "Run Simulation";
+                        document.getElementById('dfm-step').disabled = false;
+                        document.getElementById('dfm-reset').disabled = false;
+                    }
+                }, 1000);
+            }
+        }
+
+        function stepDFMSimulation(isAutoRun = false) {
+            if (!isAutoRun && dfmRunInterval) { 
+                return;
+            }
+            if (!isAutoRun && dfmCurrentState === 0) {
+                 // Reset packet if starting a new manual step
+                 dfmGeneratedPacket = [];
+            }
+
+            const alphabetStr = document.getElementById('dfm-alphabet').value;
+            dfmAlphabet = alphabetStr.split(',').filter(s => s.trim().length > 0).map(s => s.trim());
+            if (dfmAlphabet.length === 0) {
+                dfmStateOutputs[dfmCurrentState].textContent = "Error: Alphabet is empty.";
+                return;
+            }
+            
+            const randomSymbol = dfmAlphabet[Math.floor(Math.random() * dfmAlphabet.length)];
+            const moduleName = dfmModuleSelectors[dfmCurrentState].value;
+            let moduleValue = "null";
+            let moduleLabel = "None";
+
+            switch(moduleName) {
+                case "quat":
+                    moduleLabel = "Quat";
+                    moduleValue = `{w:${quat.w.toFixed(2)}, x:${quat.x.toFixed(2)}, y:${quat.y.toFixed(2)}, z:${quat.z.toFixed(2)}}`;
+                    break;
+                case "freq":
+                    moduleLabel = "Freq";
+                    moduleValue = frequencyId;
+                    break;
+                case "amp":
+                    moduleLabel = "Amp";
+                    moduleValue = amplitudeId;
+                    break;
+                case "struct":
+                    moduleLabel = "Struct";
+                    moduleValue = structuralFormId;
+                    break;
+                case "spin":
+                    moduleLabel = "Spin";
+                    moduleValue = spinClassId;
+                    break;
+                case "payload":
+                    moduleLabel = "Payload";
+                    moduleValue = payloadScaler;
+                    break;
+            }
+            
+            dfmStateOutputs[dfmCurrentState].textContent = `Symbol: '${randomSymbol}'\nProcessed: [${moduleLabel}: ${moduleValue}]`;
+            dfmGeneratedPacket[dfmCurrentState] = { [moduleLabel]: moduleValue };
+            
+            let packetStr = dfmGeneratedPacket.filter(p => p).map(p => JSON.stringify(p)).join(', ');
+            document.getElementById('dfm-generated-packet').textContent = `[${packetStr}]`;
+
+            dfmCurrentState = (dfmCurrentState + 1) % 3;
+            updateDFMVisuals();
+        }
+        
+        function updateDFMVisuals() {
+            dfmStateWindows.forEach((window, index) => {
+                if (index === dfmCurrentState) {
+                    window.classList.add('active');
+                } else {
+                    window.classList.remove('active');
+                }
+            });
+        }
+        
+        // --- Resonance Logic ---
+        function quintic(x) {
+            const x3 = x * x * x;
+            const x5 = x3 * x * x;
+            return 16 * x5 - 20 * x3 + 5 * x;
+        }
+
+        function updateResonanceFunction() {
+            const f_norm = (frequencyId / 31) * 2 - 1; 
+            const a_norm = amplitudeId / 15;
+            const quinticValue = (quintic(f_norm) * 0.5 + 0.5);
+            targetResonance = a_norm * (quinticValue * 2);
+            
+            document.getElementById('target-res-readout').textContent = targetResonance.toFixed(2);
+            drawResonanceGraph();
+        }
+
+        function drawResonanceGraph() {
+            if (!graphCtx) return;
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            graphCtx.fillStyle = '#111827';
+            graphCtx.fillRect(0, 0, w, h);
+
+            graphCtx.strokeStyle = '#3b82f6';
+            graphCtx.lineWidth = 2;
+            graphCtx.beginPath();
+
+            for (let i = 0; i < w; i++) {
+                const f_norm = (i / (w - 1)) * 2 - 1;
+                const a_norm = amplitudeId / 15;
+                const quinticValue = (quintic(f_norm) * 0.5 + 0.5);
+                const y_val = a_norm * (quinticValue * 2);
+                const y = h - (y_val / 2) * h;
+                (i === 0) ? graphCtx.moveTo(i, y) : graphCtx.lineTo(i, y);
+            }
+            graphCtx.stroke();
+            
+            const f_line_x = (frequencyId / 31) * w;
+            graphCtx.strokeStyle = '#ef4444';
+            graphCtx.lineWidth = 1;
+            graphCtx.beginPath();
+            graphCtx.moveTo(f_line_x, 0);
+            graphCtx.lineTo(f_line_x, h);
+            graphCtx.stroke();
+        }
+        
+        function updateCodexJSON() {
+            const codex = {
+                packetId: `shd-ccp-${Date.now()}`,
+                description: "SHD-CCP Packet State Snapshot",
+                timeChainStep: currentTimeStep,
+                activePacket: {
+                    centralQuaternion: { ...quat }, // Use final quat
+                    rawQuaternion: { ...rawQuat }, // Store raw quat
+                    inversePolarity: inversePolarity,
+                    metadata: {
+                        frequencyId,
+                        amplitudeId,
+                        structuralFormId,
+                        spinClassId,
+                        payloadScaler
+                    },
+                },
+                resonanceState: {
+                    targetResonance,
+                    currentMagnitude: quatMagnitude,
+                    inResonance: Math.abs(quatMagnitude - targetResonance) < 0.05
+                },
+                panmagicCodex: panmagicCodexData 
+            };
+            jsonOutputEl.textContent = JSON.stringify(codex, null, 2);
+        }
+        
+        // --- Cell Selection Algorithm ---
+        function calculateCoordinateFromAlgo(algo, w, x, y, z) {
+            let val = 0;
+            const w_norm = (w + 1) / 2; // 0 to 1
+            const x_norm = (x + 1) / 2; // 0 to 1
+            const y_norm = (y + 1) / 2; // 0 to 1
+            const z_norm = (z + 1) / 2; // 0 to 1
+
+            switch(algo) {
+                case 'algo1': val = (w_norm + x_norm) / 2; break; 
+                case 'algo2': val = (y_norm + z_norm) / 2; break; 
+                case 'algo3': val = Math.abs(w * y - x * z); break; // 0-1 range
+                case 'algo4': val = Math.abs(x_norm - z_norm); break; // 0-1 range
+                case 'algo5': val = (w_norm + x_norm + y_norm + z_norm) / 4; break;
+            }
+            return Math.floor(Math.min(0.999, Math.max(0, val)) * 8); // Clamp 0-1 and map to 0-7
+        }
+
+
+        // --- Animation Loop ---
+
+        const vec3Helper = new THREE.Vector3();
+        const vec3Helper1 = new THREE.Vector3();
+        const quatHelper = new THREE.Quaternion();
+        const clock = new THREE.Clock();
+
+        // --- FIX: Moved helper variables to global scope ---
+        const tempQHelper = new THREE.Quaternion();
+        const tempVecHelper = new THREE.Vector3();
+        const pointerVec = new THREE.Vector3();
+        
+        function updateState(time) {
+            // This is the safety guard
+            if (!spinVector || !rhombicDodecahedron || !centralSphereGroup || !latticeNodesGroup || !octantPlanes || !octantMarkers.length) {
+                return;
+            }
+            
+            // Time Chain logic sets the rawQuat. applyPolarity() is called by the playback functions.
+            // If not playing, manual sliders are in control.
+            
+            // Calculate magnitude from final (possibly inverted) quat
+            quatMagnitude = Math.sqrt(quat.w * quat.w + quat.x * quat.x + quat.y * quat.y + quat.z * quat.z);
+            document.getElementById('quat-mag-readout').textContent = quatMagnitude.toFixed(2);
+            
+            // Update JSON
+            updateCodexJSON();
+
+            // Set 3D rotation from final quat
+            quatHelper.set(quat.x, quat.y, quat.z, quat.w).normalize();
+            centralSphereGroup.setRotationFromQuaternion(quatHelper);
+            
+            // Set spin vector from final quat
+            vec3Helper.set(quat.x, quat.y, quat.z).normalize();
+            const spinAxis = vec3Helper.lengthSq() > 0.0001 ? vec3Helper : vec3Helper.set(0, 1, 0);
+            spinVector.setDirection(spinAxis);
+
+            const resonance = Math.abs(quatMagnitude - targetResonance) < 0.05;
+            const flashSphere = centralSphereGroup.getObjectByName("flashSphere");
+            flashSphere.material.opacity = Math.max(0, flashSphere.material.opacity * 0.85);
+            flashSphere.material.emissiveIntensity = Math.max(0, flashSphere.material.emissiveIntensity * 0.85);
+            if (resonance) {
+                flashSphere.material.opacity = 1.0;
+                flashSphere.material.emissiveIntensity = 2.0;
+            }
+            
+            // --- Highlight Logic (for both tabs) ---
+            let maxDot = -Infinity;
+            let newActiveIndex = -1;
+            
+            const pointerWorldDir = vec3Helper1.copy(spinAxis).applyQuaternion(centralSphereGroup.quaternion);
+
+            // --- 1. Main 12-Zone Highlighting ---
+            LATTICE_VECTORS.forEach((v, i) => {
+                const dot = pointerWorldDir.dot(v); 
+                if (dot > maxDot) {
+                    maxDot = dot;
+                    newActiveIndex = i;
+                }
+            });
+            
+            if (newActiveIndex !== activeHexIndex) {
+                if (activeHexIndex !== -1 && rhombicDodecahedron.children[activeHexIndex]) {
+                    const oldLine = rhombicDodecahedron.children[activeHexIndex].children[0];
+                    oldLine.userData.material.color.set(0x3b82f6);
+                    oldLine.userData.material.opacity = 0.3;
+                }
+                if (rhombicDodecahedron.children[newActiveIndex]) {
+                    const newLine = rhombicDodecahedron.children[newActiveIndex].children[0];
+                    newLine.userData.material.color.set(0xffffff);
+                    newLine.userData.material.opacity = 1.0;
+                }
+                activeHexIndex = newActiveIndex;
+            }
+            
+            // --- 2. Panmagic 6-Square Highlighting ---
+            maxDot = -Infinity;
+            let newSquareIndex = -1;
+            CUBE_AXES.forEach((axis, i) => {
+                const dot = pointerWorldDir.dot(axis); 
+                if (dot > maxDot) {
+                    maxDot = dot;
+                    newSquareIndex = i;
+                }
+            });
+            
+            if (newSquareIndex !== activeSquareIndex) {
+                // De-activate old one (if it exists)
+                if (activeSquareIndex !== -1 && panmagicGrids[activeSquareIndex]) { 
+                    panmagicGrids[activeSquareIndex].classList.remove('active');
+                }
+                // Activate new one (if it exists)
+                if(panmagicGrids[newSquareIndex]) { 
+                    panmagicGrids[newSquareIndex].classList.add('active');
+                }
+                activeSquareIndex = newSquareIndex;
+            }
+            
+            // --- 3. New Octant Highlighting ---
+            const showOctants = document.getElementById('show-octants-toggle').checked;
+            octantPlanes.visible = showOctants;
+            // FIX: isVisible is not defined. Use showOctants.
+            octantMarkers.forEach(m => m.visible = showOctants);
+            
+            if (showOctants) {
+                let activeOctantIndex = 0;
+                if (pointerWorldDir.x > 0) activeOctantIndex |= 1;
+                if (pointerWorldDir.y > 0) activeOctantIndex |= 2;
+                if (pointerWorldDir.z > 0) activeOctantIndex |= 4;
+                
+                octantMarkers.forEach((markerGroup, i) => {
+                    const markerSquare = markerGroup.getObjectByName("markerSquare");
+                    const markerOutline = markerGroup.getObjectByName("markerOutline");
+                    
+                    if (markerSquare && markerSquare.material && markerSquare.material.emissive && markerOutline && markerOutline.material) {
+                        if (i === activeOctantIndex) {
+                            markerSquare.material.emissive.set(0xffffff);
+                            markerSquare.material.color.set(0xffffff);
+                            markerOutline.material.color.set(0xffffff);
+                        } else {
+                            markerSquare.material.emissive.set(0x000000);
+                            markerSquare.material.color.set(0x4b5563);
+                            markerOutline.material.color.set(0x9ca3af);
+                        }
+                    }
+                });
+            }
+
+            if (showLatticeNodes || showNodeTrails || panmagicContainer.classList.contains('visible')) {
+                updateLatticeNodes(quat, time); // Pass final quat
+            }
+        }
+        
+        function updateLatticeNodes(q, time) {
+            const nodeScale = 1.0; 
+            const rotation = Math.PI / 4;
+            const cos = Math.cos(rotation);
+            const sin = Math.sin(rotation);
+            
+            const resX = (q.w - q.y) * nodeScale;
+            const resY = (q.x - q.z) * nodeScale;
+            
+            const tiltedX = resX * cos - resY * sin;
+            const tiltedY = resX * sin + resY * cos;
+            
+            vec3Helper.set(tiltedX, tiltedY, 0);
+            
+            // --- Get Row/Col values ---
+            let rowValue;
+            if (rowControlMode === 'metadata') {
+                rowValue = spinClassId;
+            } else {
+                const algo = document.getElementById('y-algo-select').value;
+                rowValue = calculateCoordinateFromAlgo(algo, q.w, q.x, q.y, q.z);
+            }
+            
+            let colValue;
+            if (colControlMode === 'metadata') {
+                colValue = (frequencyId + amplitudeId) % 8;
+            } else {
+                const algo = document.getElementById('x-algo-select').value;
+                colValue = calculateCoordinateFromAlgo(algo, q.w, q.x, q.y, q.z);
+            }
+            
+            // --- Store for Panmagic Tab ---
+            activeCell.x = colValue;
+            activeCell.y = rowValue;
+            activeCell.color = TRAIL_COLORS_HEX[rowValue];
+            
+            // --- Apply to 3D Trails ---
+            const trailColor = TRAIL_COLORS[rowValue];
+            const trailSize = (colValue / 7) * 0.2 + 0.05; // 0.05 to 0.25
+            trailPoints.material.size = trailSize; // Set global size
+
+            latticeNodesGroup.children.forEach((nodeGroup, index) => {
+                nodeGroup.getObjectByName("w_axis").scale.set(Math.max(0, q.w), Math.max(0, q.w), 1);
+                nodeGroup.getObjectByName("x_axis").scale.set(Math.max(0, q.x), Math.max(0, q.x), 1);
+                nodeGroup.getObjectByName("y_axis").scale.set(Math.max(0, q.y), Math.max(0, q.y), 1);
+                nodeGroup.getObjectByName("z_axis").scale.set(Math.max(0, q.z), Math.max(0, q.z), 1);
+                
+                const resultantNode = nodeGroup.getObjectByName("resultantNode");
+                resultantNode.position.copy(vec3Helper);
+                
+                if (showNodeTrails) {
+                    const worldPos = resultantNode.getWorldPosition(new THREE.Vector3());
+                    trailPointData.push({ 
+                        pos: worldPos, 
+                        time: time, 
+                        color: trailColor 
+                    });
+                }
+            });
+        }
+        
+        function updateTrails(time) {
+            if (!showNodeTrails && trailPointData.length === 0) {
+                 if (trailGeometry) trailGeometry.setDrawRange(0, 0); 
+                 return;
+            }
+
+            const cutoffTime = time - trailPersistence;
+            trailPointData = trailPointData.filter(p => p.time > cutoffTime);
+            
+            if (trailPointData.length > MAX_TRAIL_POINTS) {
+                trailPointData.splice(0, trailPointData.length - MAX_TRAIL_POINTS);
+            }
+
+            const positions = trailGeometry.getAttribute('position').array;
+            const colors = trailGeometry.getAttribute('color').array;
+
+            let i = 0;
+            for (const point of trailPointData) {
+                const age = (time - point.time) / trailPersistence;
+                const alpha = 1.0 - age; 
+
+                positions[i * 3] = point.pos.x;
+                positions[i * 3 + 1] = point.pos.y;
+                positions[i * 3 + 2] = point.pos.z;
+                
+                const color = point.color; 
+                colors[i * 4] = color.r;
+                colors[i * 4 + 1] = color.g;
+                colors[i * 4 + 2] = color.b;
+                colors[i * 4 + 3] = alpha;
+                i++;
+            }
+            
+            trailGeometry.getAttribute('position').needsUpdate = true;
+            trailGeometry.getAttribute('color').needsUpdate = true;
+            trailGeometry.setDrawRange(0, trailPointData.length);
+        }
+        
+        // --- NEW: Update Panmagic Grid Highlights ---
+        function updatePanmagicGridHighlights() {
+            // Clear last highlighted cell
+            if (lastActiveCell.sq !== -1) {
+                const { sq, x, y } = lastActiveCell;
+                if (panmagicGridCells[sq] && panmagicGridCells[sq][y] && panmagicGridCells[sq][y][x]) {
+                    const cellEl = panmagicGridCells[sq][y][x];
+                    cellEl.classList.remove('active-cell');
+                    cellEl.style.backgroundColor = ''; // Clear color
+                    
+                    // Reset background color
+                    const bitIndex = y * 8 + x;
+                    if (bitIndex < 32) { cellEl.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'; } 
+                    else if (bitIndex < 48) { cellEl.style.backgroundColor = 'rgba(248, 113, 113, 0.2)'; } 
+                    else if (bitIndex < 52) { cellEl.style.backgroundColor = 'rgba(139, 92, 246, 0.2)'; } 
+                    else if (bitIndex < 56) { cellEl.style.backgroundColor = 'rgba(234, 179, 8, 0.2)'; }
+                    else if (bitIndex < 59) { cellEl.style.backgroundColor = 'rgba(16, 185, 129, 0.2)'; } 
+                    else if (bitIndex < 64) { cellEl.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'; } 
+                    else { cellEl.style.backgroundColor = '#374151'; }
+                }
+            }
+            
+            // Set new active cell
+            if (activeSquareIndex !== -1) {
+                const { x, y, color } = activeCell;
+                if (panmagicGridCells[activeSquareIndex] && panmagicGridCells[activeSquareIndex][y] && panmagicGridCells[activeSquareIndex][y][x]) {
+                    const cellEl = panmagicGridCells[activeSquareIndex][y][x];
+                    cellEl.classList.add('active-cell');
+                    cellEl.style.backgroundColor = color; // Highlight with row/color
+                    
+                    // Store this for next frame's clear
+                    lastActiveCell = { sq: activeSquareIndex, x, y };
+                }
+            } else {
+                lastActiveCell = { sq: -1, x: -1, y: -1 };
+            }
+        }
+        
+        // --- NEW: Update Panmagic Grid Data (for .has-data class) ---
+        function updatePanmagicGridData() {
+            for (let i = 0; i < 6; i++) { // 6 squares
+                let count = 0;
+                const squareKey = `sq_${i}`;
+                const squareData = panmagicCodexData[squareKey] || {};
+                
+                for (let r = 0; r < 8; r++) {
+                    for (let c = 0; c < 8; c++) {
+                        const cellKey = `cell_${c}_${r}`;
+                        const cellEl = panmagicGridCells[i]?.[r]?.[c];
+                        if (!cellEl) continue; // Safety check
+                        
+                        if (squareData[cellKey]) {
+                            cellEl.classList.add('has-data');
+                            count++;
+                        } else {
+                            cellEl.classList.remove('has-data');
+                        }
+                    }
+                }
+                // Update usage stats
+                const statsEl = document.getElementById(`usage-stats-${i}`);
+                if (statsEl) {
+                    statsEl.textContent = `${count} / 64 Used`;
+                }
+            }
+        }
+        
+        // --- NEW: FPS Keyboard Listeners ---
+        function onKeyDown(event) {
+            // Only active if in FPS mode
+            if (timeChainControlMode !== 'fps' || !timeControlsFPS.isLocked) {
+                // Allow Esc to unlock
+                if (event.code === 'Escape' && timeChainControlMode === 'fps') {
+                    timeControlsFPS.unlock();
+                }
+                return;
+            }
+            
+            switch (event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    moveForward = true;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    moveLeft = true;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    moveBackward = true;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    moveRight = true;
+                    break;
+            }
+        }
+
+        function onKeyUp(event) {
+             switch (event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    moveForward = false;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    moveLeft = false;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    moveBackward = false;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    moveRight = false;
+                    break;
+            }
+        }
+        
+        function animate() {
+            const time = clock.getElapsedTime();
+            requestAnimationFrame(animate);
+
+            updateState(time);
+            
+            if(showNodeTrails) {
+                updateTrails(time);
+            }
+
+            if (packetNodesGroup) {
+                packetNodesGroup.rotation.y = time * 0.1;
+            }
+
+            // Render main 3D scene
+            controls.update();
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+            
+            // Render Panmagic 2D canvas
+            if (panmagicContainer.classList.contains('visible')) {
+                drawPanmagic2DView();
+                updatePanmagicGridHighlights(); 
+                drawTemporalGraph(); 
+                updatePanmagicGridData(); 
+            }
+            
+            // Render 3D Time Chain scene
+            if (timeChainContainer.classList.contains('visible')) {
+                // --- NEW: FPS/Orbit Logic ---
+                const timeNow = performance.now();
+                const delta = (timeNow - prevTime) / 1000.0;
+                
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+
+                if (timeControlsFPS.isLocked === true) {
+                    const speed = 10.0; // units per second
+                    if (moveForward) velocity.z -= speed * delta;
+                    if (moveBackward) velocity.z += speed * delta;
+                    if (moveLeft) velocity.x -= speed * delta;
+                    if (moveRight) velocity.x += speed * delta;
+                    
+                    timeControlsFPS.moveRight(velocity.x * delta * 5.0); // Adjust speed multiplier
+                    timeControlsFPS.moveForward(-velocity.z * delta * 5.0);
+                } else {
+                    timeControlsOrbit.update();
+                }
+                
+                prevTime = timeNow;
+                // --- End FPS/Orbit Logic ---
+
+                updateTimeChainHighlights();
+                timeRenderer.render(timeScene, timeCamera); 
+            }
+        }
+
+        function onWindowResize() {
+            let activeTab = document.querySelector('.tab-content.visible');
+            
+            // Resize Main Canvas
+            if (renderer && camera && canvas3dContainer) {
+                 if (canvas3dContainer.clientWidth > 0 && canvas3dContainer.clientHeight > 0) {
+                    camera.aspect = canvas3dContainer.clientWidth / canvas3dContainer.clientHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(canvas3dContainer.clientWidth, canvas3dContainer.clientHeight);
+                    labelRenderer.setSize(canvas3dContainer.clientWidth, canvas3dContainer.clientHeight);
+                 }
+            }
+            
+            // Resize Panmagic 2D Canvas
+            if (panmagicCanvas) {
+                const pmContainer = document.getElementById('panmagic-2d-view'); // FIX: ID was panmagic-2d-view
+                if (pmContainer && pmContainer.clientWidth > 0 && pmContainer.clientHeight > 0) {
+                    // Get dimensions from parent, which is CSS-grid-controlled
+                    const rect = pmContainer.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        panmagicCanvas.width = rect.width;
+                        panmagicCanvas.height = rect.height;
+                        if(activeTab === panmagicContainer) drawPanmagic2DView();
+                    }
+                }
+            }
+            
+            // Resize Temporal Canvas
+            if (temporalCanvas) {
+                const tContainer = document.getElementById('temporal-graph-container');
+                if (tContainer && tContainer.clientWidth > 0 && tContainer.clientHeight > 0) {
+                    const rect = tContainer.getBoundingClientRect();
+                    const header = tContainer.querySelector('.temporal-graph-header');
+                    const p = tContainer.querySelector('p');
+                    const headerHeight = (header ? header.offsetHeight : 0) + (p ? p.offsetHeight : 0) + 20; // 20 for margins
+                    
+                    if (rect.width > 0 && rect.height > headerHeight) {
+                        temporalCanvas.width = rect.width;
+                        temporalCanvas.height = rect.height - headerHeight;
+                        if(activeTab === panmagicContainer) drawTemporalGraph();
+                    }
+                }
+            }
+            
+            // Resize 3D Time Chain Canvas
+            if (timeRenderer && timeCamera && timeChainContainer) {
+                const w = timeChainContainer.clientWidth;
+                const h = timeChainContainer.clientHeight;
+                if(w > 0 && h > 0) {
+                    timeCamera.aspect = w / h;
+                    timeCamera.updateProjectionMatrix();
+                    timeRenderer.setSize(w, h);
+                }
+            }
+        }
+
+        // --- Run ---
+        init();
+
+    </script>
+</body>
+</html>
