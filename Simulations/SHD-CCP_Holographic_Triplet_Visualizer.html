@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHD-CCP Holographic Triplet Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- MathJax -->
+    <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; overflow: hidden; }
+        .panel { background-color: rgba(30, 41, 59, 0.9); border: 1px solid #334155; border-radius: 0.5rem; padding: 1rem; }
+        .canvas-container { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        .overlay { position: absolute; z-index: 10; pointer-events: none; width: 100%; height: 100%; display: flex; }
+        .sidebar { width: 350px; pointer-events: auto; display: flex; flex-direction: column; gap: 1rem; padding: 1rem; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(5px); border-right: 1px solid #334155; overflow-y: auto; }
+        .hud-top { position: absolute; top: 1rem; left: 380px; right: 1rem; display: flex; justify-content: space-between; pointer-events: auto; }
+        
+        .bit-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+        .bit-cell { aspect-ratio: 1; background: #334155; border-radius: 2px; transition: 0.1s; }
+        .bit-active { background: #00ffff; box-shadow: 0 0 5px #00ffff; }
+        
+        .scope-container {
+            width: 300px; height: 300px;
+            background: #000; border: 1px solid #334155;
+            border-radius: 0.5rem; position: relative; overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="main-canvas" class="canvas-container"></div>
+
+    <div class="overlay">
+        <!-- LEFT SIDEBAR -->
+        <div class="sidebar">
+            <h1 class="text-2xl font-bold text-cyan-400">SHD-CCP Holographic</h1>
+            <p class="text-xs text-gray-400">Clifford-Strassen Inverse Protocol</p>
+            
+            <!-- SECTION 1: Triplet Configuration -->
+            <div class="panel">
+                <h2 class="text-sm font-bold text-white mb-2 border-b border-gray-600 pb-1">1. Triplet Configuration</h2>
+                <p class="text-[10px] text-gray-400 mb-2">3 Quaternions define the concept.</p>
+                
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-cyan-300">Q1: Signifier (Word)</span>
+                            <span id="val-q1" class="font-mono">Identity</span>
+                        </div>
+                        <div class="bit-grid" id="grid-q1"></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-pink-400">Q2: Signified (Concept)</span>
+                            <span id="val-q2" class="font-mono">Cube</span>
+                        </div>
+                        <div class="bit-grid" id="grid-q2"></div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-yellow-400">Q3: Context (Relation)</span>
+                            <span id="val-q3" class="font-mono">Linear</span>
+                        </div>
+                        <div class="bit-grid" id="grid-q3"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: Holographic Projection -->
+            <div class="panel">
+                <h2 class="text-sm font-bold text-white mb-2 border-b border-gray-600 pb-1">2. Holographic Inverse</h2>
+                <div class="flex justify-between text-xs text-gray-300 mb-1">
+                    <span>Projection Scalar:</span>
+                    <span id="val-scalar" class="text-emerald-400 font-mono">1.00</span>
+                </div>
+                <input type="range" id="slider-scalar" min="0" max="2" step="0.01" value="1.0" class="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer">
+                
+                <div class="mt-4 text-xs">
+                    <p class="text-gray-400">Inverse Gap (Empty Data):</p>
+                    <div class="w-full bg-gray-700 h-2 rounded mt-1 overflow-hidden">
+                        <div id="bar-gap" class="bg-purple-500 h-full" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: Toda-Kogame Controls -->
+            <div class="panel">
+                <h2 class="text-sm font-bold text-white mb-2 border-b border-gray-600 pb-1">3. Toda-Kogame Lattice</h2>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-xs text-gray-300">Lattice Tension</label>
+                    <input type="range" id="slider-tension" min="0.1" max="5" step="0.1" value="2.0" class="w-20 h-1">
+                </div>
+                <div class="flex items-center justify-between">
+                    <label class="text-xs text-gray-300">Compression Force</label>
+                    <input type="range" id="slider-compression" min="0" max="1" step="0.01" value="0" class="w-20 h-1">
+                </div>
+            </div>
+            
+            <div class="panel bg-black border-cyan-900">
+                <div class="text-[10px] font-mono text-cyan-500 mb-1">SYS_STATUS:</div>
+                <div id="status-log" class="text-[10px] font-mono text-green-400 h-20 overflow-hidden">
+                    > INIT_CORE...<br>
+                    > LOAD_CLIFFORD_TORUS...<br>
+                    > SYNC_STRASSEN_NODES...<br>
+                    > READY.
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT HUD: Keystone Scope -->
+        <div class="absolute right-4 top-4 pointer-events-auto">
+            <div class="panel">
+                <h2 class="text-sm font-bold text-white mb-2">Keystone Scope (Micro)</h2>
+                <div id="scope-canvas" class="scope-container"></div>
+                <div class="text-center text-xs text-gray-400 mt-1">Toda-Kogame Lattice Deformation</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Globals ---
+        let sceneMain, cameraMain, rendererMain, controlsMain;
+        let sceneScope, cameraScope, rendererScope;
+        
+        let streams = []; // 16 streams
+        let inverseStreams = []; // 16 inverse streams
+        let tripletGroups = []; // The 3-quaternion structures
+        let latticeNodes = []; // For Keystone Scope
+        let latticeLinks = []; // For Keystone Scope
+        
+        // Simulation State
+        let time = 0;
+        let scalarVal = 1.0;
+        let tensionVal = 2.0;
+        let compressionVal = 0.0;
+
+        // Constants
+        const PATH_RES = 500;
+        const TUBE_RADIUS = 30;
+        const KOGAME_RADIUS = 5; // Radius of the micro-lattice in scope
+
+        // --- Init ---
+        function init() {
+            // Main Renderer
+            const containerMain = document.getElementById('main-canvas');
+            rendererMain = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            rendererMain.setSize(window.innerWidth, window.innerHeight);
+            rendererMain.setPixelRatio(window.devicePixelRatio);
+            containerMain.appendChild(rendererMain.domElement);
+
+            sceneMain = new THREE.Scene();
+            // Fog for depth
+            sceneMain.fog = new THREE.FogExp2(0x0f172a, 0.002);
+
+            cameraMain = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+            cameraMain.position.set(100, 100, 200);
+
+            controlsMain = new THREE.OrbitControls(cameraMain, rendererMain.domElement);
+            controlsMain.enableDamping = true;
+            controlsMain.autoRotate = true;
+            controlsMain.autoRotateSpeed = 0.5;
+
+            // Scope Renderer
+            const containerScope = document.getElementById('scope-canvas');
+            rendererScope = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            rendererScope.setSize(containerScope.clientWidth, containerScope.clientHeight);
+            containerScope.appendChild(rendererScope.domElement);
+
+            sceneScope = new THREE.Scene();
+            cameraScope = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+            cameraScope.position.set(0, 0, 40);
+
+            // Lighting
+            const amb = new THREE.AmbientLight(0xffffff, 0.5);
+            sceneMain.add(amb);
+            sceneScope.add(amb.clone());
+            
+            const dir = new THREE.DirectionalLight(0xffffff, 1);
+            dir.position.set(50, 100, 50);
+            sceneMain.add(dir);
+            
+            const scopeLight = new THREE.PointLight(0xffffff, 1);
+            scopeLight.position.set(10,10,10);
+            sceneScope.add(scopeLight);
+
+            // --- Build World ---
+            buildTrefoilSystem();
+            buildKeystoneLattice();
+            initUI();
+
+            window.addEventListener('resize', onResize);
+            animate();
+        }
+
+        // --- Trefoil Path Logic ---
+        class TrefoilCurve extends THREE.Curve {
+            getPoint(t, optionalTarget = new THREE.Vector3()) {
+                const angle = t * Math.PI * 4; // 2 loops
+                const R = 60;
+                const x = R * (Math.sin(angle) + 2 * Math.sin(2 * angle));
+                const y = R * (Math.cos(angle) - 2 * Math.cos(2 * angle));
+                const z = R * (-Math.sin(3 * angle));
+                return optionalTarget.set(x, y, z);
+            }
+        }
+        const path = new TrefoilCurve();
+
+        function buildTrefoilSystem() {
+            // 1. The 16-Stream Real Bundle
+            const matReal = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.3 });
+            // 2. The 16-Stream Inverse Bundle (Holographic)
+            const matInv = new THREE.LineBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0.15 });
+
+            for(let i=0; i<16; i++) {
+                const ptsReal = [];
+                const ptsInv = [];
+                const offsetAngle = (i / 16) * Math.PI * 2;
+
+                for(let j=0; j<=PATH_RES; j++) {
+                    const t = j/PATH_RES;
+                    const point = path.getPoint(t);
+                    const tangent = path.getTangent(t);
+                    const normal = new THREE.Vector3(0,1,0).applyAxisAngle(new THREE.Vector3(1,0,0), Math.PI/2).cross(tangent).normalize();
+                    const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+                    
+                    // Twist: 720 degrees (4PI)
+                    const twist = t * Math.PI * 4;
+                    
+                    // Real Stream
+                    const angleR = offsetAngle + twist;
+                    const cxR = Math.cos(angleR) * 10; // Radius 10
+                    const cyR = Math.sin(angleR) * 10;
+                    const offsetR = normal.clone().multiplyScalar(cxR).add(binormal.clone().multiplyScalar(cyR));
+                    ptsReal.push(point.clone().add(offsetR));
+
+                    // Inverse Stream (Antipodal + Phase Shift)
+                    const angleI = angleR + Math.PI; // 180 deg offset
+                    const cxI = Math.cos(angleI) * 10;
+                    const cyI = Math.sin(angleI) * 10;
+                    const offsetI = normal.clone().multiplyScalar(cxI).add(binormal.clone().multiplyScalar(cyI));
+                    // Inverse pushes slightly 'out' or 'in' based on scalar
+                    ptsInv.push(point.clone().add(offsetI.multiplyScalar(1.5))); 
+                }
+                
+                const lineR = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsReal), matReal);
+                sceneMain.add(lineR);
+                streams.push(lineR);
+
+                const lineI = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsInv), matInv);
+                sceneMain.add(lineI);
+                inverseStreams.push(lineI);
+            }
+
+            // 3. The Triplet Packets (Travelers)
+            // We create 3 separate groups for Q1, Q2, Q3
+            const geomQ = new THREE.SphereGeometry(3, 16, 16);
+            const cols = [0x00ffff, 0xff00ff, 0xffff00]; // Cyan, Pink, Yellow
+            
+            for(let k=0; k<3; k++) {
+                const grp = new THREE.Group();
+                const mesh = new THREE.Mesh(geomQ, new THREE.MeshBasicMaterial({ color: cols[k] }));
+                // Add halo ring
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(5, 0.2, 8, 32), new THREE.MeshBasicMaterial({ color: cols[k], wireframe: true }));
+                grp.add(mesh);
+                grp.add(ring);
+                sceneMain.add(grp);
+                tripletGroups.push(grp);
+            }
+        }
+
+        // --- Keystone Scope Logic (Toda-Kogame) ---
+        function buildKeystoneLattice() {
+            // Build a hexagonal (Kagome-like) lattice of 16 nodes
+            const matNode = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const matLink = new THREE.LineBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
+            const geomNode = new THREE.SphereGeometry(0.5, 8, 8);
+
+            // Create 16 nodes in a circle/hex pattern
+            for(let i=0; i<16; i++) {
+                const angle = (i / 16) * Math.PI * 2;
+                const r = 10;
+                const x = Math.cos(angle) * r;
+                const y = Math.sin(angle) * r;
+                
+                const node = new THREE.Mesh(geomNode, matNode);
+                // Store base pos for physics calculation
+                node.userData = { 
+                    baseX: x, baseY: y, baseZ: 0,
+                    angle: angle
+                }; 
+                node.position.set(x, y, 0);
+                sceneScope.add(node);
+                latticeNodes.push(node);
+            }
+            
+            // Connect Neighbors (Toda Springs)
+            const pts = [];
+            for(let i=0; i<16; i++) {
+                const next = (i+1)%16;
+                // Just for visual lines, we'll update geom in animate
+                const p1 = latticeNodes[i].position;
+                const p2 = latticeNodes[next].position;
+                // Create individual line object for each link to update easily? 
+                // Or one big buffer geom. Let's do individual for simplicity of logic logic
+                const g = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+                const l = new THREE.Line(g, matLink);
+                l.userData = { n1: i, n2: next };
+                sceneScope.add(l);
+                latticeLinks.push(l);
+                
+                // Cross links for rigidity (Kagome structure)
+                const cross = (i+3)%16;
+                const g2 = new THREE.BufferGeometry().setFromPoints([p1, latticeNodes[cross].position]);
+                const l2 = new THREE.Line(g2, matLink);
+                l2.userData = { n1: i, n2: cross };
+                sceneScope.add(l2);
+                latticeLinks.push(l2);
+            }
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            time += 0.002;
+            const t = time % 1;
+
+            // 1. Update Triplet Positions (Macro)
+            // They travel with a slight delay to form a 'train'
+            tripletGroups.forEach((grp, i) => {
+                const lag = i * 0.02; // Spacing
+                const localT = (t - lag + 1) % 1; // Wrap around
+                
+                const pos = path.getPointAt(localT);
+                const tangent = path.getTangentAt(localT);
+                
+                grp.position.copy(pos);
+                grp.lookAt(pos.clone().add(tangent));
+                
+                // Spin the rings based on scalar
+                grp.children[1].rotation.z += 0.05 * scalarVal;
+                
+                // Expansion/Compression Breathing (Holographic)
+                // Scalar > 1 expands, < 1 compresses
+                const pulse = 1 + Math.sin(time * 10 + i) * 0.2 * compressionVal;
+                grp.scale.setScalar(scalarVal * pulse);
+            });
+
+            // 2. Update Inverse Streams (Holographic Projection)
+            // They should pulse inversely to the scalar
+            const invScale = 2.0 - scalarVal; // Inverse relationship
+            inverseStreams.forEach(line => {
+               line.scale.setScalar(invScale); 
+               line.visible = invScale > 0.1;
+            });
+            
+            // 3. Update Gap Bar UI
+            const gap = Math.abs(scalarVal - invScale) * 50;
+            document.getElementById('bar-gap').style.width = Math.min(gap, 100) + '%';
+
+            // 4. Update Keystone Scope (Toda-Kogame Physics)
+            updateKeystonePhysics();
+
+            controlsMain.update();
+            rendererMain.render(sceneMain, cameraMain);
+            rendererScope.render(sceneScope, cameraScope);
+        }
+        
+        function updateKeystonePhysics() {
+            // Simulate Toda Lattice dynamics
+            // Force = exp(-(r - r0)) - exp(-(r0 - r))
+            // Here we visualize the result:
+            // "Compression" slider pushes nodes inward
+            // "Tension" slider resists
+            
+            const baseR = 10;
+            // Calculate effective radius based on compression vs tension
+            // Higher tension resists compression
+            const r = baseR * (1 - (compressionVal / tensionVal));
+            
+            latticeNodes.forEach((node, i) => {
+                // Apply a twist based on simulation time (the flow along the knot)
+                const twist = time * 2; 
+                const angle = node.userData.angle + twist;
+                
+                // Toda deformation: non-linear squashing
+                // Inner nodes (relative to turn) compress more
+                // We simulate this by modulating radius with a sine wave of the angle
+                const deformation = 1 + (Math.cos(angle * 2) * 0.2 * compressionVal);
+                
+                const currR = r * deformation;
+                
+                node.position.x = Math.cos(angle) * currR;
+                node.position.y = Math.sin(angle) * currR;
+            });
+            
+            // Update links
+            latticeLinks.forEach(link => {
+                const n1 = latticeNodes[link.userData.n1];
+                const n2 = latticeNodes[link.userData.n2];
+                const pos = link.geometry.attributes.position.array;
+                pos[0] = n1.position.x; pos[1] = n1.position.y; pos[2] = n1.position.z;
+                pos[3] = n2.position.x; pos[4] = n2.position.y; pos[5] = n2.position.z;
+                link.geometry.attributes.position.needsUpdate = true;
+            });
+        }
+
+        function initUI() {
+            // Setup Bit Grids (Visual Candy)
+            ['q1', 'q2', 'q3'].forEach(id => {
+                const grid = document.getElementById('grid-'+id);
+                for(let i=0; i<16; i++) {
+                    const d = document.createElement('div');
+                    d.className = 'bit-cell';
+                    if(Math.random()>0.5) d.classList.add('bit-active');
+                    grid.appendChild(d);
+                }
+            });
+            
+            // Sliders
+            document.getElementById('slider-scalar').addEventListener('input', (e) => {
+                scalarVal = parseFloat(e.target.value);
+                document.getElementById('val-scalar').innerText = scalarVal.toFixed(2);
+            });
+            document.getElementById('slider-tension').addEventListener('input', (e) => {
+                tensionVal = parseFloat(e.target.value);
+            });
+            document.getElementById('slider-compression').addEventListener('input', (e) => {
+                compressionVal = parseFloat(e.target.value);
+            });
+        }
+
+        function onResize() {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            rendererMain.setSize(w, h);
+            cameraMain.aspect = w/h;
+            cameraMain.updateProjectionMatrix();
+        }
+
+        // Boot
+        init();
+    </script>
+</body>
+</html>
