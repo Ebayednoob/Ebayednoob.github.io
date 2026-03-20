@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nested Harmonic Cocoon - Master Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #020617; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* UI Overlay */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; }
+        
+        /* Left Sidebar - Navigation Hub */
+        .nav-sidebar { width: 350px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); border-right: 1px solid #1e293b; padding: 1.5rem; pointer-events: auto; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 20px 0 40px rgba(0,0,0,0.6); }
+        
+        .glass-panel { background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1.25rem; transition: all 0.2s; }
+        
+        /* Custom Buttons */
+        .tool-link { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: rgba(15, 23, 42, 0.6); border: 1px solid #475569; border-radius: 0.5rem; margin-bottom: 0.5rem; cursor: pointer; text-decoration: none; color: #e2e8f0; transition: all 0.2s; }
+        .tool-link:hover { background: #1e293b; border-color: #3b82f6; transform: translateX(5px); }
+        .tool-link.active { background: #1e3a8a; border-color: #60a5fa; color: white; }
+        
+        .tutorial-link { display: flex; align-items: center; font-size: 0.75rem; color: #94a3b8; padding: 0.5rem; text-decoration: none; border-radius: 0.25rem; transition: all 0.2s; }
+        .tutorial-link:hover { color: #38bdf8; background: rgba(56, 189, 248, 0.1); }
+
+        /* Right Sidebar - System Status */
+        .status-sidebar { width: 300px; background: transparent; padding: 1.5rem; pointer-events: auto; position: absolute; right: 0; top: 0; height: 100%; display: flex; flex-direction: column; align-items: flex-end; }
+        .status-badge { background: rgba(2, 6, 23, 0.8); border: 1px solid #334155; padding: 0.5rem 1rem; border-radius: 2rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; backdrop-filter: blur(8px); }
+        .indicator { width: 8px; height: 8px; border-radius: 50%; }
+        .indicator.on { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <!-- Navigation Hub -->
+        <div class="nav-sidebar">
+            <div class="mb-6">
+                <h1 class="text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 mb-1">NESTED HARMONIC</h1>
+                <h2 class="text-sm tracking-widest text-slate-400 uppercase font-semibold">Master Hub Visualizer</h2>
+            </div>
+
+            <div class="glass-panel">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Engineering Modules</h3>
+                
+                <a href="tools/coil_cad.html" class="tool-link">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        <span class="font-semibold text-sm">Bifilar Coil CAD</span>
+                    </div>
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+                
+                <a href="tools/body_cad.html" class="tool-link">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                        <span class="font-semibold text-sm">Body Alignment CAD</span>
+                    </div>
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+                
+                <a href="tools/acoustic_cad.html" class="tool-link">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                        <span class="font-semibold text-sm">Acoustic Array CAD</span>
+                    </div>
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+
+                <a href="tools/nested9_visualizer.html" class="tool-link">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-5 h-5 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                        <span class="font-semibold text-sm">Learning Designer</span>
+                    </div>
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+            </div>
+
+            <div class="glass-panel border-slate-700/50">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Documentation & Tutorials</h3>
+                <div class="flex flex-col gap-1">
+                    <a href="tutorials/visualizer_guide.html" class="tutorial-link"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg> Master Project Guide (Readme)</a>
+                    <a href="tutorials/coil_guide.html" class="tutorial-link"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> How to Wind Bifilar Coils</a>
+                    <a href="tutorials/body_guide.html" class="tutorial-link"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Glass Bed & Crystal Alignment</a>
+                    <a href="tutorials/acoustic_guide.html" class="tutorial-link"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Wiring the DML Exciters</a>
+                </div>
+            </div>
+            
+            <div class="mt-auto p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg text-[10px] text-blue-200 leading-relaxed">
+                <strong class="block text-blue-400 mb-1 text-xs">Visualization Active</strong>
+                Showing full macro-environment. Use mouse/touch to orbit, pan, and zoom the 3D cocoon array.
+            </div>
+        </div>
+
+        <!-- System Status Overlay -->
+        <div class="status-sidebar">
+            <div class="status-badge">
+                <div class="indicator on"></div>
+                <span class="text-slate-300 font-mono">OPTICS: 16.5Hz SYNC</span>
+            </div>
+            <div class="status-badge">
+                <div class="indicator on" style="background: #a855f7; box-shadow: 0 0 8px #a855f7;"></div>
+                <span class="text-slate-300 font-mono">SCALAR: 7.83Hz FLUX</span>
+            </div>
+            <div class="status-badge">
+                <div class="indicator on" style="background: #3b82f6; box-shadow: 0 0 8px #3b82f6;"></div>
+                <span class="text-slate-300 font-mono">ACOUSTIC: 174Hz DML</span>
+            </div>
+            
+            <div class="mt-4 flex flex-col items-end gap-2">
+                <label class="flex items-center text-xs text-gray-400 cursor-pointer hover:text-white transition bg-slate-900/80 px-3 py-1.5 rounded border border-slate-700">
+                    <input type="checkbox" id="toggle-waves" class="mr-2" checked onchange="toggleWaves(this.checked)"> Show Acoustic Standing Waves
+                </label>
+                <label class="flex items-center text-xs text-gray-400 cursor-pointer hover:text-white transition bg-slate-900/80 px-3 py-1.5 rounded border border-slate-700">
+                    <input type="checkbox" id="toggle-beams" class="mr-2" checked onchange="toggleBeams(this.checked)"> Show Crystal Photonics
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x020617, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(-25, 20, 25);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't let camera go too far below ground
+
+        // Lights
+        scene.add(new THREE.AmbientLight(0xffffff, 0.1));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // --- Environment Architecture ---
+        const floorGeo = new THREE.PlaneGeometry(100, 100);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9, metalness: 0.1 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.y = -10;
+        scene.add(floor);
+
+        const grid = new THREE.GridHelper(100, 50, 0x1e293b, 0x0f172a);
+        grid.position.y = -9.9;
+        scene.add(grid);
+
+        // --- The Bed & Glass ---
+        const bedGroup = new THREE.Group();
+        
+        // Wooden Base Frame
+        const frameGeo = new THREE.BoxGeometry(22, 10, 44.25);
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x3e2723, roughness: 0.8 }); // Dark wood
+        const frame = new THREE.Mesh(frameGeo, frameMat);
+        frame.position.y = -5;
+        bedGroup.add(frame);
+
+        // Tempered Glass Top
+        const glassGeo = new THREE.BoxGeometry(23, 0.5, 45.25);
+        const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transparent: true, opacity: 0.3, roughness: 0.05, transmission: 0.9, thickness: 0.5 });
+        const glass = new THREE.Mesh(glassGeo, glassMat);
+        glass.position.y = 0.25;
+        bedGroup.add(glass);
+        
+        scene.add(bedGroup);
+
+        // --- Abstract Human Body (Meditator) ---
+        const bodyMaterial = new THREE.MeshPhysicalMaterial({
+            color: 0x64748b,
+            metalness: 0.2,
+            roughness: 0.1,
+            transmission: 0.8, // glass-like
+            thickness: 0.5,
+            envMapIntensity: 1.0,
+            transparent: true,
+            opacity: 0.6
+        });
+
+        const humanGroup = new THREE.Group();
+        
+        // Head
+        const headGeo = new THREE.SphereGeometry(3.5, 32, 32);
+        const head = new THREE.Mesh(headGeo, bodyMaterial);
+        head.position.set(0, 3.5, -10);
+        humanGroup.add(head);
+
+        // Torso 
+        const torsoGeo = new THREE.CylinderGeometry(5, 4, 16, 16);
+        const torso = new THREE.Mesh(torsoGeo, bodyMaterial);
+        torso.rotation.x = Math.PI / 2;
+        torso.position.set(0, 4.5, 0);
+        humanGroup.add(torso);
+
+        // Legs 
+        const legGeo = new THREE.CylinderGeometry(2.5, 2, 20, 16);
+        const leftLeg = new THREE.Mesh(legGeo, bodyMaterial);
+        leftLeg.rotation.x = Math.PI / 2;
+        leftLeg.position.set(-2.5, 2.5, 18);
+        humanGroup.add(leftLeg);
+
+        const rightLeg = new THREE.Mesh(legGeo, bodyMaterial);
+        rightLeg.rotation.x = Math.PI / 2;
+        rightLeg.position.set(2.5, 2.5, 18);
+        humanGroup.add(rightLeg);
+
+        // Elevate body slightly above the glass
+        humanGroup.position.y = 0.5; 
+        scene.add(humanGroup);
+
+        // --- 7 Chakras (Coils + Crystals + Photons) ---
+        const CHAKRAS = [
+            { color: 0xff0000, z: 12 },   // Root
+            { color: 0xff7f00, z: 8 },    // Sacral
+            { color: 0xffff00, z: 4 },    // Solar
+            { color: 0x00ff00, z: 0 },    // Heart
+            { color: 0x0000ff, z: -4 },   // Throat
+            { color: 0x4b0082, z: -8 },   // Third Eye
+            { color: 0x9400d3, z: -12 }   // Crown
+        ];
+
+        const photonBeams = [];
+        const scalarAuras = [];
+
+        CHAKRAS.forEach(c => {
+            const node = new THREE.Group();
+            node.position.set(0, -0.5, c.z);
+
+            // Coil Mockup
+            const coilGeo = new THREE.CylinderGeometry(2, 2, 0.5, 32);
+            const coilMat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.8, roughness: 0.4 });
+            const coil = new THREE.Mesh(coilGeo, coilMat);
+            node.add(coil);
+
+            // Crystal Obelisk
+            const crysGeo = new THREE.ConeGeometry(0.8, 3, 6);
+            const crysMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, transmission: 0.9, roughness: 0.1 });
+            const crystal = new THREE.Mesh(crysGeo, crysMat);
+            crystal.position.y = 1.5;
+            node.add(crystal);
+
+            // Optic Photon Beam (Lasers shooting up)
+            const beamGeo = new THREE.CylinderGeometry(0.1, 0.8, 30, 16);
+            const beamMat = new THREE.MeshBasicMaterial({ color: c.color, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+            const beam = new THREE.Mesh(beamGeo, beamMat);
+            beam.position.y = 15;
+            node.add(beam);
+            photonBeams.push(beam);
+
+            // Scalar Magnetic Aura (The 4:1 expansion)
+            const auraGeo = new THREE.TorusGeometry(3, 4, 16, 32);
+            const auraMat = new THREE.MeshBasicMaterial({ color: 0xcc33ff, wireframe: true, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending });
+            const aura = new THREE.Mesh(auraGeo, auraMat);
+            aura.rotation.x = Math.PI/2;
+            aura.position.y = 2;
+            aura.scale.set(1, 1, 3); // 4:1 stretch
+            node.add(aura);
+            scalarAuras.push(aura);
+
+            bedGroup.add(node);
+        });
+
+        // --- The Nested 9 DML Acoustic Canopy ---
+        const canopyGroup = new THREE.Group();
+        canopyGroup.position.y = 18; // Suspend above bed
+        const acousticWaves = [];
+
+        // 3x3 Grid
+        for(let x = -1; x <= 1; x++) {
+            for(let z = -1; z <= 1; z++) {
+                const panelGroup = new THREE.Group();
+                panelGroup.position.set(x * 12, 0, z * 16);
+
+                // Angling the outer panels inward towards the body
+                panelGroup.rotation.z = x * 0.2;
+                panelGroup.rotation.x = -z * 0.15;
+
+                // EPS Panel
+                const pGeo = new THREE.BoxGeometry(8, 0.5, 10);
+                const pMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.7 });
+                const panel = new THREE.Mesh(pGeo, pMat);
+                panelGroup.add(panel);
+
+                // Tactile Exciter (Driver)
+                const excGeo = new THREE.CylinderGeometry(1.5, 1.5, 1, 16);
+                const excMat = new THREE.MeshStandardMaterial({ color: 0x000000, metalness: 0.8 });
+                const exciter = new THREE.Mesh(excGeo, excMat);
+                exciter.position.y = 0.5;
+                panelGroup.add(exciter);
+
+                // Acoustic Standing Wave Visualizer (Downward cones)
+                const waveGeo = new THREE.ConeGeometry(8, 20, 32, 4, true);
+                const waveMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, wireframe: true, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending });
+                const wave = new THREE.Mesh(waveGeo, waveMat);
+                wave.position.y = -10;
+                wave.rotation.x = Math.PI; // Point down
+                panelGroup.add(wave);
+                acousticWaves.push(wave);
+
+                canopyGroup.add(panelGroup);
+            }
+        }
+        scene.add(canopyGroup);
+
+        // --- UI Toggles ---
+        function toggleWaves(show) {
+            acousticWaves.forEach(w => w.visible = show);
+        }
+        
+        function toggleBeams(show) {
+            photonBeams.forEach(b => b.visible = show);
+        }
+
+        // --- Render Loop ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            const time = Date.now() * 0.002;
+
+            // Animate Optic Beams (16.5Hz stroboscopic pulsing simulation)
+            const strobe = (Math.sin(time * 16.5) + 1) / 2;
+            photonBeams.forEach(b => {
+                b.material.opacity = 0.1 + (strobe * 0.2);
+            });
+
+            // Animate Scalar Auras (7.83Hz breathing simulation)
+            const scalarPulse = Math.sin(time * 7.83) * 0.1;
+            scalarAuras.forEach(a => {
+                a.rotation.z -= 0.01;
+                a.scale.set(1 + scalarPulse, 1 + scalarPulse, 3 + (scalarPulse * 2));
+            });
+
+            // Animate DML Acoustic Standing Waves (174Hz ripple effect)
+            acousticWaves.forEach((w, i) => {
+                // Phase offset based on grid position for complex interference pattern
+                const offset = i * 0.5;
+                const wavePulse = (Math.sin(time * 5 + offset) + 1) / 2;
+                w.scale.set(1 + wavePulse*0.2, 1, 1 + wavePulse*0.2);
+                w.material.opacity = 0.05 + (wavePulse * 0.05);
+            });
+
+            // Gentle floating of the entire canopy
+            canopyGroup.position.y = 18 + Math.sin(time * 0.5) * 0.5;
+
+            renderer.render(scene, camera);
+        }
+
+        // Init
+        animate();
+    </script>
+</body>
+</html>
