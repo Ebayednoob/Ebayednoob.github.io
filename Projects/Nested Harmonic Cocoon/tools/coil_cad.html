@@ -1,1 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scalar Coil CAD & Electrical Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; z-index: 10; }
+        .sidebar { width: 400px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(12px); border-right: 1px solid #334155; padding: 1.5rem; pointer-events: auto; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); border: 1px solid #475569; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        
+        input[type=range] { width: 100%; accent-color: #3b82f6; cursor: pointer; }
+        select { background: #1e293b; border: 1px solid #475569; color: white; padding: 0.35rem; border-radius: 0.25rem; width: 100%; font-size: 0.875rem; outline: none; }
+        
+        .stat-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.875rem; }
+        .stat-label { color: #94a3b8; }
+        .stat-value { font-family: monospace; font-weight: bold; color: #f8fafc; }
+        .warning-text { color: #ef4444; font-weight: bold; }
+        .safe-text { color: #22c55e; font-weight: bold; }
+    </style>
+</head>
+<body class="antialiased">
 
+    <div id="canvas-container"></div>
+
+    <div id="ui-container">
+        <div class="sidebar">
+            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500 mb-1">Scalar Coil CAD</h1>
+            <p class="text-xs text-gray-400 mb-4 border-b border-gray-700 pb-4">Bifilar geometry & PWM electrical simulator.</p>
+
+            <!-- Physical Parameters -->
+            <div class="glass-panel">
+                <h2 class="text-sm font-bold text-white mb-3 uppercase tracking-wider flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"></path></svg>
+                    Coil Geometry
+                </h2>
+                
+                <div class="mb-3">
+                    <label class="block text-xs text-teal-400 mb-1 font-bold">Winding Topology</label>
+                    <select id="coil-type" onchange="updateCalculations()" class="border-teal-500/50 mb-2">
+                        <option value="pancake" selected>Flat Pancake (Horizontal Zip-Cord)</option>
+                        <option value="stacked">Stacked Bifilar (Vertical Zip-Cord)</option>
+                    </select>
+                    
+                    <label class="block text-xs text-indigo-400 mb-1 font-bold">Wire Display Mode</label>
+                    <select id="wire-display" onchange="updateCalculations()" class="border-indigo-500/50">
+                        <option value="copper" selected>Realistic Copper</option>
+                        <option value="polarity">Polarity & Current Flow</option>
+                    </select>
+                    <p id="topology-desc" class="text-[10px] text-gray-400 mt-2 leading-tight bg-slate-800 p-2 rounded border border-slate-700"></p>
+                </div>
+
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-400 mb-1">Wire Gauge (AWG)</label>
+                    <select id="wire-awg" onchange="updateCalculations()">
+                        <option value="12">12 AWG (Thickest)</option>
+                        <option value="14">14 AWG</option>
+                        <option value="16" selected>16 AWG (Standard Speaker)</option>
+                        <option value="18">18 AWG</option>
+                        <option value="20">20 AWG</option>
+                        <option value="22">22 AWG</option>
+                        <option value="24">24 AWG (Thinnest)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Zip-Cord Width (mm)</span>
+                        <span id="val-width" class="font-mono text-white">6.0 mm</span>
+                    </div>
+                    <input type="range" id="wire-width" min="2" max="10" step="0.1" value="6.0" oninput="updateCalculations()">
+                    <p class="text-[10px] text-gray-500 mt-1">Width of the 2-conductor speaker wire laid flat.</p>
+                </div>
+
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Inner Diameter / Core (Inches)</span>
+                        <span id="val-id" class="font-mono text-white">1.0 in</span>
+                    </div>
+                    <input type="range" id="coil-id" min="0.5" max="4.0" step="0.1" value="1.0" oninput="updateCalculations()">
+                </div>
+
+                <div class="mb-1">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>Number of Turns</span>
+                        <span id="val-turns" class="font-mono text-white">8</span>
+                    </div>
+                    <input type="range" id="coil-turns" min="2" max="60" step="1" value="8" oninput="updateCalculations()">
+                </div>
+            </div>
+
+            <!-- Electrical Parameters -->
+            <div class="glass-panel">
+                <h2 class="text-sm font-bold text-white mb-3 uppercase tracking-wider flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    Power Supply & Array
+                </h2>
+
+                <div class="mb-3">
+                    <label class="block text-xs text-gray-400 mb-1">System Wiring Strategy</label>
+                    <select id="system-setup" onchange="updateCalculations()">
+                        <option value="1">1 Single Coil (Test Mode)</option>
+                        <option value="7" selected>7 Coils Wired in SERIES (Spinal Array)</option>
+                        <option value="7p">7 Coils Wired in PARALLEL (Danger)</option>
+                    </select>
+                </div>
+
+                <div class="mb-1">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1">
+                        <span>PWM Duty Cycle (%)</span>
+                        <span id="val-pwm" class="font-mono text-white">50%</span>
+                    </div>
+                    <input type="range" id="pwm-duty" min="1" max="100" step="1" value="50" oninput="updateCalculations()">
+                    <p class="text-[10px] text-gray-500 mt-1">Controls the active "on" time of the 5V pulse.</p>
+                </div>
+            </div>
+
+            <!-- Field Visualization -->
+            <div class="glass-panel border-purple-500/50">
+                <h2 class="text-sm font-bold text-white mb-3 uppercase tracking-wider flex items-center text-purple-400">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5"></path></svg>
+                    Scalar Topology
+                </h2>
+                <label class="flex items-center text-xs text-gray-300 cursor-pointer hover:text-white transition">
+                    <input type="checkbox" id="toggle-torus" class="mr-2 accent-purple-500" onchange="toggleTorus(this.checked)">
+                    Show Magnetic/Scalar Field Dynamics
+                </label>
+                <p class="text-[10px] text-gray-400 mt-2 leading-tight">Visualizes the theoretical macroscopic cancellation of the magnetic dipole based on the selected winding geometry.</p>
+            </div>
+
+            <!-- Video Tutorials -->
+            <div class="glass-panel border-red-500/30">
+                <h3 class="text-xs font-bold text-gray-300 uppercase mb-3 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-red-500" fill="currentColor" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.5 12 3.5 12 3.5s-7.505 0-9.377.55a3.016 3.016 0 0 0-2.122 2.136C0 8.059 0 12 0 12s0 3.941.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.55 9.376.55 9.376.55s7.505 0 9.377-.55a3.016 3.016 0 0 0 2.122-2.136C24 15.941 24 12 24 12s0-3.941-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                    Video Tutorials
+                </h3>
+                <a href="https://youtu.be/ryVlknRDwGA" target="_blank" class="block bg-slate-800 p-2 rounded text-xs text-blue-400 hover:text-blue-300 mb-2 border border-slate-700 hover:border-blue-500 transition">▶ How to Wind Pancake Bifilar Coils</a>
+                <a href="https://youtu.be/AneHyvpL2AI" target="_blank" class="block bg-slate-800 p-2 rounded text-xs text-blue-400 hover:text-blue-300 border border-slate-700 hover:border-blue-500 transition">▶ Geometric Compression of Scalar Coils</a>
+            </div>
+
+            <!-- Live Output Statistics -->
+            <div class="bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-inner mt-auto">
+                <h3 class="text-xs text-gray-500 uppercase font-bold mb-2 border-b border-gray-700 pb-1">Physical Dimensions (Per Coil)</h3>
+                <div class="stat-row"><span class="stat-label">Outer Diameter (OD):</span><span class="stat-value text-blue-300" id="out-od">0.00 in</span></div>
+                <div class="stat-row"><span class="stat-label">Wire Length Used:</span><span class="stat-value" id="out-length">0.00 ft</span></div>
+                
+                <h3 class="text-xs text-gray-500 uppercase font-bold mt-4 mb-2 border-b border-gray-700 pb-1">Electrical Load (Total System)</h3>
+                <div class="stat-row"><span class="stat-label">System Resistance:</span><span class="stat-value" id="out-res">0.000 &Omega;</span></div>
+                <div class="stat-row"><span class="stat-label">Supply Voltage:</span><span class="stat-value text-gray-400">5.0 V</span></div>
+                
+                <div class="bg-black/50 p-2 rounded mt-2 border border-gray-700">
+                    <div class="stat-row mb-1"><span class="stat-label">Peak Current Draw:</span><span class="stat-value" id="out-amps">0.00 A</span></div>
+                    <div class="stat-row"><span class="stat-label">Average Power (w/ PWM):</span><span class="stat-value" id="out-watts">0.00 W</span></div>
+                </div>
+                
+                <div id="warning-box" class="mt-3 text-xs p-2 rounded bg-red-900/40 border border-red-700 text-red-300 hidden">
+                    <strong>WARNING:</strong> Current exceeds 60A power supply limit! The system will short-circuit or melt. Increase resistance by adding turns or wiring in series.
+                </div>
+                <div id="safe-box" class="mt-3 text-xs p-2 rounded bg-green-900/40 border border-green-700 text-green-300">
+                    <strong>SAFE:</strong> System operates within 60A limits. Heat dissipation looks manageable.
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <div class="mt-6 pt-4 border-t border-slate-700 grid grid-cols-1 gap-2 mb-4 flex-shrink-0">
+                <a href="../index.html" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 p-2 rounded text-center text-gray-300 transition">⌂ Master Hub Visualizer</a>
+                <a href="body_cad.html" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 p-2 rounded text-center text-gray-300 transition">🧍 Body Alignment CAD</a>
+                <a href="acoustic_cad.html" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600 p-2 rounded text-center text-gray-300 transition">🔊 Acoustic Array CAD</a>
+            </div>
+
+        </div>
+
+        <!-- Wiring Diagram Overlay -->
+        <div class="absolute bottom-6 right-6 glass-panel max-w-sm pointer-events-auto">
+            <h3 class="font-bold text-white mb-2 text-sm flex items-center">
+                <svg class="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Scalar Wiring Guide (Non-Inductive)
+            </h3>
+            <p class="text-xs text-gray-300 mb-3">To create a true scalar field (zero-point magnetics), the current must flow in opposite directions through the parallel wires to cancel the magnetic field.</p>
+            <div class="bg-slate-900 p-3 rounded text-xs font-mono text-gray-400">
+                <p>1. Take the two ends of the speaker wire at the <strong class="text-white">OUTSIDE</strong> of the coil.</p>
+                <p class="my-1">2. Strip them and twist/solder them together (creates a U-turn).</p>
+                <p>3. Hook your amplifier/PWM +/- to the two bare wires at the <strong class="text-white">INSIDE</strong> of the core.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- AWG Data (Ohms per 1000m, bare diameter mm) ---
+        const AWG_DATA = {
+            12: { ohmsPerKm: 5.21, defaultWidth: 8.0 },
+            14: { ohmsPerKm: 8.28, defaultWidth: 7.0 },
+            16: { ohmsPerKm: 13.17, defaultWidth: 6.0 },
+            18: { ohmsPerKm: 20.95, defaultWidth: 5.0 },
+            20: { ohmsPerKm: 33.31, defaultWidth: 4.0 },
+            22: { ohmsPerKm: 52.96, defaultWidth: 3.5 },
+            24: { ohmsPerKm: 84.22, defaultWidth: 3.0 }
+        };
+
+        const MM_TO_INCH = 0.0393701;
+        const M_TO_FT = 3.28084;
+        const VOLTAGE = 5.0; // 5V Power Supply
+        const MAX_AMPS = 60.0;
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 15, 20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+        const spotLight = new THREE.SpotLight(0xffffff, 0.8);
+        spotLight.position.set(0, 20, 0);
+        scene.add(spotLight);
+
+        // Grid & Glass Plate Reference
+        const grid = new THREE.GridHelper(40, 40, 0x334155, 0x1e293b);
+        scene.add(grid);
+
+        const glassGeo = new THREE.BoxGeometry(20, 0.2, 20);
+        const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transparent: true, opacity: 0.1, roughness: 0.1 });
+        const glassMesh = new THREE.Mesh(glassGeo, glassMat);
+        glassMesh.position.y = -0.15;
+        scene.add(glassMesh);
+
+        // Coil Group
+        let coilMesh;
+        let torusFieldGroup;
+        let isTorusVisible = false;
+
+        function toggleTorus(checked) {
+            isTorusVisible = checked;
+            if (torusFieldGroup) torusFieldGroup.visible = isTorusVisible;
+        }
+
+        // --- Logic & Geometry ---
+        function updateCalculations() {
+            // Get Inputs
+            const coilType = document.getElementById('coil-type').value;
+            const wireDisplay = document.getElementById('wire-display').value;
+            const awg = parseInt(document.getElementById('wire-awg').value);
+            const wireWidthMm = parseFloat(document.getElementById('wire-width').value);
+            const idInches = parseFloat(document.getElementById('coil-id').value);
+            const turns = parseInt(document.getElementById('coil-turns').value);
+            const systemSetup = document.getElementById('system-setup').value;
+            const pwmDuty = parseFloat(document.getElementById('pwm-duty').value) / 100.0;
+
+            // Update Dynamic Physics Description
+            const descEl = document.getElementById('topology-desc');
+            let descText = "";
+            if (coilType === 'pancake') {
+                descText = "<strong class='text-teal-300'>Coplanar Cancellation:</strong> Wires sit side-by-side. The opposing currents cancel macroscopically on the same horizontal plane, creating a unified Double-Cover Toroidal field.";
+            } else {
+                descText = "<strong class='text-teal-300'>Fibonacci Asymmetrical Double-Cover:</strong> The Tesla Constructive Stack. The top (blue) positive volumetric field expands exponentially at the Fibonacci ratio (1, 2, 3, 5), while the flipped bottom (purple) field remains tightly bound. Symmetrical wireframes physically trace the spatial distortion inside the aura.";
+            }
+
+            if (wireDisplay === 'polarity') {
+                if (coilType === 'pancake') {
+                    descText += "<div class='mt-2 pt-2 border-t border-slate-600'><strong class='text-indigo-300'>Flow Visualizer:</strong> Wire A (<span class='text-red-400 font-bold'>Red/North</span>) flows inward. Wire B (<span class='text-blue-400 font-bold'>Blue/South</span>) flows outward. Opposing angular flow = Scalar Cancellation.</div>";
+                } else {
+                    descText += "<div class='mt-2 pt-2 border-t border-slate-600'><strong class='text-indigo-300'>Flow Visualizer:</strong> Both Wire A (<span class='text-red-400 font-bold'>Red</span>) and Wire B (<span class='text-pink-400 font-bold'>Magenta</span>) flow inward. Identical angular flow = Constructive 4:1 Multiplication.</div>";
+                }
+            }
+            descEl.innerHTML = descText;
+
+            // Update UI Labels
+            document.getElementById('val-width').innerText = wireWidthMm.toFixed(1) + ' mm';
+            document.getElementById('val-id').innerText = idInches.toFixed(1) + ' in';
+            document.getElementById('val-turns').innerText = turns;
+            document.getElementById('val-pwm').innerText = (pwmDuty * 100).toFixed(0) + '%';
+
+            // --- Physical Math ---
+            const idMm = idInches / MM_TO_INCH;
+            const wireThicknessMm = wireWidthMm * 0.5;
+            
+            let radialStepMm;
+            if (coilType === 'pancake') {
+                radialStepMm = wireWidthMm;
+            } else {
+                radialStepMm = wireThicknessMm; // Vertical edge takes up less radial space
+            }
+
+            const odMm = idMm + (turns * 2 * radialStepMm);
+            const odInches = odMm * MM_TO_INCH;
+            
+            // Average turn length * number of turns
+            const averageDiameterMm = (idMm + odMm) / 2;
+            const lengthMm = Math.PI * averageDiameterMm * turns;
+            const lengthMeters = lengthMm / 1000;
+            const lengthFt = lengthMeters * M_TO_FT;
+
+            // --- Electrical Math ---
+            // For a non-inductive bifilar, current travels down wire A and back through wire B.
+            // So the total electrical path length is 2 * the physical length of the speaker wire.
+            const electricalLengthMeters = lengthMeters * 2;
+            
+            const ohmsPerMeter = AWG_DATA[awg].ohmsPerKm / 1000;
+            const resistancePerCoil = electricalLengthMeters * ohmsPerMeter;
+
+            let systemResistance = resistancePerCoil;
+            if (systemSetup === '7') systemResistance = resistancePerCoil * 7; // Series
+            if (systemSetup === '7p') systemResistance = resistancePerCoil / 7; // Parallel
+
+            // Prevent divide by zero if extremely short
+            if (systemResistance < 0.001) systemResistance = 0.001; 
+
+            const peakAmps = VOLTAGE / systemResistance;
+            const peakPower = VOLTAGE * peakAmps;
+            const avgPowerPwm = peakPower * pwmDuty;
+
+            // --- Update UI Stats ---
+            document.getElementById('out-od').innerText = odInches.toFixed(2) + ' in';
+            document.getElementById('out-length').innerText = lengthFt.toFixed(1) + ' ft';
+            document.getElementById('out-res').innerText = systemResistance.toFixed(3) + ' Ω';
+            
+            const ampsEl = document.getElementById('out-amps');
+            ampsEl.innerText = peakAmps.toFixed(1) + ' A';
+            document.getElementById('out-watts').innerText = avgPowerPwm.toFixed(1) + ' W';
+
+            const warnBox = document.getElementById('warning-box');
+            const safeBox = document.getElementById('safe-box');
+
+            if (peakAmps > MAX_AMPS) {
+                ampsEl.classList.add('warning-text');
+                ampsEl.classList.remove('safe-text');
+                warnBox.classList.remove('hidden');
+                safeBox.classList.add('hidden');
+            } else {
+                ampsEl.classList.add('safe-text');
+                ampsEl.classList.remove('warning-text');
+                warnBox.classList.add('hidden');
+                safeBox.classList.remove('hidden');
+            }
+
+            drawCoil3D(idMm / 10, wireWidthMm / 10, turns, coilType, wireDisplay); // Scale down for 3D view
+        }
+
+        // Handle default width changes when AWG changes
+        document.getElementById('wire-awg').addEventListener('change', function(e) {
+            const awg = parseInt(e.target.value);
+            const defW = AWG_DATA[awg].defaultWidth;
+            document.getElementById('wire-width').value = defW;
+            updateCalculations();
+        });
+
+        // --- 3D Drawing ---
+        function drawCoil3D(innerRadius, width, turns, coilType, wireDisplay) {
+            if (coilMesh) scene.remove(coilMesh);
+
+            const pointsA = [];
+            const pointsB = [];
+            
+            const segmentsPerTurn = 64;
+            const totalSegments = turns * segmentsPerTurn;
+            const maxTheta = turns * 2 * Math.PI;
+
+            const thickness = width * 0.5;
+            const tubeRadius = thickness * 0.4;
+            let radialStep, xOffsetB, yOffsetB;
+
+            if (coilType === 'pancake') {
+                radialStep = width;
+                xOffsetB = width * 0.4; // Conductor B sits next to Conductor A
+                yOffsetB = 0;
+            } else {
+                radialStep = thickness;
+                xOffsetB = 0;
+                yOffsetB = width * 0.4; // Conductor B is stacked vertically on top of A
+            }
+
+            for (let i = 0; i <= totalSegments; i++) {
+                const theta = (i / totalSegments) * maxTheta;
+                const baseR = innerRadius + (radialStep / (2 * Math.PI)) * theta;
+                
+                const xA = Math.cos(theta) * baseR;
+                const zA = Math.sin(theta) * baseR;
+                pointsA.push(new THREE.Vector3(xA, 0, zA));
+
+                const xB = Math.cos(theta) * (baseR + xOffsetB);
+                const zB = Math.sin(theta) * (baseR + xOffsetB);
+                pointsB.push(new THREE.Vector3(xB, yOffsetB, zB));
+            }
+
+            const pathA = new THREE.CatmullRomCurve3(pointsA);
+            const pathB = new THREE.CatmullRomCurve3(pointsB);
+
+            // Representing the copper cores
+            const geoA = new THREE.TubeGeometry(pathA, totalSegments, tubeRadius, 8, false);
+            const geoB = new THREE.TubeGeometry(pathB, totalSegments, tubeRadius, 8, false);
+
+            let colorA = 0xb87333; // Copper A
+            let colorB = 0xc88343; // Copper B
+            let isTrans = false;
+            let opac = 1.0;
+
+            if (wireDisplay === 'polarity') {
+                isTrans = true;
+                opac = 0.65;
+                colorA = 0xff3333; // Red / North
+                colorB = coilType === 'pancake' ? 0x3366ff : 0xff33aa; // Blue (South) or Magenta (Constructive North)
+            }
+
+            const matA = new THREE.MeshStandardMaterial({ 
+                color: colorA, 
+                roughness: wireDisplay === 'polarity' ? 0.2 : 0.4, 
+                metalness: wireDisplay === 'polarity' ? 0.3 : 0.8,
+                transparent: isTrans, opacity: opac
+            }); 
+            const matB = new THREE.MeshStandardMaterial({ 
+                color: colorB, 
+                roughness: wireDisplay === 'polarity' ? 0.2 : 0.4, 
+                metalness: wireDisplay === 'polarity' ? 0.3 : 0.8,
+                transparent: isTrans, opacity: opac
+            }); 
+
+            const meshA = new THREE.Mesh(geoA, matA);
+            const meshB = new THREE.Mesh(geoB, matB);
+
+            coilMesh = new THREE.Group();
+            coilMesh.add(meshA);
+            coilMesh.add(meshB);
+
+            // Flow Lines for Polarity Mode
+            if (wireDisplay === 'polarity') {
+                const dashLen = width * 1.5;
+                const lineMatA = new THREE.LineDashedMaterial({
+                    color: 0xffff00,
+                    linewidth: 2,
+                    dashSize: dashLen,
+                    gapSize: dashLen * 1.5,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                const lineMatB = lineMatA.clone();
+
+                // Shift slightly UP so flow lines trace beautifully inside the top-half of the translucent tube
+                const ptsA = pointsA.map(p => new THREE.Vector3(p.x, p.y + tubeRadius * 1.05, p.z));
+                const ptsB = pointsB.map(p => new THREE.Vector3(p.x, p.y + tubeRadius * 1.05, p.z));
+                
+                const geoLineA = new THREE.BufferGeometry().setFromPoints(ptsA);
+                const geoLineB = new THREE.BufferGeometry().setFromPoints(ptsB);
+
+                const flowA = new THREE.Line(geoLineA, lineMatA);
+                flowA.computeLineDistances();
+                
+                const flowB = new THREE.Line(geoLineB, lineMatB);
+                flowB.computeLineDistances();
+
+                coilMesh.add(flowA);
+                coilMesh.add(flowB);
+
+                coilMesh.userData.flowA = flowA;
+                coilMesh.userData.flowB = flowB;
+                coilMesh.userData.topology = coilType;
+            }
+
+            // Add center target visual (where the crystal goes)
+            const crystalGeo = new THREE.CylinderGeometry(innerRadius*0.9, innerRadius*0.9, 1.5, 32);
+            const crystalMat = new THREE.MeshPhysicalMaterial({ color: 0xccffff, transparent: true, opacity: 0.4, roughness: 0.1, transmission: 0.9 });
+            const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+            crystal.position.y = 0.75;
+            coilMesh.add(crystal);
+
+            // Create Scalar Fields based on Topology
+            const outerR = innerRadius + (radialStep / (2 * Math.PI)) * maxTheta;
+            const coilMidR = (innerRadius + outerR) / 2;
+            const baseTubeR = (outerR - innerRadius) / 2;
+            
+            torusFieldGroup = new THREE.Group();
+            torusFieldGroup.userData.topology = coilType; // Tag for animation loop
+
+            if (coilType === 'pancake') {
+                // MACROSCOPIC CANCELLATION: Unified Torus
+                // Outer Cover (Cyan/Electric representing outward scalar expansion)
+                const tGeo1 = new THREE.TorusGeometry(coilMidR, baseTubeR * 1.5, 32, 64);
+                const tMat1 = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
+                const tMesh1 = new THREE.Mesh(tGeo1, tMat1);
+                tMesh1.rotation.x = Math.PI / 2;
+                
+                // Inner Cover (Purple/Magnetic representing inward void collapse)
+                const tGeo2 = new THREE.TorusGeometry(coilMidR, baseTubeR * 1.3, 32, 48);
+                const tMat2 = new THREE.MeshBasicMaterial({ color: 0xcc33ff, wireframe: true, transparent: true, opacity: 0.25, blending: THREE.AdditiveBlending });
+                const tMesh2 = new THREE.Mesh(tGeo2, tMat2);
+                tMesh2.rotation.x = Math.PI / 2;
+
+                torusFieldGroup.add(tMesh1);
+                torusFieldGroup.add(tMesh2);
+                torusFieldGroup.position.y = 0.1; 
+            } else {
+                // TESLA CONSTRUCTIVE BIFILAR: Fibonacci 4-Point Scaling & Flipped Purple Field
+                
+                // 1. Continuous Volumetric Toroidal Fields (The underlying Double-Cover Aura)
+                const tGeoTopVol = new THREE.TorusGeometry(coilMidR, baseTubeR * 2.0, 32, 64);
+                const tMatTopVol = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending });
+                const meshTopVol = new THREE.Mesh(tGeoTopVol, tMatTopVol);
+                meshTopVol.rotation.x = Math.PI / 2;
+                meshTopVol.position.y = yOffsetB + (baseTubeR * 1.5); 
+                meshTopVol.scale.set(1.2, 1.2, 4.0); 
+                torusFieldGroup.add(meshTopVol);
+                torusFieldGroup.userData.topVol = meshTopVol;
+
+                const tGeoBotVol = new THREE.TorusGeometry(coilMidR, baseTubeR * 1.0, 32, 48);
+                const tMatBotVol = new THREE.MeshBasicMaterial({ color: 0xcc33ff, wireframe: true, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending });
+                const meshBotVol = new THREE.Mesh(tGeoBotVol, tMatBotVol);
+                meshBotVol.rotation.x = Math.PI / 2;
+                meshBotVol.position.y = -(baseTubeR * 0.5); 
+                meshBotVol.scale.set(0.8, 0.8, 1.0);
+                torusFieldGroup.add(meshBotVol);
+                torusFieldGroup.userData.botVol = meshBotVol;
+
+                // 2. Fibonacci 4-Point Scaling & Flipped Purple Field (Structural Framework)
+                const fib = [1, 2, 3, 5]; // Fibonacci ratio expansion for Blue
+                const sym = [1, 1.25, 1.5, 1.75]; // Tight linear binding for Purple
+
+                const tMatTop = new THREE.MeshBasicMaterial({ color: 0x00ffff, wireframe: true, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+                const tMatBot = new THREE.MeshBasicMaterial({ color: 0xcc33ff, wireframe: true, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending });
+                const lineMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending });
+
+                torusFieldGroup.userData.topRings = [];
+                torusFieldGroup.userData.botRings = [];
+                torusFieldGroup.userData.connections = [];
+
+                for (let i = 0; i < 4; i++) {
+                    const topF = fib[i];
+                    const botF = sym[i];
+
+                    // 1. Top Toroid Circles (Blue - Fibonacci Scales)
+                    const rTop = coilMidR + (baseTubeR * topF * 0.4);
+                    const yTop = yOffsetB + (baseTubeR * topF * 1.2);
+                    
+                    const geoTop = new THREE.TorusGeometry(rTop, baseTubeR * 0.15, 16, 64);
+                    const meshTop = new THREE.Mesh(geoTop, tMatTop);
+                    meshTop.rotation.x = Math.PI / 2;
+                    meshTop.position.y = yTop;
+                    torusFieldGroup.add(meshTop);
+                    torusFieldGroup.userData.topRings.push(meshTop);
+
+                    // 2. Bottom Toroid Circles (Purple - Flipped and Bound)
+                    const rBot = coilMidR + (baseTubeR * botF * 0.2);
+                    const yBot = -(baseTubeR * botF * 0.8); // Flipped explicitly into negative Y
+                    
+                    const geoBot = new THREE.TorusGeometry(rBot, baseTubeR * 0.15, 16, 64);
+                    const meshBot = new THREE.Mesh(geoBot, tMatBot);
+                    meshBot.rotation.x = Math.PI / 2;
+                    meshBot.position.y = yBot;
+                    torusFieldGroup.add(meshBot);
+                    torusFieldGroup.userData.botRings.push(meshBot);
+
+                    // 3. Connection Lines connecting Ring i (Top) to Ring i (Bottom) to show Symmetry Difference
+                    const connectionGroup = new THREE.Group();
+                    const numConnections = 16; // 16 lines around the circumference
+                    for (let j = 0; j < numConnections; j++) {
+                        const angle = (j / numConnections) * Math.PI * 2;
+                        const pTop = new THREE.Vector3(Math.cos(angle) * rTop, yTop, Math.sin(angle) * rTop);
+                        const pBot = new THREE.Vector3(Math.cos(angle) * rBot, yBot, Math.sin(angle) * rBot);
+                        
+                        const lineGeo = new THREE.BufferGeometry().setFromPoints([pTop, pBot]);
+                        const line = new THREE.Line(lineGeo, lineMat);
+                        connectionGroup.add(line);
+                    }
+                    torusFieldGroup.add(connectionGroup);
+                    torusFieldGroup.userData.connections.push(connectionGroup);
+                }
+            }
+
+            torusFieldGroup.visible = isTorusVisible;
+            coilMesh.add(torusFieldGroup);
+
+            scene.add(coilMesh);
+        }
+
+        // --- Render Loop ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Animate Current Flow (Electrons)
+            if (coilMesh && coilMesh.userData.flowA && coilMesh.userData.flowB) {
+                const flowSpeed = 0.4;
+                
+                // Wire A always flows INWARD
+                coilMesh.userData.flowA.material.dashOffset += flowSpeed;
+                
+                if (coilMesh.userData.topology === 'pancake') {
+                    // Wire B flows OUTWARD (Opposing current cancels the field)
+                    coilMesh.userData.flowB.material.dashOffset -= flowSpeed;
+                } else {
+                    // Wire B flows INWARD (Constructive Tesla Stack multiplies the field)
+                    coilMesh.userData.flowB.material.dashOffset += flowSpeed;
+                }
+            }
+
+            if (torusFieldGroup && isTorusVisible) {
+                const time = Date.now() * 0.002;
+                
+                if (torusFieldGroup.userData.topology === 'pancake') {
+                    // Coplanar Unified Torus Animation
+                    const scale = 1.0 + Math.sin(time) * 0.03;
+                    torusFieldGroup.scale.set(scale, scale, scale);
+                    
+                    torusFieldGroup.children[0].rotation.z -= 0.01; 
+                    torusFieldGroup.children[1].rotation.z += 0.015; 
+                } else {
+                    // Fibonacci 4-Point Asymmetrical Animation
+                    const pulse = Math.sin(time * 2) * 0.1;
+                    const fib = [1, 2, 3, 5];
+                    
+                    // Animate the continuous volumetric auras
+                    if (torusFieldGroup.userData.topVol) {
+                        torusFieldGroup.userData.topVol.rotation.z -= 0.015;
+                        const volExpand = 1.0 + pulse;
+                        torusFieldGroup.userData.topVol.scale.set(1.2 * volExpand, 1.2 * volExpand, 4.0 * (1.0 + pulse * 1.5));
+                    }
+                    if (torusFieldGroup.userData.botVol) {
+                        torusFieldGroup.userData.botVol.rotation.z -= 0.015;
+                        const volShrink = 1.0 - (pulse * 0.2);
+                        torusFieldGroup.userData.botVol.scale.set(0.8, 0.8, volShrink);
+                    }
+                    
+                    const topRings = torusFieldGroup.userData.topRings;
+                    const botRings = torusFieldGroup.userData.botRings;
+                    const connections = torusFieldGroup.userData.connections;
+
+                    if (topRings && botRings) {
+                        for (let i = 0; i < 4; i++) {
+                            // Spin all geometries in the same uniform directional flow
+                            topRings[i].rotation.z -= 0.015;
+                            botRings[i].rotation.z -= 0.015;
+                            connections[i].rotation.y -= 0.015; // Match spin for the wireframe connections
+                            
+                            // Exponential breathing on the blue top field
+                            const expandTop = 1.0 + (pulse * fib[i] * 0.15);
+                            topRings[i].scale.set(expandTop, expandTop, 1.0);
+                            
+                            // Rigid/bound resistance on the purple bottom field
+                            const shrinkBot = 1.0 - (pulse * 0.05);
+                            botRings[i].scale.set(shrinkBot, shrinkBot, 1.0);
+                        }
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Init
+        updateCalculations();
+        animate();
+
+    </script>
+</body>
+</html>
