@@ -1,1 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acoustic Placement & Phase Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/DragControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; }
+        .sidebar { width: 350px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px); border-right: 1px solid #334155; padding: 1.5rem; pointer-events: auto; overflow-y: auto; display: flex; flex-direction: column;}
+        .glass-panel { background: rgba(30, 41, 59, 0.7); border: 1px solid #475569; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        
+        input[type=number] { background: #0f172a; border: 1px solid #475569; color: white; padding: 0.25rem; border-radius: 0.25rem; width: 100%; font-family: monospace; font-size: 0.875rem;}
+        select { background: #0f172a; border: 1px solid #475569; color: white; padding: 0.25rem; border-radius: 0.25rem; width: 100%; font-size: 0.875rem; }
+        
+        .btn { background: #2563eb; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; transition: background 0.2s; cursor: pointer; text-align: center; width: 100%; margin-bottom: 0.5rem;}
+        .btn:hover { background: #1d4ed8; }
+        .btn-alt { background: #475569; }
+        .btn-alt:hover { background: #334155; }
+        
+        .phase-bar { height: 6px; border-radius: 3px; background: #1e293b; overflow: hidden; margin-top: 4px; }
+        .phase-fill { height: 100%; transition: width 0.1s, background-color 0.1s; }
+        input[type=range] { cursor: pointer; }
+    </style>
+</head>
+<body class="antialiased">
 
+    <!-- 3D Canvas -->
+    <div id="canvas-container" style="width: 100vw; height: 100vh;"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-container">
+        <!-- Left Sidebar: Controls & List -->
+        <div class="sidebar shadow-2xl z-10">
+            <div class="flex justify-between items-center mb-1">
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-400">Placement CAD</h1>
+                <select id="unit-selector" onchange="changeUnit(this.value)" class="w-auto text-xs py-1 px-2 border-gray-600 outline-none">
+                    <option value="m">Meters</option>
+                    <option value="in">Inches</option>
+                    <option value="cm">CM</option>
+                </select>
+            </div>
+            <p class="text-xs text-gray-400 mb-6">Phase alignment and distance calculator.</p>
+            
+            <div class="space-y-2 mb-6">
+                <button class="btn flex items-center justify-center" onclick="addSpeaker('bose')">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                    Add Subwoofer (Floor)
+                </button>
+                <button class="btn bg-purple-600 hover:bg-purple-500 flex items-center justify-center" onclick="addSpeaker('cone')">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5v14l11-7z"></path></svg>
+                    Add Standard Speaker
+                </button>
+                <button class="btn bg-teal-600 hover:bg-teal-500 flex items-center justify-center" onclick="addSpeaker('tweeter')">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"></circle><circle cx="12" cy="12" r="4" stroke-width="2"></circle></svg>
+                    Add Micro-Array Speaker
+                </button>
+                <button class="btn btn-alt flex items-center justify-center" onclick="addSpeaker('dml')">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    Add DML Panel
+                </button>
+            </div>
+
+            <!-- Chakra Node Size Slider -->
+            <div class="mb-6 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                <label class="block text-xs text-gray-400 mb-2 flex justify-between">
+                    <span class="font-bold">Target Node Size</span>
+                    <span id="node-size-val" class="font-mono text-white">1.0x</span>
+                </label>
+                <input type="range" id="node-size" min="0.5" max="4" step="0.1" value="1" class="w-full accent-blue-500" oninput="updateNodeSize(this.value)">
+            </div>
+
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider">Active Speakers</h2>
+                <span class="text-xs bg-gray-700 px-2 py-1 rounded-full text-gray-300">Drag to move</span>
+            </div>
+            
+            <div id="speaker-list" class="flex-1 overflow-y-auto space-y-3 pb-4">
+                <!-- Speaker items will be injected here -->
+            </div>
+        </div>
+
+        <!-- Right Side Hints -->
+        <div class="absolute bottom-6 right-6 pointer-events-auto bg-slate-800/80 p-4 rounded-lg border border-slate-600 backdrop-blur text-sm text-gray-300 shadow-xl max-w-sm">
+            <h3 class="font-bold text-white mb-2 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Hybrid System Tips
+            </h3>
+            <ul class="list-disc pl-4 space-y-2 text-xs">
+                <li><strong>Subwoofers (174Hz / 285Hz):</strong> Place on the floor. Low frequencies are omnidirectional. Focus on constructive phase match (>90%).</li>
+                <li><strong>Micro-Arrays (High Freq):</strong> Use the "Point at Target" feature. Place in a halo around the head for spatial sweeping.</li>
+                <li><strong>Phase Match:</strong> <span class="text-green-400 font-bold">Green (100%)</span> means the wave crest hits the listener perfectly. <span class="text-red-400 font-bold">Red (0%)</span> creates a dead zone (cancellation).</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // --- Acoustics Constants ---
+        const SPEED_OF_SOUND = 343; // m/s
+        const SOLFEGGIO = {
+            174: { color: '#ef4444', wl: SPEED_OF_SOUND / 174 },
+            285: { color: '#f97316', wl: SPEED_OF_SOUND / 285 },
+            396: { color: '#f59e0b', wl: SPEED_OF_SOUND / 396 },
+            417: { color: '#eab308', wl: SPEED_OF_SOUND / 417 },
+            528: { color: '#22c55e', wl: SPEED_OF_SOUND / 528 },
+            639: { color: '#06b6d4', wl: SPEED_OF_SOUND / 639 },
+            741: { color: '#3b82f6', wl: SPEED_OF_SOUND / 741 },
+            852: { color: '#8b5cf6', wl: SPEED_OF_SOUND / 852 },
+            963: { color: '#d946ef', wl: SPEED_OF_SOUND / 963 }
+        };
+
+        // --- Three.js Setup ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x0f172a, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 5, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x0f172a);
+        container.appendChild(renderer.domElement);
+
+        const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+        orbitControls.enableDamping = true;
+        orbitControls.dampingFactor = 0.05;
+        orbitControls.maxPolarAngle = Math.PI / 2 + 0.1; // Restrict below ground
+
+        // Lighting
+        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        // Floor Grid
+        const grid = new THREE.GridHelper(20, 40, 0x334155, 0x1e293b);
+        scene.add(grid);
+
+        // --- Target/Listener (The Meditator) ---
+        const listenerGroup = new THREE.Group();
+
+        // Torso
+        const torsoGeo = new THREE.CylinderGeometry(0.25, 0.25, 1.1, 16);
+        const listenerMat = new THREE.MeshPhysicalMaterial({ color: 0x94a3b8, transparent: true, opacity: 0.4, roughness: 0.2 });
+        const torsoMesh = new THREE.Mesh(torsoGeo, listenerMat);
+        torsoMesh.rotation.x = Math.PI / 2;
+        torsoMesh.position.set(0, 0, 0); 
+        listenerGroup.add(torsoMesh);
+
+        // Head
+        const headGeo = new THREE.SphereGeometry(0.22, 16, 16);
+        const headMesh = new THREE.Mesh(headGeo, listenerMat);
+        headMesh.position.set(0, 0, -0.75); // Positioned correctly above the torso
+        listenerGroup.add(headMesh);
+
+        listenerGroup.position.set(0, 0.35, 0); // Shifted slightly up
+        scene.add(listenerGroup);
+
+        // --- Target Nodes & Chakras ---
+        const targetNodes = {};
+
+        // 1. Full Body Platform (Tempered Glass Bed)
+        const bedGeo = new THREE.BoxGeometry(0.7, 0.05, 1.8);
+        const bedMat = new THREE.MeshPhysicalMaterial({ color: 0x88ccff, transparent: true, opacity: 0.2, roughness: 0.1 });
+        const bedMesh = new THREE.Mesh(bedGeo, bedMat);
+        bedMesh.position.set(0, 0.2, 0); // Supported under the listener
+        scene.add(bedMesh);
+        targetNodes['body'] = { name: 'Full Glass Platform', pos: new THREE.Vector3(0, 0.2, 0) };
+
+        // 2. The 7 Chakra Nodes (Mapped to provided chart)
+        const CHAKRAS = {
+            'root': { name: 'Root (Muladhara)', color: '#ef4444', y: 0.60, z: 0.50 },
+            'sacral': { name: 'Sacral (Svadhisthana)', color: '#f97316', y: 0.60, z: 0.25 },
+            'solar': { name: 'Solar Plexus (Manipura)', color: '#eab308', y: 0.60, z: 0.00 },
+            'heart': { name: 'Heart (Anahata)', color: '#22c55e', y: 0.60, z: -0.25 },
+            'throat': { name: 'Throat (Vishuddha)', color: '#3b82f6', y: 0.60, z: -0.50 },
+            'thirdeye': { name: 'Third Eye (Ajna)', color: '#1e40af', y: 0.57, z: -0.75 },
+            'crown': { name: 'Crown (Sahasrara)', color: '#e81cff', y: 0.35, z: -0.98 }
+        };
+
+        Object.keys(CHAKRAS).forEach(key => {
+            const c = CHAKRAS[key];
+            const geo = new THREE.SphereGeometry(0.04, 16, 16);
+            const mat = new THREE.MeshBasicMaterial({ color: c.color });
+            const mesh = new THREE.Mesh(geo, mat);
+            // Mapped exactly to the 3D surface geometry of the chest and head
+            const pos = new THREE.Vector3(0, c.y, c.z); 
+            mesh.position.copy(pos);
+            scene.add(mesh);
+            
+            targetNodes[key] = { name: c.name, pos: pos, color: c.color, mesh: mesh };
+        });
+
+        // --- Application State ---
+        let speakers = [];
+        let speakerMeshes = [];
+        let speakerIdCounter = 0;
+
+        let currentUnit = 'm';
+        const unitMult = { m: 1, cm: 100, in: 39.3701 };
+        function getMult() { return unitMult[currentUnit]; }
+
+        function changeUnit(unit) {
+            currentUnit = unit;
+            speakers.forEach(spk => {
+                document.getElementById(`label-x-${spk.id}`).innerText = `X (${unit})`;
+                document.getElementById(`label-y-${spk.id}`).innerText = `Y (${unit})`;
+                document.getElementById(`label-z-${spk.id}`).innerText = `Z (${unit})`;
+                updateUIFromDrag(spk.mesh);
+                calculateAcoustics(spk); // Updates dist and wl labels
+                updateTriangulation(spk);
+            });
+            updateDistanceLines();
+        }
+
+        // Initialize Drag Controls
+        const dragControls = new THREE.DragControls(speakerMeshes, camera, renderer.domElement);
+        
+        dragControls.addEventListener('dragstart', function (event) {
+            orbitControls.enabled = false;
+            event.object.material.emissive.setHex(0x333333);
+        });
+        
+        dragControls.addEventListener('drag', function (event) {
+            // Keep objects above ground
+            if(event.object.userData.type === 'bose') {
+                event.object.position.y = 0.3; // Floor standing
+            } else {
+                if(event.object.position.y < 0.1) event.object.position.y = 0.1;
+            }
+            
+            const spk = event.object.userData;
+            updateUIFromDrag(event.object);
+            updateDistanceLines();
+            
+            // Reposition waves and recalculate traceback rings if height changed
+            if (spk.waveGroup) spk.waveGroup.position.copy(event.object.position);
+            if (spk.showTraceback) updateSpeakerVisuals(spk); 
+        });
+        
+        dragControls.addEventListener('dragend', function (event) {
+            orbitControls.enabled = true;
+            event.object.material.emissive.setHex(0x000000);
+            updateUIFromDrag(event.object);
+        });
+
+        // --- Core Logic ---
+
+        function addSpeaker(type) {
+            speakerIdCounter++;
+            const id = speakerIdCounter;
+            
+            let geo, mat, mesh, defaultFreq, defaultY, defaultTarget;
+            let displayFace = false;
+            
+            if (type === 'bose') {
+                geo = new THREE.BoxGeometry(0.6, 0.6, 0.6); // Chunky subwoofer
+                defaultFreq = 174;
+                defaultY = 0.3;
+                defaultTarget = 'body';
+            } else if (type === 'cone') {
+                geo = new THREE.BoxGeometry(0.3, 0.45, 0.3); // Traditional bookshelf speaker
+                defaultFreq = 741; // Default to upper frequencies for side speakers
+                defaultY = 1.0;
+                defaultTarget = 'thirdeye';
+                displayFace = true;
+            } else if (type === 'tweeter') {
+                // Micro-Array USB speaker (truncated cone shape like image)
+                geo = new THREE.CylinderGeometry(0.08, 0.12, 0.15, 32); 
+                defaultFreq = 963;
+                defaultY = 1.0;
+                defaultTarget = 'crown';
+            } else {
+                geo = new THREE.BoxGeometry(0.8, 0.8, 0.05); // Flat panel
+                defaultFreq = 528;
+                defaultY = 1.5;
+                defaultTarget = 'heart';
+            }
+
+            mat = new THREE.MeshStandardMaterial({ color: SOLFEGGIO[defaultFreq].color, roughness: 0.4 });
+            mesh = new THREE.Mesh(geo, mat);
+            
+            // Add a visual "driver cone" to the front of standard speakers to show projection direction
+            if (displayFace) {
+                const driverGeo = new THREE.CircleGeometry(0.12, 32);
+                const driverMat = new THREE.MeshBasicMaterial({ color: 0x111111 }); // Dark driver
+                const driverMesh = new THREE.Mesh(driverGeo, driverMat);
+                driverMesh.position.set(0, 0, -0.151); // Placed slightly off the -Z face
+                driverMesh.rotation.y = Math.PI; // Face outwards
+                mesh.add(driverMesh);
+            }
+
+            // Add LED glow ring to micro-tweeters
+            if (type === 'tweeter') {
+                const ledGeo = new THREE.CylinderGeometry(0.125, 0.125, 0.02, 32);
+                const ledMat = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.8 }); // Blue LED
+                const ledMesh = new THREE.Mesh(ledGeo, ledMat);
+                ledMesh.position.y = -0.065; // Base of the cylinder
+                mesh.add(ledMesh);
+                
+                // Adjust natural orientation so the "top" of cylinder points at target
+                mesh.geometry.rotateX(Math.PI / 2);
+                ledMesh.geometry.rotateX(Math.PI / 2);
+                ledMesh.position.set(0, 0, 0.065);
+            }
+            
+            // Initial position (staggered slightly)
+            mesh.position.set(-2 + Math.random(), defaultY, -2 + Math.random());
+            if(type === 'dml' || type === 'cone') {
+                mesh.rotation.x = Math.PI/4; // Angle it inwards
+                mesh.rotation.y = Math.PI/4;
+            }
+
+            // Distance visualizer line
+            const lineMat = new THREE.LineDashedMaterial({ color: SOLFEGGIO[defaultFreq].color, dashSize: 0.1, gapSize: 0.1 });
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([mesh.position, targetNodes[defaultTarget].pos]);
+            const line = new THREE.Line(lineGeo, lineMat);
+            line.computeLineDistances();
+            scene.add(line);
+
+            // New Visualization Groups
+            const waveGroup = new THREE.Group();
+            const tracebackGroup = new THREE.Group();
+            const triangulationGroup = new THREE.Group();
+            scene.add(waveGroup);
+            scene.add(tracebackGroup);
+            scene.add(triangulationGroup);
+
+            const speakerData = {
+                id: id,
+                type: type,
+                mesh: mesh,
+                line: line,
+                freq: defaultFreq,
+                targetId: defaultTarget,
+                waveGroup: waveGroup,
+                tracebackGroup: tracebackGroup,
+                triangulationGroup: triangulationGroup,
+                waveMode: 'off',
+                showTraceback: false,
+                show40Hz: false,
+                showTriangulation: false,
+                name: type === 'bose' ? `Subwoofer ${id}` : (type === 'cone' ? `Standard Speaker ${id}` : (type === 'tweeter' ? `Micro Array ${id}` : `DML Panel ${id}`))
+            };
+
+            mesh.userData = speakerData; // Link mesh back to data
+            
+            scene.add(mesh);
+            speakers.push(speakerData);
+            speakerMeshes.push(mesh);
+            
+            renderSpeakerUI(speakerData);
+            updateDistanceLines();
+            updateSpeakerVisuals(speakerData);
+        }
+
+        function removeSpeaker(id) {
+            const index = speakers.findIndex(s => s.id === id);
+            if (index > -1) {
+                const spk = speakers[index];
+                scene.remove(spk.mesh);
+                scene.remove(spk.line);
+                scene.remove(spk.waveGroup);
+                scene.remove(spk.tracebackGroup);
+                scene.remove(spk.triangulationGroup);
+                
+                // Remove from DragControls array
+                const meshIndex = speakerMeshes.indexOf(spk.mesh);
+                if(meshIndex > -1) speakerMeshes.splice(meshIndex, 1);
+                
+                speakers.splice(index, 1);
+                document.getElementById(`ui-card-${id}`).remove();
+            }
+        }
+
+        // --- UI & Calculations ---
+
+        function renderSpeakerUI(spk) {
+            const list = document.getElementById('speaker-list');
+            
+            const card = document.createElement('div');
+            card.id = `ui-card-${spk.id}`;
+            card.className = "glass-panel p-0 relative overflow-hidden";
+            
+            const freqOptions = Object.keys(SOLFEGGIO).map(f => 
+                `<option value="${f}" ${parseInt(f) === spk.freq ? 'selected' : ''}>${f} Hz</option>`
+            ).join('');
+
+            const targetOptions = Object.keys(targetNodes).map(t => 
+                `<option value="${t}" ${t === spk.targetId ? 'selected' : ''}>${targetNodes[t].name}</option>`
+            ).join('');
+
+            card.innerHTML = `
+                <div class="p-3 border-b border-gray-700 flex justify-between items-center cursor-pointer bg-slate-800/80 hover:bg-slate-700/80 transition" onclick="toggleCard(${spk.id})">
+                    <h3 class="font-bold text-white flex-1" style="color: ${SOLFEGGIO[spk.freq].color}" id="title-${spk.id}">${spk.name}</h3>
+                    <button onclick="event.stopPropagation(); removeSpeaker(${spk.id})" class="text-gray-500 hover:text-red-400 mr-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <svg id="chevron-${spk.id}" class="w-4 h-4 text-gray-400 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+                
+                <div id="card-content-${spk.id}" class="p-3">
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Target Frequency</label>
+                            <select id="freq-${spk.id}" onchange="changeFreq(${spk.id}, this.value)">
+                                ${freqOptions}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Acoustic Target</label>
+                            <select id="target-${spk.id}" onchange="changeTarget(${spk.id}, this.value)">
+                                ${targetOptions}
+                            </select>
+                        </div>
+                    </div>
+
+                    ${spk.type !== 'bose' ? `
+                        <button onclick="autoAlign(${spk.id})" class="mb-3 w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-xs font-bold text-white transition flex justify-center items-center">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                            Point at Target
+                        </button>
+                    ` : ''}
+
+                    <div class="grid grid-cols-3 gap-2 mb-3">
+                        <div>
+                            <label id="label-x-${spk.id}" class="block text-xs text-gray-500 text-center">X (${currentUnit})</label>
+                            <input type="number" id="posx-${spk.id}" value="${(spk.mesh.position.x * getMult()).toFixed(2)}" step="0.05" onchange="updatePosFromUI(${spk.id})">
+                        </div>
+                        <div>
+                            <label id="label-y-${spk.id}" class="block text-xs text-gray-500 text-center">Y (${currentUnit})</label>
+                            <input type="number" id="posy-${spk.id}" value="${(spk.mesh.position.y * getMult()).toFixed(2)}" step="0.05" onchange="updatePosFromUI(${spk.id})">
+                        </div>
+                        <div>
+                            <label id="label-z-${spk.id}" class="block text-xs text-gray-500 text-center">Z (${currentUnit})</label>
+                            <input type="number" id="posz-${spk.id}" value="${(spk.mesh.position.z * getMult()).toFixed(2)}" step="0.05" onchange="updatePosFromUI(${spk.id})">
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-900/50 p-2 rounded border border-gray-700">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Dist to Target:</span>
+                            <span class="font-mono text-white" id="dist-${spk.id}">0.00${currentUnit}</span>
+                        </div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-400">Wavelength (<span class="font-mono">&lambda;</span>):</span>
+                            <span class="font-mono text-white" id="wl-${spk.id}">${(SOLFEGGIO[spk.freq].wl * getMult()).toFixed(2)}${currentUnit}</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-gray-300 font-bold">Phase Match</span>
+                                <span class="font-bold" id="match-txt-${spk.id}">100%</span>
+                            </div>
+                            <div class="phase-bar">
+                                <div class="phase-fill" id="match-bar-${spk.id}" style="width: 100%; background: #22c55e;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-1 mt-3">
+                        <button onclick="autoPhase(${spk.id}, -1)" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition" title="Move Closer (-1 Wavelength)">-&lambda;</button>
+                        <button onclick="autoPhase(${spk.id}, 0)" class="flex-1 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs text-white font-bold transition flex items-center justify-center">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Auto Phase
+                        </button>
+                        <button onclick="autoPhase(${spk.id}, 1)" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition" title="Move Further (+1 Wavelength)">+&lambda;</button>
+                    </div>
+
+                    <div id="triangulation-stats-${spk.id}" class="hidden bg-blue-900/30 p-2 rounded border border-blue-800/50 mt-3 mb-1">
+                        <div class="text-xs text-blue-300 font-bold mb-1 border-b border-blue-800/50 pb-1">Physical Triangulation Offsets</div>
+                        <div class="flex justify-between text-xs text-gray-300"><span>ΔX (Left/Right):</span> <span class="font-mono text-white" id="tri-x-${spk.id}">0.00</span></div>
+                        <div class="flex justify-between text-xs text-gray-300"><span>ΔY (Height):</span> <span class="font-mono text-white" id="tri-y-${spk.id}">0.00</span></div>
+                        <div class="flex justify-between text-xs text-gray-300"><span>ΔZ (Head/Foot):</span> <span class="font-mono text-white" id="tri-z-${spk.id}">0.00</span></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-gray-700">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Emanating Waves</label>
+                            <select id="wave-${spk.id}" onchange="changeWaveMode(${spk.id}, this.value)">
+                                <option value="off" ${spk.waveMode==='off'?'selected':''}>Off</option>
+                                <option value="2d" ${spk.waveMode==='2d'?'selected':''}>2D Rings</option>
+                                <option value="3d" ${spk.waveMode==='3d'?'selected':''}>3D Spheres</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col justify-end space-y-1 pb-1">
+                            <label class="flex items-center text-xs text-gray-300 cursor-pointer hover:text-white transition">
+                                <input type="checkbox" id="trace-${spk.id}" class="mr-2 accent-blue-500" onchange="toggleTraceback(${spk.id}, this.checked)" ${spk.showTraceback?'checked':''}>
+                                Sweet Spots
+                            </label>
+                            <label class="flex items-center text-xs text-gray-300 cursor-pointer hover:text-white transition">
+                                <input type="checkbox" id="tri-${spk.id}" class="mr-2 accent-blue-500" onchange="toggleTriangulation(${spk.id}, this.checked)" ${spk.showTriangulation?'checked':''}>
+                                Triangulation
+                            </label>
+                            ${spk.type === 'bose' ? `
+                            <label class="flex items-center text-xs text-green-300 cursor-pointer hover:text-green-200 transition">
+                                <input type="checkbox" id="40hz-${spk.id}" class="mr-2 accent-green-500" onchange="toggle40Hz(${spk.id}, this.checked)" ${spk.show40Hz?'checked':''}>
+                                40Hz Overlay
+                            </label>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            list.appendChild(card);
+            calculateAcoustics(spk);
+        }
+
+        function toggleCard(id) {
+            const content = document.getElementById(`card-content-${id}`);
+            const chevron = document.getElementById(`chevron-${id}`);
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.display = 'none';
+                chevron.style.transform = 'rotate(-90deg)';
+            }
+        }
+
+        function toggleTriangulation(id, checked) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            spk.showTriangulation = checked;
+            updateTriangulation(spk);
+        }
+
+        function toggle40Hz(id, checked) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            spk.show40Hz = checked;
+            updateSpeakerVisuals(spk);
+        }
+
+        function autoAlign(id) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            const tPos = targetNodes[spk.targetId].pos;
+            if (spk.type === 'tweeter') {
+                // Adjust for orientation of the created cylinder geometry
+                const targetPoint = tPos.clone();
+                spk.mesh.lookAt(targetPoint);
+            } else {
+                spk.mesh.lookAt(tPos);
+            }
+            // Removed rotation syncing so waves stay flat on the horizontal plane
+        }
+
+        function changeWaveMode(id, mode) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            spk.waveMode = mode;
+            updateSpeakerVisuals(spk);
+        }
+
+        function toggleTraceback(id, checked) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            spk.showTraceback = checked;
+            updateSpeakerVisuals(spk);
+        }
+
+        function changeFreq(id, newFreq) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            
+            spk.freq = parseInt(newFreq);
+            const color = SOLFEGGIO[spk.freq].color;
+            
+            spk.mesh.material.color.set(color);
+            spk.line.material.color.set(color);
+            document.getElementById(`title-${spk.id}`).style.color = color;
+            document.getElementById(`wl-${spk.id}`).innerText = (SOLFEGGIO[spk.freq].wl * getMult()).toFixed(2) + currentUnit;
+            
+            calculateAcoustics(spk);
+            updateSpeakerVisuals(spk);
+        }
+
+        function changeTarget(id, newTarget) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            spk.targetId = newTarget;
+            updateDistanceLines();
+            updateSpeakerVisuals(spk);
+            updateTriangulation(spk);
+        }
+
+        function updateNodeSize(val) {
+            document.getElementById('node-size-val').innerText = parseFloat(val).toFixed(1) + 'x';
+            Object.keys(CHAKRAS).forEach(key => {
+                if(targetNodes[key] && targetNodes[key].mesh) {
+                    targetNodes[key].mesh.scale.set(val, val, val);
+                }
+            });
+        }
+
+        function updatePosFromUI(id) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+
+            const x = parseFloat(document.getElementById(`posx-${spk.id}`).value) / getMult();
+            const y = parseFloat(document.getElementById(`posy-${spk.id}`).value) / getMult();
+            const z = parseFloat(document.getElementById(`posz-${spk.id}`).value) / getMult();
+
+            spk.mesh.position.set(x, y, z);
+            spk.waveGroup.position.copy(spk.mesh.position);
+            updateDistanceLines();
+            updateSpeakerVisuals(spk);
+        }
+
+        function updateUIFromDrag(mesh) {
+            const spk = mesh.userData;
+            document.getElementById(`posx-${spk.id}`).value = (mesh.position.x * getMult()).toFixed(2);
+            document.getElementById(`posy-${spk.id}`).value = (mesh.position.y * getMult()).toFixed(2);
+            document.getElementById(`posz-${spk.id}`).value = (mesh.position.z * getMult()).toFixed(2);
+        }
+
+        function updateDistanceLines() {
+            speakers.forEach(spk => {
+                const positions = spk.line.geometry.attributes.position.array;
+                const tPos = targetNodes[spk.targetId].pos;
+                
+                // Update Line Start Point
+                positions[0] = spk.mesh.position.x;
+                positions[1] = spk.mesh.position.y;
+                positions[2] = spk.mesh.position.z;
+                
+                // Update Line End Point (Target)
+                positions[3] = tPos.x;
+                positions[4] = tPos.y;
+                positions[5] = tPos.z;
+                
+                spk.line.geometry.attributes.position.needsUpdate = true;
+                spk.line.computeLineDistances(); // Required for dashed lines
+                
+                calculateAcoustics(spk);
+                updateTriangulation(spk);
+            });
+        }
+
+        function updateTriangulation(spk) {
+            // Clear existing
+            while(spk.triangulationGroup.children.length > 0) {
+                spk.triangulationGroup.children[0].geometry.dispose();
+                spk.triangulationGroup.children[0].material.dispose();
+                spk.triangulationGroup.remove(spk.triangulationGroup.children[0]);
+            }
+            
+            const statsEl = document.getElementById(`triangulation-stats-${spk.id}`);
+            if (!spk.showTriangulation) {
+                if (statsEl) statsEl.style.display = 'none';
+                return;
+            }
+            
+            const sPos = spk.mesh.position;
+            const tPos = targetNodes[spk.targetId].pos;
+            
+            // Draw Right Angle Staircase: Target -> X-axis -> Y-axis -> Z-axis -> Speaker
+            const p1 = new THREE.Vector3(sPos.x, tPos.y, tPos.z);
+            const p2 = new THREE.Vector3(sPos.x, sPos.y, tPos.z);
+            
+            const pts = [tPos, p1, p1, p2, p2, sPos];
+            const geo = new THREE.BufferGeometry().setFromPoints(pts);
+            const mat = new THREE.LineBasicMaterial({ color: 0xffff00 }); // Yellow laser lines
+            const line = new THREE.LineSegments(geo, mat);
+            spk.triangulationGroup.add(line);
+            
+            // Update UI
+            if (statsEl) {
+                statsEl.style.display = 'block';
+                const dx = Math.abs(sPos.x - tPos.x) * getMult();
+                const dy = Math.abs(sPos.y - tPos.y) * getMult();
+                const dz = Math.abs(sPos.z - tPos.z) * getMult();
+                document.getElementById(`tri-x-${spk.id}`).innerText = dx.toFixed(2) + currentUnit;
+                document.getElementById(`tri-y-${spk.id}`).innerText = dy.toFixed(2) + currentUnit;
+                document.getElementById(`tri-z-${spk.id}`).innerText = dz.toFixed(2) + currentUnit;
+            }
+        }
+
+        function calculateAcoustics(spk) {
+            const tPos = targetNodes[spk.targetId].pos;
+            
+            // 1. Calculate precise distance to selected target
+            const dist = spk.mesh.position.distanceTo(tPos);
+            document.getElementById(`dist-${spk.id}`).innerText = (dist * getMult()).toFixed(2) + currentUnit;
+
+            // 2. Calculate Phase Match
+            const wl = SOLFEGGIO[spk.freq].wl;
+            const remainder = dist % wl;
+            let phaseRatio = remainder / wl; // 0 to 1
+            
+            // Map 0 -> 100% (Constructive), 0.5 -> 0% (Destructive), 1.0 -> 100%
+            if (phaseRatio > 0.5) {
+                phaseRatio = 1.0 - phaseRatio; // fold back down to 0..0.5
+            }
+            
+            // Convert to percentage (0 ratio = 100%, 0.5 ratio = 0%)
+            const matchPercent = (1.0 - (phaseRatio * 2)) * 100;
+            
+            // Update UI Bars
+            const bar = document.getElementById(`match-bar-${spk.id}`);
+            const txt = document.getElementById(`match-txt-${spk.id}`);
+            
+            bar.style.width = `${matchPercent}%`;
+            txt.innerText = `${matchPercent.toFixed(1)}%`;
+
+            // Color Coding based on Phase Match
+            if (matchPercent > 85) {
+                bar.style.background = '#22c55e'; // Green
+                txt.style.color = '#22c55e';
+            } else if (matchPercent > 40) {
+                bar.style.background = '#eab308'; // Yellow
+                txt.style.color = '#eab308';
+            } else {
+                bar.style.background = '#ef4444'; // Red
+                txt.style.color = '#ef4444';
+            }
+        }
+
+        function updateSpeakerVisuals(spk) {
+            // Clear existing geometries to avoid memory leaks
+            while(spk.waveGroup.children.length > 0) {
+                spk.waveGroup.children[0].geometry.dispose();
+                spk.waveGroup.children[0].material.dispose();
+                spk.waveGroup.remove(spk.waveGroup.children[0]);
+            }
+            while(spk.tracebackGroup.children.length > 0) {
+                spk.tracebackGroup.children[0].geometry.dispose();
+                spk.tracebackGroup.children[0].material.dispose();
+                spk.tracebackGroup.remove(spk.tracebackGroup.children[0]);
+            }
+
+            const freqsToDraw = [{ freq: spk.freq, color: SOLFEGGIO[spk.freq].color }];
+            if (spk.show40Hz) {
+                freqsToDraw.push({ freq: 40, color: '#e2e8f0', wl: SPEED_OF_SOUND / 40 }); 
+            }
+
+            freqsToDraw.forEach(item => {
+                const wl = item.wl || SOLFEGGIO[item.freq].wl;
+                const color = new THREE.Color(item.color);
+                const oppColor = item.freq === 40 ? new THREE.Color(0x334155) : color.clone().offsetHSL(0.5, 0, 0);
+
+                // 1. Draw Wave Field
+                if (spk.waveMode !== 'off') {
+                    const is3D = spk.waveMode === '3d';
+                    const maxR = 6.0; // Draw out to 6 meters
+                    const steps = Math.floor(maxR / (wl * 0.5));
+
+                    for (let i = 1; i <= steps; i++) {
+                        const r = i * wl * 0.5;
+                        const isPeak = (i % 2 === 0);
+                        const matColor = isPeak ? color : oppColor;
+                        let opacity = isPeak ? 0.6 : 0.2;
+                        if (item.freq === 40) opacity *= 0.5; // Make 40Hz overlay slightly ghosted
+
+                        let geo, mesh;
+                        if (is3D) {
+                            geo = new THREE.SphereGeometry(r, 32, 16);
+                            const mat = new THREE.MeshBasicMaterial({ color: matColor, wireframe: true, transparent: true, opacity: opacity, depthWrite: false });
+                            mesh = new THREE.Mesh(geo, mat);
+                        } else {
+                            geo = new THREE.RingGeometry(r - 0.02, r + 0.02, 64);
+                            const mat = new THREE.MeshBasicMaterial({ color: matColor, transparent: true, opacity: opacity + 0.2, side: THREE.DoubleSide, depthWrite: false });
+                            mesh = new THREE.Mesh(geo, mat);
+                            mesh.rotation.x = -Math.PI / 2; // Force rings to be horizontally flat
+                        }
+                        spk.waveGroup.add(mesh);
+                    }
+                    spk.waveGroup.position.copy(spk.mesh.position);
+                    spk.waveGroup.rotation.set(0, 0, 0); // Keep waves parallel to the floor
+                }
+
+                // 2. Draw 100% Sweet Spot Traceback Rings
+                if (spk.showTraceback) {
+                    const tPos = targetNodes[spk.targetId].pos;
+                    const maxR = 8.0;
+                    const steps = Math.floor(maxR / wl);
+
+                    for (let i = 1; i <= steps; i++) {
+                        const r = i * wl;
+                        
+                        // We calculate where the spherical wave intersects the speaker's current horizontal plane
+                        const dy = spk.mesh.position.y - tPos.y;
+                        
+                        if (r * r > dy * dy) {
+                            const drawRadius = Math.sqrt(r * r - dy * dy);
+                            const curve = new THREE.EllipseCurve(0, 0, drawRadius, drawRadius, 0, 2 * Math.PI, false, 0);
+                            const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(64));
+                            const mat = new THREE.LineDashedMaterial({ color: item.freq === 40 ? 0xffffff : 0x22c55e, dashSize: 0.1, gapSize: 0.1, transparent: true, opacity: item.freq === 40 ? 0.4 : 0.8 });
+                            const line = new THREE.Line(geo, mat);
+                            line.computeLineDistances();
+                            line.rotation.x = -Math.PI / 2;
+                            line.position.set(tPos.x, spk.mesh.position.y, tPos.z);
+                            spk.tracebackGroup.add(line);
+                        }
+                    }
+                }
+            });
+        }
+
+        function autoPhase(id, shift) {
+            const spk = speakers.find(s => s.id === id);
+            if (!spk) return;
+            
+            const tPos = targetNodes[spk.targetId].pos;
+            const wl = SOLFEGGIO[spk.freq].wl;
+            
+            const dir = new THREE.Vector3().subVectors(spk.mesh.position, tPos);
+            let dist = dir.length();
+            if (dist === 0) { dir.set(1, 0, 0); dist = 0.001; } // Prevent divide by zero
+            
+            // Find current closest Wavelength multiplier
+            let n = Math.round(dist / wl);
+            
+            // Apply shift (-1 for closer, +1 for further, 0 for closest match)
+            if (shift !== 0) n += shift;
+            if (n < 1) n = 1; // Prevent snapping inside the target body
+            
+            let targetDist = n * wl;
+            
+            if (spk.type === 'bose') {
+                // Keep subwoofers strictly on the floor (Y = 0.3)
+                const dy = 0.3 - tPos.y;
+                const r2 = targetDist * targetDist - dy * dy;
+                
+                if (r2 > 0) {
+                    const r = Math.sqrt(r2);
+                    let dirXZ = new THREE.Vector2(dir.x, dir.z);
+                    if (dirXZ.lengthSq() < 0.001) dirXZ.set(1, 0);
+                    dirXZ.normalize();
+                    spk.mesh.position.set(tPos.x + dirXZ.x * r, 0.3, tPos.z + dirXZ.y * r);
+                } else {
+                    // Wavelength distance too small to reach floor; push outward directly
+                    dir.normalize();
+                    spk.mesh.position.copy(tPos).add(dir.multiplyScalar(targetDist));
+                }
+            } else {
+                // DML panels snap perfectly along their direct 3D vector
+                dir.normalize();
+                spk.mesh.position.copy(tPos).add(dir.multiplyScalar(targetDist));
+            }
+            
+            spk.waveGroup.position.copy(spk.mesh.position);
+            updateUIFromDrag(spk.mesh);
+            updateDistanceLines();
+            updateSpeakerVisuals(spk);
+        }
+
+        // --- Render Loop ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            orbitControls.update();
+            renderer.render(scene, camera);
+        }
+        
+        // Start app
+        animate();
+        
+        // Auto-add one subwoofer and one DML to start
+        setTimeout(() => {
+            addSpeaker('bose');
+            // Slight offset for demonstration
+            speakers[0].mesh.position.set(-1.5, 0.3, 1.5);
+            updateUIFromDrag(speakers[0].mesh);
+            
+            addSpeaker('dml');
+            speakers[1].mesh.position.set(0, 1.3, -1.0);
+            updateUIFromDrag(speakers[1].mesh);
+            
+            updateDistanceLines();
+        }, 500);
+
+    </script>
+</body>
+</html>
