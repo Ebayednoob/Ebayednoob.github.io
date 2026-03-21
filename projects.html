@@ -1,13 +1,50 @@
-        <!-- Project Structure -->
+<!-- Project Structure -->
         <div class="text-left">
             <h2 class="text-4xl font-bold mb-6 border-b border-gray-700 pb-3">My Projects</h2>
         
-            <!-- Project 1: Schism Labs
+            <!-- Project 0: Nested Harmonic Cocoon (NEWLY ADDED) -->
+            <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/NHC/NHC-banner.png');">
+                <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
+                <div class="relative">
+                    <!-- This button toggles the visibility of the div below -->
+                    <button data-toggle-id="nhc-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
+                        <div class="flex items-center space-x-4 pointer-events-none">
+                            <img src="Resources/Pictures/NHC/NHC-logo.png" alt="Nested Harmonic Cocoon Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover border border-cyan-500/30">
+                            <div>
+                                <h3 class="text-2xl font-semibold text-cyan-400">Nested Harmonic Cocoon</h3>
+                                <p class="text-gray-300 mt-1">Bio-resonance architecture, spatial audio entrainment, and 3D CAD ecosystem.</p>
+                            </div>
+                        </div>
+                    </button>
+
+                    <!-- Collapsible content area for NHC -->
+                    <div id="nhc-options" class="hidden px-6 pb-6 bg-black/20">
+                        <div class="border-t border-gray-600 pt-4">
+                            <p class="text-gray-400 mb-4">Select a resource to view:</p>
+                            <div class="flex items-center space-x-2">
+                                <!-- Link to the Master Hub Visualizer (Update the href path to where your NHC index.html is stored) -->
+                                <a href="path/to/NHC/index.html"
+                                   target="_blank" rel="noopener noreferrer"
+                                   class="inline-block bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                   Enter Master Hub
+                                </a>
+                                <!-- Link to Spatial Audio Meditation -->
+                                <a href="https://ebayednoob.github.io/Pages/Meditation%20Suite/Meditation%20Suite.html"
+                                   target="_blank" rel="noopener noreferrer"
+                                   class="inline-block bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                   Spatial Audio Meditation
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Project 1: Schism Labs -->
             <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/Logo Files/Schism-cardbg.png');">
                 <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
                 <div class="relative">
-                    <!-- This button toggles the visibility of the div below 
-                
+                    <!-- This button toggles the visibility of the div below -->
                     <button data-toggle-id="schism-labs-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
                         <div class="flex items-center space-x-4 pointer-events-none">
                             <img src="Resources/Pictures/Logo Files/Schism-logo.png" alt="Schism Labs Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
@@ -17,43 +54,37 @@
                             </div>
                         </div>
                     </button>
-                                            <!-- This is the collapsible content area for Schism Labs 
-                            <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
-                                <div class="border-t border-gray-600 pt-4">
-                                    <p class="text-gray-400 mb-4">Select a resource to view:</p>
-                            
-                                    <div class="flex items-center space-x-2">
-                
-                                        <!-- Link to the project page 
-                                        <a href="https://schism-data.github.io/"
-                                           target="_blank" rel="noopener noreferrer"
-                                           class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                                             View Landing Page
-                                        </a>
-                                        <!-- NEW: Link to LinkedIn Profile 
-                                        <a href="https://www.linkedin.com/company/schismlabs/posts/?feedView=all"
-                                           target="_blank" rel="noopener noreferrer"
-                                           class="inline-block bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
-                                             View LinkedIn Profile
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
                     
-                                
+                    <!-- Collapsible content area for Schism Labs -->
+                    <div id="schism-labs-options" class="hidden px-6 pb-6 bg-black/20">
+                        <div class="border-t border-gray-600 pt-4">
+                            <p class="text-gray-400 mb-4">Select a resource to view:</p>
+                            <div class="flex items-center space-x-2">
+                                <!-- Link to the project page -->
+                                <a href="https://schism-data.github.io/"
+                                   target="_blank" rel="noopener noreferrer"
+                                   class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                   View Landing Page
+                                </a>
+                                <!-- Link to LinkedIn Profile -->
+                                <a href="https://www.linkedin.com/company/schismlabs/posts/?feedView=all"
+                                   target="_blank" rel="noopener noreferrer"
+                                   class="inline-block bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">
+                                   View LinkedIn Profile
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
                 
-            <!-- Project 3: SHD-CCP (NEWLY ADDED) -->
+            <!-- Project 2: SHD-CCP -->
             <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/SHDCCP/SHD-CCP explore.png');">
-                <!-- Using a placeholder background color as no image was provided -->
                 <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
                 <div class="relative">
                     <!-- This button toggles the visibility of the div below -->
                     <button data-toggle-id="shd-ccp-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
                         <div class="flex items-center space-x-4 pointer-events-none">
-                            <!-- Placeholder image -->
                             <img src="Resources/Pictures/SHDCCP/shd lattice.png"
                                  alt="SHD-CCP Logo" 
                                  class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
@@ -64,7 +95,7 @@
                         </div>
                     </button>
 
-                    <!-- This is the collapsible content area for SHD-CCP -->
+                    <!-- Collapsible content area for SHD-CCP -->
                     <div id="shd-ccp-options" class="hidden px-6 pb-6 bg-black/20">
                         <div class="border-t border-gray-600 pt-4">
                             <p class="text-gray-400 mb-4">Select a resource to view:</p>
@@ -85,23 +116,28 @@
                 </div>
             </div>
                 
-            <!-- Project 2: Bio Entrainment Therapeutics -->
+            <!-- Project 3: Bio Entrainment Therapeutics -->
             <div class="relative bg-cover bg-center rounded-lg mb-4 overflow-hidden" style="background-image: url('Resources/Pictures/Bio-Entrainment/Bio-entrainment bg.png');">
                 <div class="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
                 <div class="relative">
-                     <!-- This button toggles the visibility of the div below -->
+                    <!-- This button toggles the visibility of the div below -->
                     <button data-toggle-id="bio-entrainment-options" class="w-full text-left p-6 focus:outline-none transition-colors hover:bg-black/20">
                         <div class="flex items-center space-x-4 pointer-events-none">
                             <img src="Resources/Pictures/Bio-Entrainment/Bio-Entrainment Icon.png" alt="Bio Entrainment Logo" class="h-16 w-16 flex-shrink-0 rounded-md object-cover">
                             <div>
                                 <h3 class="text-2xl font-semibold text-blue-400">Bio Entrainment Therapeutics</h3>
-                                <p class="text-gray-300 mt-1">A venture into Brainwave Entrainment and Hemi-Sync medical applications</p>
+                                <p class="text-gray-300 mt-1">A venture into Brainwave Entrainment and Hemi-Sync medical applications.</p>
                             </div>
                         </div>
-
+                    </button>
+                    
+                    <!-- Collapsible content area for Bio Entrainment (Add links later if needed) -->
+                    <div id="bio-entrainment-options" class="hidden px-6 pb-6 bg-black/20">
+                        <div class="border-t border-gray-600 pt-4">
+                            <p class="text-gray-400">Resource links coming soon.</p>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
-    </div>
