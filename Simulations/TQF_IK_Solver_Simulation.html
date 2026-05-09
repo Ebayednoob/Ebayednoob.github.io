@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyperbolic TQF-Propagation: IK Solver Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0f1115;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(20, 25, 35, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .math-font {
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+        }
+
+        /* Color Coding from Research */
+        .color-q1 { color: #2dd4bf; } /* Teal - Q1 */
+        .color-q2 { color: #fbbf24; } /* Orange - Q2 */
+        .color-q3 { color: #c084fc; } /* Purple - Q3 */
+        .color-gap { color: #f43f5e; } /* Red - Gap */
+        
+        canvas {
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .stream-bit {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-action {
+            transition: all 0.2s;
+        }
+        .btn-action:active {
+            transform: scale(0.95);
+        }
+
+        /* Minimize state for panels */
+        .minimized {
+            height: 40px !important;
+            overflow: hidden;
+        }
+        .minimized .panel-content {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* 3D/2D Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 34px;
+            height: 20px;
+        }
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 12px;
+            width: 12px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            -webkit-transition: .4s;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+        input:focus + .slider {
+            box-shadow: 0 0 1px #2196F3;
+        }
+        input:checked + .slider:before {
+            -webkit-transform: translateX(14px);
+            -ms-transform: translateX(14px);
+            transform: translateX(14px);
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #22d3ee;
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #374151;
+            border-radius: 2px;
+        }
+        input[type=range]:focus {
+            outline: none;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-[#161b22] z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+            <h1 class="text-sm font-bold tracking-wider text-gray-200">HYPERBOLIC TQF-PROPAGATION <span class="text-xs text-gray-500 font-normal">| ALGEBRAIC IK SOLVER</span></h1>
+        </div>
+        <div class="flex items-center gap-4 text-xs text-gray-400">
+            <span>Mode: <span id="view-mode-label" class="text-green-400 font-bold">2D SCHEMATIC</span></span>
+            <label class="switch">
+                <input type="checkbox" id="view-toggle" onchange="toggleViewMode()">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Panel: Controls & Math -->
+        <aside id="controls-panel" class="w-96 glass-panel m-4 flex flex-col z-10 absolute left-0 top-0 bottom-0 max-h-[calc(100vh-80px)] transition-all duration-300">
+            <!-- Header Toggle -->
+            <div class="flex justify-between items-center p-4 border-b border-gray-800 cursor-pointer" onclick="togglePanel('controls-panel', 'ctrl-icon')">
+                <h3 class="text-xs font-bold text-gray-200 uppercase">System Controls</h3>
+                <button class="text-gray-500 hover:text-white transition-colors">
+                    <svg id="ctrl-icon" class="w-4 h-4 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="panel-content flex-1 overflow-y-auto p-4 space-y-4 transition-opacity duration-300">
+                
+                <div class="p-4 bg-black/40 rounded-lg border border-gray-800">
+                    <h2 class="text-xs font-bold text-gray-400 mb-2 uppercase border-b border-gray-800 pb-1">1. Cycle Dynamics</h2>
+                    <p class="text-[10px] text-gray-500 mb-3">720-Step Holographic Cycle (4 Quadrants x 90 Steps).</p>
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs">Current Step:</span>
+                        <span id="cycle-step-text" class="text-xs font-mono text-cyan-400">0 / 720</span>
+                    </div>
+                    
+                    <!-- New Range Slider -->
+                    <div class="mb-3">
+                        <input type="range" id="cycle-slider" min="0" max="720" value="0" step="1" oninput="manualCycleUpdate(this.value)" onchange="resumeCycleIfNeeded()">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                         <button onclick="toggleAutoCycle()" id="btn-cycle" class="btn-action w-full py-2 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white">Start Cycle</button>
+                         <button onclick="stepCycle()" class="btn-action w-full py-2 bg-blue-600 hover:bg-blue-500 rounded text-xs text-white">Step +1</button>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-black/40 rounded-lg border border-gray-800">
+                    <h2 class="text-xs font-bold text-gray-400 mb-2 uppercase border-b border-gray-800 pb-1">2. SHD-CCP Cubic Structure</h2>
+                    <p class="text-[10px] text-gray-500 mb-3">4 Active Quaternions per layer (3x, 3y, 3z).</p>
+                    <div class="grid grid-cols-3 gap-1 text-center text-[9px] font-mono text-gray-400 mb-2">
+                        <div class="border border-gray-700 p-1 rounded">X-Axis<br><span id="q-x" class="text-white">Active</span></div>
+                        <div class="border border-gray-700 p-1 rounded">Y-Axis<br><span id="q-y" class="text-gray-600">--</span></div>
+                        <div class="border border-gray-700 p-1 rounded">Z-Axis<br><span id="q-z" class="text-gray-600">--</span></div>
+                    </div>
+                </div>
+
+                <div class="p-4 bg-black/40 rounded-lg border border-purple-900/30 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-1">
+                        <div class="w-2 h-2 rounded-full bg-purple-500/50"></div>
+                    </div>
+                    <h2 class="text-xs font-bold text-purple-300 mb-2 uppercase border-b border-purple-900/50 pb-1">3. TQF 5th Step Solve</h2>
+                    <p class="text-[10px] text-gray-500 mb-3">Identifies instant backprop path every 4 steps.</p>
+                    
+                    <div class="flex items-center justify-between text-[10px] font-mono bg-black/60 p-2 rounded border border-gray-700 mb-3">
+                        <span class="text-gray-400">Step Modulo 5:</span>
+                        <span id="mod-step" class="text-purple-400 font-bold">0</span>
+                    </div>
+
+                    <button onclick="solveTQF()" id="btn-solve" class="btn-action w-full py-3 bg-purple-600 hover:bg-purple-500 rounded text-xs text-white font-bold shadow-[0_0_20px_rgba(147,51,234,0.4)] flex justify-center items-center gap-2 opacity-50 cursor-not-allowed">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        AWAITING 5TH STEP
+                    </button>
+                </div>
+
+                <!-- Parity Buffer Viz -->
+                <div class="p-4 bg-black/40 rounded-lg border border-gray-800">
+                    <h2 class="text-xs font-bold text-gray-400 mb-2 uppercase border-b border-gray-800 pb-1">4. 16-Stream Trefoil</h2>
+                    <div class="flex justify-between text-[10px] text-gray-500 mb-1">
+                        <span>Data Flow</span>
+                        <span>Projection</span>
+                    </div>
+                    <div class="flex gap-1" id="bit-grid">
+                        <!-- Generated via JS -->
+                    </div>
+                    <p class="text-[9px] text-gray-600 mt-2 italic">Holographic projection of 3 inverse squares.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: Canvas Visualization -->
+        <main class="flex-1 relative bg-[#0f1115] w-full h-full">
+            <canvas id="simCanvas" class="absolute inset-0 z-0"></canvas>
+            
+            <!-- Overlay Labels -->
+            <div class="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none text-center">
+                <div class="text-[10px] text-gray-500 font-mono bg-black/50 px-3 py-1 rounded backdrop-blur-sm border border-white/10">
+                    <div>System State: <span id="state-label" class="text-white">IDLE</span></div>
+                    <div>Cycle Phase: <span id="phase-label" class="text-cyan-400">Q1 (Expansion)</span></div>
+                    <div>TQF Residual: <span id="tqf-residual">0.00</span></div>
+                    <div class="mt-1 text-[9px] text-gray-600">Drag to Pan • Scroll to Zoom</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right: Data Panels -->
+        <div class="flex flex-col absolute right-0 top-0 bottom-0 z-10 max-h-[calc(100vh-20px)] m-4 pointer-events-none">
+            
+            <!-- Manifold Data Panel -->
+            <aside id="data-panel" class="w-64 glass-panel mb-4 flex flex-col text-[10px] font-mono text-gray-400 pointer-events-auto transition-all duration-300">
+                <div class="flex justify-between items-center p-3 border-b border-gray-800 cursor-pointer bg-black/20 rounded-t-lg" onclick="togglePanel('data-panel', 'data-icon')">
+                    <h3 class="text-xs font-bold text-blue-300 uppercase">Manifold Data</h3>
+                    <button class="text-gray-500 hover:text-white transition-colors">
+                        <svg id="data-icon" class="w-3 h-3 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                <div class="panel-content flex-1 overflow-y-auto transition-opacity duration-300">
+                    <div class="p-3">
+                        <div class="grid grid-cols-4 gap-2 mb-2 text-[9px] uppercase text-gray-500 font-bold border-b border-gray-800 pb-1">
+                            <div>Layer</div>
+                            <div>Phase</div>
+                            <div>Rotor(°)</div>
+                            <div>Quad</div>
+                        </div>
+                        <div id="manifold-rows" class="space-y-1">
+                            <!-- Rows generated via JS -->
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Rational Log Panel -->
+            <aside id="log-panel" class="w-64 glass-panel flex flex-col text-[10px] font-mono text-gray-400 pointer-events-auto transition-all duration-300 flex-1 min-h-0">
+                <div class="flex justify-between items-center p-3 border-b border-gray-800 cursor-pointer bg-black/20 rounded-t-lg" onclick="togglePanel('log-panel', 'log-icon')">
+                    <h3 class="text-xs font-bold text-gray-200 uppercase">Rational Log</h3>
+                    <button class="text-gray-500 hover:text-white transition-colors">
+                        <svg id="log-icon" class="w-3 h-3 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                </div>
+                <div id="console-log" class="panel-content flex-1 overflow-y-auto p-3 space-y-1 transition-opacity duration-300">
+                    <div class="text-green-500">> System Initialized</div>
+                </div>
+            </aside>
+
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONSTANTS & STATE ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        
+        // Viewport State
+        const VIEW = {
+            scale: 0.8,
+            offsetX: 0,
+            offsetY: 0,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0,
+            mode: '2D', // '2D' or '3D'
+            rotX: 0.5,    // 3D Rotation X
+            rotY: 0.5     // 3D Rotation Y
+        };
+
+        // System State
+        const SYSTEM = {
+            layers: 5,
+            weights: [], 
+            lengths: [],
+            phases: ['α', 'β', 'γ'],
+            target: { x: 0, y: 0 },
+            endEffector: { x: 0, y: 0 },
+            joints: [],
+            isSolved: false,
+            cycleStep: 0,
+            isCycling: false,
+            cycleTimer: null,
+            quaternions: { x: 0, y: 0, z: 0 },
+            wasCyclingBeforeDrag: false
+        };
+
+        // Initialize Layout
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight; // Adjust for header
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Re-center view on resize if first load
+            if(SYSTEM.joints.length === 0) {
+                initSystem();
+                VIEW.offsetX = width / 2;
+                VIEW.offsetY = height / 2;
+            }
+        }
+        window.addEventListener('resize', resize);
+
+        // --- INTERACTION HANDLERS ---
+        
+        canvas.addEventListener('mousedown', (e) => {
+            VIEW.isDragging = true;
+            VIEW.lastX = e.clientX;
+            VIEW.lastY = e.clientY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (VIEW.isDragging) {
+                const dx = e.clientX - VIEW.lastX;
+                const dy = e.clientY - VIEW.lastY;
+                
+                if (VIEW.mode === '2D') {
+                    VIEW.offsetX += dx;
+                    VIEW.offsetY += dy;
+                } else {
+                    // 3D Interaction Logic
+                    if (e.shiftKey) {
+                        // Pan in 3D
+                        VIEW.offsetX += dx;
+                        VIEW.offsetY += dy;
+                    } else {
+                        // Orbit in 3D
+                        VIEW.rotY += dx * 0.01;
+                        VIEW.rotX += dy * 0.01;
+                    }
+                }
+                
+                VIEW.lastX = e.clientX;
+                VIEW.lastY = e.clientY;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            VIEW.isDragging = false;
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomSensitivity = 0.001;
+            const delta = -e.deltaY * zoomSensitivity;
+            const newScale = Math.min(Math.max(0.1, VIEW.scale + delta), 5);
+            VIEW.scale = newScale;
+        }, { passive: false });
+
+        function togglePanel(panelId, iconId) {
+            const panel = document.getElementById(panelId);
+            const icon = document.getElementById(iconId);
+            panel.classList.toggle('minimized');
+            if(panel.classList.contains('minimized')) {
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function toggleViewMode() {
+            const chk = document.getElementById('view-toggle');
+            const lbl = document.getElementById('view-mode-label');
+            VIEW.mode = chk.checked ? '3D' : '2D';
+            lbl.innerText = VIEW.mode === '3D' ? '3D TOPOLOGY' : '2D SCHEMATIC';
+            lbl.className = VIEW.mode === '3D' ? 'text-purple-400 font-bold' : 'text-green-400 font-bold';
+            
+            // Reset transforms for cleanliness
+            if (VIEW.mode === '3D') {
+                VIEW.rotX = 0.5; // Slight tilt
+                VIEW.rotY = 0.5;
+                VIEW.offsetX = width / 2; // Recentering for 3D
+                VIEW.offsetY = height / 2;
+                VIEW.scale = 1.0;
+            } else {
+                VIEW.offsetX = width / 2;
+                VIEW.offsetY = height / 2;
+                VIEW.scale = 0.8;
+            }
+        }
+
+        // --- MATH ENGINE (RATIONAL TRIGONOMETRY) ---
+        
+        function quadrance(p1, p2) {
+            return Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2);
+        }
+
+        // --- SIMULATION LOGIC ---
+
+        function initSystem() {
+            SYSTEM.weights = [];
+            SYSTEM.lengths = [];
+            SYSTEM.joints = [];
+            
+            // Create 5 Layers (Links) representing the 5-manifold IK system
+            for(let i=0; i<SYSTEM.layers; i++) {
+                SYSTEM.weights.push((Math.random() - 0.5) * 1.5); // Random initial twist
+                SYSTEM.lengths.push(60); // Fixed Quadrance (Length) per layer
+            }
+
+            // Set Initial Target
+            SYSTEM.target = { x: 200, y: -100 };
+            
+            updateJoints();
+            renderBitGrid();
+            updateManifoldData();
+            log("Manifolds Initialized. Weights Random.");
+        }
+
+        function updateJoints() {
+            // Root is at logical (0,0) - center of torus
+            let cx = 0;
+            let cy = 0;
+            let totalAngle = 0;
+
+            SYSTEM.joints = [{x: cx, y: cy}]; // Base
+
+            for(let i=0; i<SYSTEM.layers; i++) {
+                totalAngle += SYSTEM.weights[i];
+                // Projecting onto the current step's tangent space
+                // In full 3D simulation this would be a helical path on the torus surface
+                cx += Math.cos(totalAngle) * SYSTEM.lengths[i];
+                cy += Math.sin(totalAngle) * SYSTEM.lengths[i];
+                SYSTEM.joints.push({x: cx, y: cy});
+            }
+            SYSTEM.endEffector = {x: cx, y: cy};
+        }
+
+        // --- CYCLE & 5TH STEP LOGIC ---
+
+        function toggleAutoCycle() {
+            SYSTEM.isCycling = !SYSTEM.isCycling;
+            const btn = document.getElementById('btn-cycle');
+            if (SYSTEM.isCycling) {
+                btn.innerText = "Stop Cycle";
+                btn.classList.add("bg-red-600", "hover:bg-red-500");
+                btn.classList.remove("bg-gray-700", "hover:bg-gray-600");
+                cycleLoop();
+            } else {
+                btn.innerText = "Start Cycle";
+                btn.classList.remove("bg-red-600", "hover:bg-red-500");
+                btn.classList.add("bg-gray-700", "hover:bg-gray-600");
+                clearTimeout(SYSTEM.cycleTimer);
+            }
+        }
+
+        function manualCycleUpdate(val) {
+            // Pause cycling if dragging
+            if(SYSTEM.isCycling && !SYSTEM.wasCyclingBeforeDrag) {
+                SYSTEM.wasCyclingBeforeDrag = true;
+                clearTimeout(SYSTEM.cycleTimer);
+            }
+            
+            SYSTEM.cycleStep = parseInt(val);
+            updateCycleState();
+        }
+
+        function resumeCycleIfNeeded() {
+            if(SYSTEM.isCycling && SYSTEM.wasCyclingBeforeDrag) {
+                SYSTEM.wasCyclingBeforeDrag = false;
+                cycleLoop();
+            }
+        }
+
+        function cycleLoop() {
+            if (!SYSTEM.isCycling) return;
+            stepCycle();
+            SYSTEM.cycleTimer = setTimeout(cycleLoop, 50); // Speed of simulation
+        }
+
+        function stepCycle() {
+            SYSTEM.cycleStep = (SYSTEM.cycleStep + 1) % 720;
+            // Sync slider if not dragging
+            const slider = document.getElementById('cycle-slider');
+            if(slider) slider.value = SYSTEM.cycleStep;
+            
+            updateCycleState();
+        }
+
+        function updateCycleState() {
+            // Update UI Text
+            const stepEl = document.getElementById('cycle-step-text');
+            if (stepEl) stepEl.innerText = `${SYSTEM.cycleStep} / 720`;
+            
+            // Note: We removed the progress bar in favor of the slider
+            
+            // Update Phase Labels - 8 Phases of 90 Steps
+            let segment = Math.floor(SYSTEM.cycleStep / 90);
+            let phaseLabels = [
+                "Q1 (Expansion +)", "Q2 (Twist +)", "Q3 (Compression +)", "Q4 (Twist -)",
+                "Q1 (Expansion -)", "Q2 (Twist -)", "Q3 (Compression -)", "Q4 (Twist +)" // Inverse phases
+            ];
+            let colors = ["text-cyan-400", "text-yellow-400", "text-purple-400", "text-pink-400",
+                          "text-cyan-600", "text-yellow-600", "text-purple-600", "text-pink-600"];
+            
+            const phaseLabel = document.getElementById('phase-label');
+            if (phaseLabel) {
+                phaseLabel.innerText = phaseLabels[segment];
+                phaseLabel.className = colors[segment] + " font-bold";
+            }
+
+            // Update Active Quaternions based on Cubic Structure
+            // 4 steps cycle within the 90. 
+            // 5th step is the backprop trigger.
+            let mod5 = SYSTEM.cycleStep % 5;
+            const modStepEl = document.getElementById('mod-step');
+            if (modStepEl) modStepEl.innerText = mod5;
+            
+            const btnSolve = document.getElementById('btn-solve');
+            
+            // Rotate the Manifold Chain slightly to simulate flow along the Trefoil
+            let flowRate = 0.05;
+            SYSTEM.weights[0] += Math.sin(SYSTEM.cycleStep * 0.01) * flowRate;
+            SYSTEM.weights[1] += Math.cos(SYSTEM.cycleStep * 0.01) * flowRate;
+            updateJoints();
+
+            // Check for 5th Step (The "Gap" Step)
+            if (mod5 === 4) {
+                // Activate Solve Button
+                if (btnSolve) {
+                    btnSolve.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-purple-600');
+                    btnSolve.classList.add('bg-green-600', 'hover:bg-green-500', 'animate-pulse');
+                    btnSolve.innerText = ">>> EXECUTE TQF SOLVE <<<";
+                }
+                
+                if(SYSTEM.isCycling) {
+                    solveTQF(); 
+                }
+            } else {
+                if (btnSolve) {
+                    btnSolve.classList.add('opacity-50', 'cursor-not-allowed', 'bg-purple-600');
+                    btnSolve.classList.remove('bg-green-600', 'hover:bg-green-500', 'animate-pulse');
+                    btnSolve.innerText = "AWAITING 5TH STEP";
+                }
+                SYSTEM.isSolved = false;
+            }
+            
+            // Update Active Axes Indicators
+            let subStep = SYSTEM.cycleStep % 4; // 0,1,2,3 are active data steps
+            const qx = document.getElementById('q-x');
+            const qy = document.getElementById('q-y');
+            const qz = document.getElementById('q-z');
+            if (qx) qx.className = subStep === 0 ? "text-green-400 font-bold" : "text-gray-600";
+            if (qy) qy.className = subStep === 1 ? "text-green-400 font-bold" : "text-gray-600";
+            if (qz) qz.className = subStep === 2 ? "text-green-400 font-bold" : "text-gray-600";
+            
+            updateUI();
+        }
+
+        // --- CORE ALGORITHMS ---
+
+        function scramble() {
+            for(let i=0; i<SYSTEM.layers; i++) {
+                SYSTEM.weights[i] = (Math.random() - 0.5) * 2.0;
+            }
+            SYSTEM.isSolved = false;
+            SYSTEM.target = { 
+                x: (Math.random()*300 - 150), 
+                y: (Math.random()*300 - 150)
+            };
+            updateJoints();
+            updateUI();
+            log("Entropy introduced. Target shifted.");
+        }
+
+        function forwardPass() {
+            log("Forward Pass: Calculating State...");
+            updateJoints();
+            const qGap = quadrance(SYSTEM.endEffector, SYSTEM.target);
+            log(`Output State Computed. Q_gap: ${Math.floor(qGap)}`);
+            updateUI();
+        }
+
+        function solveTQF() {
+            let targetX = SYSTEM.target.x; 
+            targetX = Math.cos(SYSTEM.cycleStep * 0.05) * 150;
+            let targetY = Math.sin(SYSTEM.cycleStep * 0.05) * 150;
+            SYSTEM.target = {x: targetX, y: targetY};
+
+            for (let i = 0; i < 20; i++) { 
+                for (let j = SYSTEM.layers - 1; j >= 0; j--) {
+                    let joint = SYSTEM.joints[j];
+                    let endEffector = SYSTEM.joints[SYSTEM.joints.length-1];
+                    
+                    let v1 = {x: endEffector.x - joint.x, y: endEffector.y - joint.y};
+                    let v2 = {x: targetX - joint.x, y: targetY - joint.y};
+                    
+                    let mag1 = Math.sqrt(v1.x*v1.x + v1.y*v1.y);
+                    let mag2 = Math.sqrt(v2.x*v2.x + v2.y*v2.y);
+                    
+                    if(mag1 * mag2 <= 0) continue;
+                    
+                    let cosTheta = (v1.x * v2.x + v1.y * v2.y) / (mag1 * mag2);
+                    if(cosTheta > 1) cosTheta = 1;
+                    if(cosTheta < -1) cosTheta = -1;
+                    
+                    let angle = Math.acos(cosTheta);
+                    if (v1.x * v2.y - v1.y * v2.x < 0) angle = -angle;
+                    
+                    SYSTEM.weights[j] += angle;
+                    updateJoints();
+                }
+            }
+
+            SYSTEM.isSolved = true;
+            fillParityBuffer();
+            updateUI();
+        }
+
+        // --- VISUALIZATION RENDERING ---
+
+        // Simple 3D Projection (Weak Perspective)
+        function project3D(x, y, z, centerX, centerY) {
+            // Apply Rotation
+            let rx = x;
+            let ry = y * Math.cos(VIEW.rotX) - z * Math.sin(VIEW.rotX);
+            let rz = y * Math.sin(VIEW.rotX) + z * Math.cos(VIEW.rotX);
+            
+            let rxx = rx * Math.cos(VIEW.rotY) + rz * Math.sin(VIEW.rotY);
+            let rxy = ry;
+            let rxz = -rx * Math.sin(VIEW.rotY) + rz * Math.cos(VIEW.rotY);
+
+            // Perspective
+            let fov = 800;
+            // Use VIEW.scale to simulate zoom in projection logic
+            let scale = (fov / (fov + rxz + 1000)) * VIEW.scale; 
+            return {
+                x: rxx * scale * 4 + centerX, // Scale up for visual
+                y: rxy * scale * 4 + centerY,
+                z: rxz, // Return depth for sorting if needed
+                scale: scale
+            };
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.save();
+
+            if (VIEW.mode === '3D') {
+                draw3D();
+            } else {
+                draw2D();
+            }
+
+            ctx.restore();
+            requestAnimationFrame(draw);
+        }
+
+        function draw2D() {
+            ctx.translate(VIEW.offsetX, VIEW.offsetY);
+            ctx.scale(VIEW.scale, VIEW.scale);
+
+            // --- DRAW NESTED TOROIDAL STRUCTURE ---
+            
+            // 1. Draw the Main Torus Ring (The 720 Step Cycle)
+            ctx.beginPath();
+            ctx.arc(0, 0, 250, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 40 / VIEW.scale;
+            ctx.stroke();
+            
+            // 2. Draw Quadrants (90 Steps * 8 Segments for 720)
+            for(let i=0; i<8; i++) {
+                let startAng = (i * Math.PI / 4) - Math.PI/2;
+                let endAng = ((i+1) * Math.PI / 4) - Math.PI/2;
+                ctx.beginPath();
+                ctx.arc(0, 0, 250, startAng, endAng);
+                // Colors: Cyan, Magenta, Yellow, White cycle
+                let hue = [180, 300, 60, 0][i % 4];
+                let sat = i < 4 ? "100%" : "50%"; // Dimmer for Double Cover/Inverse
+                ctx.strokeStyle = `hsla(${hue}, ${sat}, 50%, 0.2)`;
+                ctx.lineWidth = 30 / VIEW.scale;
+                ctx.stroke();
+            }
+
+            // 3. Draw 16-Stream Trefoil Knot Flow
+            // Parametric Trefoil: x = sin(t) + 2sin(2t), y = cos(t) - 2cos(2t) ... adapted for 2D visual
+            ctx.beginPath();
+            for(let t=0; t<Math.PI*2; t+=0.05) {
+                let r = 250 + Math.sin(t * 3 + SYSTEM.cycleStep * 0.05) * 30; // Wiggle for knot
+                let x = Math.cos(t) * r;
+                let y = Math.sin(t) * r;
+                if(t===0) ctx.moveTo(x,y);
+                else ctx.lineTo(x,y);
+            }
+            ctx.strokeStyle = "rgba(100, 200, 255, 0.3)";
+            ctx.lineWidth = 2 / VIEW.scale;
+            ctx.stroke();
+
+            // 4. Current Step Indicator
+            let stepAngle = (SYSTEM.cycleStep / 720) * Math.PI * 2 - Math.PI/2;
+            
+            let curX = Math.cos(stepAngle) * 250;
+            let curY = Math.sin(stepAngle) * 250;
+            
+            // Draw "Cubic Structure" embedded at current step
+            ctx.save();
+            ctx.translate(curX, curY);
+            ctx.rotate(stepAngle + Math.PI/2);
+            
+            // Draw 4 active quaternions (little boxes)
+            ctx.fillStyle = "#fff";
+            for(let q=0; q<4; q++) {
+                let qx = (q - 1.5) * 15;
+                ctx.globalAlpha = (SYSTEM.cycleStep % 5 === q) ? 1.0 : 0.2;
+                ctx.fillRect(qx, -10, 10, 20);
+            }
+            
+            // Draw 5th Step Indicator (The Gap/Backprop)
+            if (SYSTEM.cycleStep % 5 === 4) {
+                ctx.strokeStyle = "#f43f5e";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, 40, 0, Math.PI*2);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+
+            // --- DRAW MANIFOLD CHAIN (IK SOLVER) ---
+            
+            // Draw Connection to Target (The Gap)
+            if (!SYSTEM.isSolved && SYSTEM.cycleStep % 5 === 4) {
+                ctx.beginPath();
+                ctx.moveTo(SYSTEM.endEffector.x, SYSTEM.endEffector.y);
+                ctx.lineTo(SYSTEM.target.x, SYSTEM.target.y);
+                ctx.setLineDash([5 / VIEW.scale, 5 / VIEW.scale]);
+                ctx.strokeStyle = "#f43f5e"; // Red
+                ctx.lineWidth = 2 / VIEW.scale;
+                ctx.stroke();
+            }
+
+            // Draw Chain
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            for(let i=0; i<SYSTEM.layers; i++) {
+                let start = SYSTEM.joints[i];
+                let end = SYSTEM.joints[i+1];
+                
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = `hsl(${i * 40 + 180}, 100%, 50%)`;
+                
+                ctx.beginPath();
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+                ctx.strokeStyle = `hsl(${i * 40 + 180}, 70%, 60%)`;
+                ctx.lineWidth = 6 / VIEW.scale;
+                ctx.stroke();
+                
+                ctx.shadowBlur = 0;
+            }
+
+            for(let i=0; i<=SYSTEM.layers; i++) {
+                let p = SYSTEM.joints[i];
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 6 / VIEW.scale, 0, Math.PI*2);
+                ctx.fillStyle = "#fff";
+                ctx.fill();
+                
+                if(i < SYSTEM.layers) {
+                    let angle = SYSTEM.weights[i]; 
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 12 / VIEW.scale, angle, angle + Math.PI/1.5);
+                    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+                    ctx.lineWidth = 2 / VIEW.scale;
+                    ctx.stroke();
+                }
+            }
+
+            // Draw Target
+            ctx.beginPath();
+            ctx.arc(SYSTEM.target.x, SYSTEM.target.y, 10 / VIEW.scale, 0, Math.PI*2);
+            ctx.fillStyle = "rgba(34, 197, 94, 0.2)";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(SYSTEM.target.x, SYSTEM.target.y, 4 / VIEW.scale, 0, Math.PI*2);
+            ctx.fillStyle = "#22c55e";
+            ctx.fill();
+        }
+
+        function draw3D() {
+            let cx = width / 2;
+            let cy = height / 2;
+            
+            // Using VIEW.offsetX/Y for panning in 3D too
+            // But we need to use them as offsets from center
+            // Let's modify cx, cy
+            cx = VIEW.offsetX;
+            cy = VIEW.offsetY;
+            
+            // Draw Torus Wireframe (Nested)
+            // R = 150, r = 60
+            
+            ctx.strokeStyle = "rgba(100, 200, 255, 0.1)";
+            ctx.lineWidth = 1;
+            
+            let R = 150;
+            let r = 60;
+
+            // Longitudinal Lines (around the large ring)
+            for(let i=0; i<360; i+=20) {
+                ctx.beginPath();
+                let lastP = null;
+                for(let j=0; j<=360; j+=20) {
+                    let phi = i * Math.PI / 180;
+                    let theta = j * Math.PI / 180;
+                    
+                    let x = (R + r * Math.cos(theta)) * Math.cos(phi);
+                    let y = (R + r * Math.cos(theta)) * Math.sin(phi);
+                    let z = r * Math.sin(theta);
+                    
+                    let p = project3D(x, y, z, cx, cy);
+                    
+                    if(lastP) {
+                        ctx.moveTo(lastP.x, lastP.y);
+                        ctx.lineTo(p.x, p.y);
+                    }
+                    lastP = p;
+                }
+                ctx.stroke();
+            }
+
+            // Latitudinal Lines (around the tube)
+            for(let j=0; j<360; j+=45) {
+                ctx.beginPath();
+                let lastP = null;
+                for(let i=0; i<=360; i+=10) {
+                    let phi = i * Math.PI / 180;
+                    let theta = j * Math.PI / 180;
+                    
+                    let x = (R + r * Math.cos(theta)) * Math.cos(phi);
+                    let y = (R + r * Math.cos(theta)) * Math.sin(phi);
+                    let z = r * Math.sin(theta);
+                    
+                    let p = project3D(x, y, z, cx, cy);
+                    
+                    if(lastP) {
+                        ctx.moveTo(lastP.x, lastP.y);
+                        ctx.lineTo(p.x, p.y);
+                    }
+                    lastP = p;
+                }
+                ctx.stroke();
+            }
+            
+            // 64 Loops inside the toroid (The Rail System)
+            // Mapping 16 streams x 4 bits each to 4x4 data tubes
+            
+            ctx.lineWidth = 1;
+            
+            // Trefoil parameters (p=2, q=3) for path winding
+            let pVal = 2;
+            let qVal = 3;
+
+            // Loop through 16 distinct data streams
+            // We visualize these as 16 main tubes, each carrying 4 bits
+            for(let s = 0; s < 16; s++) {
+                
+                // Map stream index 's' (0-15) to a 4x4 spatial grid offset (u,v)
+                // This creates the "Square in Circle" cross-section
+                let sx = s % 4;
+                let sy = Math.floor(s / 4);
+                
+                // Cross-section offset
+                // Map 0..3 to -1..1 range
+                let u = (sx - 1.5) / 1.5; 
+                let v = (sy - 1.5) / 1.5;
+                
+                // Scale to fit inside torus tube radius r
+                let tubeScale = 0.5;
+                
+                ctx.beginPath();
+                let lastP = null;
+                
+                for(let t=0; t<=Math.PI*2; t+=0.05) {
+                    let phi = pVal * t; // Major angle around torus
+                    let theta = qVal * t; // Minor angle
+
+                    // Twist factor: The square grid must rotate as it traverses the knot
+                    // to maintain orientation relative to the path tangent/normal
+                    let twist = theta; 
+                    
+                    // Rotate local (u,v) by twist
+                    let ru = u * Math.cos(twist) - v * Math.sin(twist);
+                    let rv = u * Math.sin(twist) + v * Math.cos(twist);
+                    
+                    // Apply to torus geometry relative to the Trefoil core path
+                    // Trefoil core path is defined by r_knot (minor radius of path itself)
+                    let r_knot = r * 0.7; // Path sits inside the tube
+                    
+                    // Core position in minor circle frame
+                    let core_radial = r_knot * Math.cos(theta);
+                    let core_z = r_knot * Math.sin(theta);
+                    
+                    // Add the square grid offset to the core position
+                    let total_radial = core_radial + (ru * r * tubeScale * 0.3); 
+                    let total_z = core_z + (rv * r * tubeScale * 0.3);
+                    
+                    let x = (R + total_radial) * Math.cos(phi);
+                    let y = (R + total_radial) * Math.sin(phi);
+                    let z = total_z;
+                    
+                    // Apply Global Rotation for view
+                    let rotT = SYSTEM.cycleStep * 0.005; // Slow rotation
+                    let xr = x * Math.cos(rotT) - y * Math.sin(rotT);
+                    let yr = x * Math.sin(rotT) + y * Math.cos(rotT);
+                    
+                    let p = project3D(xr, yr, z, cx, cy);
+                    
+                    if(lastP) {
+                        ctx.moveTo(lastP.x, lastP.y);
+                        ctx.lineTo(p.x, p.y);
+                    }
+                    lastP = p;
+                }
+                
+                // Color code based on quadrants/phases
+                // Streams 0-3: Cyan, 4-7: Yellow, etc.
+                let hue = (Math.floor(s/4) * 90) + (s%4)*20; 
+                ctx.strokeStyle = `hsla(${hue}, 70%, 60%, 0.4)`;
+                ctx.stroke();
+            }
+            
+            // Draw 4x4x4 Cubic Voxel System traversing the rail
+            // It needs to follow the twisted path
+            let tCurrent = (SYSTEM.cycleStep / 720) * Math.PI * 2; // Cycle position 0..2PI
+            
+            let phi_path = pVal * tCurrent;
+            let theta_path = qVal * tCurrent;
+            let twistCurrent = theta_path;
+            
+            // Calculate global rotation for object placement
+            let rotT = SYSTEM.cycleStep * 0.005;
+            
+            let r_knot = r * 0.7;
+            let core_radial = r_knot * Math.cos(theta_path);
+            let core_z = r_knot * Math.sin(theta_path);
+            let tubeScale = 0.5;
+
+            // Draw 64 Voxel Nodes (16 Streams * 4 Bits)
+            // 4 bits per stream are arranged along the tangent of the path (z-depth in local stream frame)
+            let bitSpacing = 10; 
+
+            for(let s=0; s<16; s++) {
+                // Stream coordinates
+                let sx = s % 4;
+                let sy = Math.floor(s / 4);
+                
+                let u = (sx - 1.5) / 1.5; 
+                let v = (sy - 1.5) / 1.5;
+                
+                // Apply twist at current position
+                let ru = u * Math.cos(twistCurrent) - v * Math.sin(twistCurrent);
+                let rv = u * Math.sin(twistCurrent) + v * Math.cos(twistCurrent);
+                
+                let total_radial = core_radial + (ru * r * tubeScale * 0.3);
+                let baseZ = core_z + (rv * r * tubeScale * 0.3);
+                
+                let baseX = (R + total_radial) * Math.cos(phi_path);
+                let baseY = (R + total_radial) * Math.sin(phi_path);
+                
+                // Iterate 4 bits for this stream along the tangent
+                for(let b=0; b<4; b++) {
+                    // Tangent direction approximation (-sin, cos, 0) for phi
+                    let tangentOffset = (b - 1.5) * bitSpacing;
+                    
+                    let tx = -Math.sin(phi_path) * tangentOffset;
+                    let ty = Math.cos(phi_path) * tangentOffset;
+                    
+                    let px = baseX + tx;
+                    let py = baseY + ty;
+                    let pz = baseZ; 
+                    
+                    // Apply Global View Rotation
+                    let xr = px * Math.cos(rotT) - py * Math.sin(rotT);
+                    let yr = px * Math.sin(rotT) + py * Math.cos(rotT);
+                    
+                    let p = project3D(xr, yr, pz, cx, cy);
+                    
+                    // Color logic
+                    let alpha = 0.8;
+                    let color = `hsl(${(Math.floor(s/4) * 90) + (s%4)*20}, 80%, 70%)`;
+                    
+                    if (SYSTEM.cycleStep % 5 === 4) {
+                        color = "#f43f5e"; // Flash red on backprop
+                        alpha = 1.0;
+                    }
+                    
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 2 * p.scale, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            ctx.globalAlpha = 1.0;
+            
+            // Draw 5-Manifold Chain in 3D (Simple representation)
+            // Root at center
+            let jx = 0, jy = 0, jz = 0;
+            
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2;
+            
+            for(let i=0; i<SYSTEM.layers; i++) {
+                let startP = project3D(jx, jy, jz, cx, cy);
+                
+                // 3D Random Walk for joints based on weights (angles)
+                // Map 2D weights to spherical coords for visual
+                let theta = SYSTEM.weights[i];
+                let phi = SYSTEM.weights[i] * 2; // Arbitrary 3D mapping
+                let len = SYSTEM.lengths[i] * 1.5;
+                
+                let nx = jx + len * Math.sin(theta) * Math.cos(phi);
+                let ny = jy + len * Math.sin(theta) * Math.sin(phi);
+                let nz = jz + len * Math.cos(theta);
+                
+                let endP = project3D(nx, ny, nz, cx, cy);
+                
+                ctx.beginPath();
+                ctx.moveTo(startP.x, startP.y);
+                ctx.lineTo(endP.x, endP.y);
+                ctx.stroke();
+                
+                // Node
+                ctx.beginPath();
+                ctx.arc(endP.x, endP.y, 4 * endP.scale, 0, Math.PI*2);
+                ctx.fillStyle = `hsl(${i * 40 + 180}, 100%, 50%)`;
+                ctx.fill();
+                
+                jx = nx; jy = ny; jz = nz;
+            }
+            
+            // 3D Target (Orbiting)
+            let tx = SYSTEM.target.x; // mapped from 2D
+            let ty = SYSTEM.target.y;
+            let tz = 0; // Flat plane target
+            
+            // Map 2D target to 3D ring orbit for better visual
+            tx = Math.cos(SYSTEM.cycleStep * 0.05) * 150;
+            ty = Math.sin(SYSTEM.cycleStep * 0.05) * 150;
+            tz = Math.sin(SYSTEM.cycleStep * 0.1) * 50;
+            
+            let tp = project3D(tx, ty, tz, cx, cy);
+            
+            ctx.beginPath();
+            ctx.arc(tp.x, tp.y, 8 * tp.scale, 0, Math.PI*2);
+            ctx.fillStyle = "#22c55e";
+            ctx.fill();
+            
+            // Gap Line
+            let efP = project3D(jx, jy, jz, cx, cy);
+            
+            if (!SYSTEM.isSolved && SYSTEM.cycleStep % 5 === 4) {
+                ctx.beginPath();
+                ctx.moveTo(efP.x, efP.y);
+                ctx.lineTo(tp.x, tp.y);
+                ctx.strokeStyle = "#f43f5e";
+                ctx.setLineDash([5,5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // --- UI UPDATES ---
+
+        function updateUI() {
+            const qGap = quadrance(SYSTEM.endEffector, SYSTEM.target);
+            
+            // Update Overlay Elements (These exist in the main view)
+            const residualEl = document.getElementById('tqf-residual');
+            if (residualEl) {
+                residualEl.innerText = SYSTEM.isSolved ? "0.00 (Balanced)" : (qGap / 1000).toFixed(2) + " (Unbalanced)";
+            }
+
+            const stateLabel = document.getElementById('state-label');
+            if (stateLabel) {
+                stateLabel.innerText = SYSTEM.isSolved ? "CONVERGED" : "TRAINING";
+                stateLabel.className = SYSTEM.isSolved ? "text-green-400 font-bold" : "text-yellow-400 font-bold";
+            }
+
+            if(!SYSTEM.isSolved) {
+               resetParityBuffer();
+            }
+            updateManifoldData();
+        }
+
+        function updateManifoldData() {
+            const container = document.getElementById('manifold-rows');
+            if (container) {
+                container.innerHTML = '';
+                
+                SYSTEM.weights.forEach((w, i) => {
+                    const phase = SYSTEM.phases[i % 3];
+                    const angleDeg = (w * 180 / Math.PI).toFixed(1);
+                    const quad = SYSTEM.lengths[i];
+                    
+                    const row = document.createElement('div');
+                    row.className = "grid grid-cols-4 gap-2 text-[10px] items-center border-b border-gray-800/50 pb-1";
+                    row.innerHTML = `
+                        <div class="text-gray-300">M-${i+1}</div>
+                        <div class="text-${phase === 'α' ? 'cyan' : phase === 'β' ? 'yellow' : 'purple'}-400 font-bold">${phase}</div>
+                        <div class="font-mono text-gray-400">${angleDeg}°</div>
+                        <div class="font-mono text-gray-500">${quad}</div>
+                    `;
+                    container.appendChild(row);
+                });
+            }
+        }
+
+        function renderBitGrid() {
+            const grid = document.getElementById('bit-grid');
+            if (grid) {
+                grid.innerHTML = '';
+                
+                let dataContainer = document.createElement('div');
+                dataContainer.className = "flex gap-0.5 flex-wrap w-[120px]";
+                for(let i=0; i<64; i++) {
+                    let d = document.createElement('div');
+                    d.className = "stream-bit bg-gray-700";
+                    dataContainer.appendChild(d);
+                }
+                grid.appendChild(dataContainer);
+
+                let spacer = document.createElement('div');
+                spacer.className = "w-2";
+                grid.appendChild(spacer);
+
+                let parityContainer = document.createElement('div');
+                parityContainer.className = "flex gap-0.5 flex-wrap w-[40px]";
+                for(let i=0; i<8; i++) {
+                    let d = document.createElement('div');
+                    d.className = "stream-bit bg-gray-800 border border-gray-600";
+                    d.id = `parity-${i}`;
+                    parityContainer.appendChild(d);
+                }
+                grid.appendChild(parityContainer);
+            }
+        }
+
+        function fillParityBuffer() {
+            for(let i=0; i<8; i++) {
+                setTimeout(() => {
+                    const el = document.getElementById(`parity-${i}`);
+                    if (el) {
+                        el.classList.remove('bg-gray-800');
+                        el.classList.add('bg-rose-500');
+                        el.style.boxShadow = "0 0 5px #f43f5e";
+                    }
+                }, i * 50);
+            }
+        }
+
+        function resetParityBuffer() {
+            for(let i=0; i<8; i++) {
+                const el = document.getElementById(`parity-${i}`);
+                if(el) {
+                    el.classList.add('bg-gray-800');
+                    el.classList.remove('bg-rose-500');
+                    el.style.boxShadow = "none";
+                }
+            }
+        }
+
+        function log(msg) {
+            const console = document.getElementById('console-log');
+            if (console) {
+                const entry = document.createElement('div');
+                entry.innerHTML = `> ${msg}`;
+                console.insertBefore(entry, console.firstChild);
+                if(console.children.length > 20) console.lastChild.remove();
+            }
+        }
+
+        // Start
+        resize();
+        requestAnimationFrame(draw);
+
+    </script>
+</body>
+</html>
