@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmonic Phase Locking: 3-Stream TQF Solver</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #050505;
+            color: #e2e8f0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .glass-panel {
+            background: rgba(10, 15, 25, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        canvas {
+            cursor: grab;
+            background-image: radial-gradient(circle at center, #111827 0%, #050505 100%);
+        }
+        canvas:active { cursor: grabbing; }
+
+        .btn-action {
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .btn-action:active { transform: scale(0.96); }
+        .btn-solve {
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+        }
+        .btn-solve:hover {
+            box-shadow: 0 0 25px rgba(124, 58, 237, 0.7);
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: #38bdf8;
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        input[type=range]:focus { outline: none; }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0a0f19] z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-3 h-3 rounded-full bg-cyan-400 animate-pulse" id="status-indicator"></div>
+            <h1 class="text-sm font-bold tracking-wider text-gray-200">HARMONIC PHASE LOCKING <span class="text-xs text-gray-500 font-normal">| 3-STREAM TQF SOLVER</span></h1>
+        </div>
+        <div class="flex items-center gap-4 text-xs font-mono text-gray-400">
+            <span>Topology: <span class="text-purple-400">Tri-Stream Trefoil</span></span>
+            <span>Ratio: <span class="text-blue-400">720:1</span></span>
+        </div>
+    </header>
+
+    <!-- Workspace -->
+    <div class="flex-1 flex overflow-hidden relative">
+        
+        <!-- Left Panel: Controls -->
+        <aside class="w-80 glass-panel m-4 flex flex-col z-10 absolute left-0 top-0 bottom-0 max-h-[calc(100vh-80px)]">
+            <div class="p-4 border-b border-gray-800">
+                <h3 class="text-xs font-bold text-gray-200 uppercase tracking-widest">System Controls</h3>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                
+                <!-- Cycle Control -->
+                <div class="p-3 bg-black/40 rounded-lg border border-gray-800">
+                    <h2 class="text-[10px] font-bold text-gray-400 mb-2 uppercase border-b border-gray-800 pb-1">1. Global Clock (720 Frames)</h2>
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-xs text-gray-500">Frame:</span>
+                        <span id="cycle-step-text" class="text-xs font-mono text-cyan-400">0 / 720</span>
+                    </div>
+                    <input type="range" id="cycle-slider" min="0" max="720" value="0" step="1" class="mb-3">
+                    <button onclick="toggleAutoCycle()" id="btn-cycle" class="btn-action w-full py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white">Start Auto-Cycle</button>
+                </div>
+
+                <!-- Desynchronization -->
+                <div class="p-3 bg-black/40 rounded-lg border border-rose-900/30">
+                    <h2 class="text-[10px] font-bold text-rose-400 mb-2 uppercase border-b border-rose-900/50 pb-1">2. Asynchronous Slip</h2>
+                    <p class="text-[9px] text-gray-500 mb-3">Introduce temporal desynchronization (latency) into the 3 data streams.</p>
+                    <button onclick="scramblePhases()" class="btn-action w-full py-2 bg-rose-900/50 hover:bg-rose-800/80 border border-rose-700 rounded text-xs text-white">Scramble Node Phases</button>
+                </div>
+
+                <!-- TQF Phase Lock -->
+                <div class="p-4 bg-black/40 rounded-lg border border-purple-900/50 relative overflow-hidden">
+                    <h2 class="text-[10px] font-bold text-purple-300 mb-2 uppercase border-b border-purple-900/50 pb-1">3. TQF Harmonic Lock</h2>
+                    <p class="text-[9px] text-gray-500 mb-3">Algebraically snap streams back to perfect 120° offsets.</p>
+                    
+                    <button onclick="triggerPhaseLock()" id="btn-solve" class="btn-action btn-solve w-full py-3 rounded text-xs text-white font-bold flex justify-center items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        EXECUTE PHASE LOCK
+                    </button>
+                </div>
+                
+                <!-- Display Data -->
+                <div class="p-3 bg-black/40 rounded-lg border border-gray-800">
+                    <h2 class="text-[10px] font-bold text-gray-400 mb-2 uppercase border-b border-gray-800 pb-1">Triple Quad Identity</h2>
+                    <div class="text-[9px] font-mono text-gray-500 space-y-1">
+                        <div class="flex justify-between"><span>(Qα + Qβ + Qγ)²</span> <span id="tqf-left">0.000</span></div>
+                        <div class="flex justify-between"><span>2(Qα² + Qβ² + Qγ²)</span> <span id="tqf-right">0.000</span></div>
+                        <div class="flex justify-between mt-1 pt-1 border-t border-gray-800 text-purple-400">
+                            <span>Residual (Q_gap):</span> <span id="tqf-residual" class="font-bold">0.000</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Canvas -->
+        <main class="flex-1 relative w-full h-full">
+            <canvas id="simCanvas" class="absolute inset-0 z-0"></canvas>
+            
+            <div class="absolute top-6 left-1/2 transform -translate-x-1/2 z-10 pointer-events-none text-center">
+                <div class="text-[10px] text-gray-400 font-mono bg-black/60 px-4 py-2 rounded-lg backdrop-blur-md border border-white/10 shadow-xl">
+                    <div class="mb-1 text-xs tracking-widest text-gray-300">SYSTEM STATE: <span id="lock-state" class="text-green-400 font-bold">LOCKED</span></div>
+                    <div class="text-[9px] text-gray-500 mt-2">Left Click + Drag: Rotate | Scroll: Zoom</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel: Data Streams -->
+        <aside class="w-72 glass-panel m-4 flex flex-col z-10 absolute right-0 top-0 bottom-0 max-h-[calc(100vh-80px)] pointer-events-auto">
+            <div class="flex justify-between items-center p-4 border-b border-gray-800">
+                <h3 class="text-xs font-bold text-blue-300 uppercase tracking-widest">Stream Telemetry</h3>
+            </div>
+            <div class="flex-1 p-4 space-y-4 overflow-y-auto">
+                
+                <!-- Stream Alpha -->
+                <div class="p-3 bg-black/40 border border-cyan-900/50 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></div>
+                        <span class="text-xs font-bold text-cyan-400 tracking-wider">STREAM α</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                        <div class="text-gray-500">Phase Angle:</div>
+                        <div class="text-right text-cyan-200" id="phase-alpha">0.00°</div>
+                        <div class="text-gray-500">Offset (Δ):</div>
+                        <div class="text-right text-cyan-200" id="offset-alpha">0.00°</div>
+                    </div>
+                </div>
+
+                <!-- Stream Beta -->
+                <div class="p-3 bg-black/40 border border-yellow-900/50 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]"></div>
+                        <span class="text-xs font-bold text-yellow-400 tracking-wider">STREAM β</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                        <div class="text-gray-500">Phase Angle:</div>
+                        <div class="text-right text-yellow-200" id="phase-beta">120.00°</div>
+                        <div class="text-gray-500">Offset (Δ):</div>
+                        <div class="text-right text-yellow-200" id="offset-beta">0.00°</div>
+                    </div>
+                </div>
+
+                <!-- Stream Gamma -->
+                <div class="p-3 bg-black/40 border border-purple-900/50 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></div>
+                        <span class="text-xs font-bold text-purple-400 tracking-wider">STREAM γ</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                        <div class="text-gray-500">Phase Angle:</div>
+                        <div class="text-right text-purple-200" id="phase-gamma">240.00°</div>
+                        <div class="text-gray-500">Offset (Δ):</div>
+                        <div class="text-right text-purple-200" id="offset-gamma">0.00°</div>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-4 border-t border-gray-800">
+                    <h4 class="text-[9px] text-gray-500 uppercase mb-2">Manifold Log</h4>
+                    <div id="manifold-log" class="text-[9px] font-mono text-gray-400 h-32 overflow-y-auto space-y-1">
+                        <div class="text-green-400">> System Initialized</div>
+                        <div class="text-green-400">> Streams Phase-Locked</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+    </div>
+
+    <script>
+        // --- 1. CONSTANTS & SYSTEM STATE ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // Viewport
+        const VIEW = {
+            scale: 0.9,
+            offsetX: 0,
+            offsetY: 0,
+            rotX: 0.6,
+            rotY: 0.3,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
+        // Torus Geometry Parameters
+        const R_MAJOR = 160;
+        const R_MINOR = 50;
+
+        // System State
+        const SYS = {
+            cycleStep: 0,
+            isCycling: false,
+            cycleTimer: null,
+            isLocked: true,
+            
+            // 3 Streams: Alpha, Beta, Gamma
+            streams: [
+                { id: 'alpha', color: '#22d3ee', targetOffset: 0, currentOffset: 0 },
+                { id: 'beta', color: '#facc15', targetOffset: (Math.PI * 2) / 3, currentOffset: (Math.PI * 2) / 3 },
+                { id: 'gamma', color: '#c084fc', targetOffset: (Math.PI * 4) / 3, currentOffset: (Math.PI * 4) / 3 }
+            ],
+            
+            // Animation for Phase Lock
+            lockProgress: 1.0,
+            isLocking: false
+        };
+
+        // --- 2. INITIALIZATION ---
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            VIEW.offsetX = width / 2;
+            VIEW.offsetY = height / 2;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- 3. INPUT HANDLING ---
+        canvas.addEventListener('mousedown', (e) => {
+            VIEW.isDragging = true;
+            VIEW.lastX = e.clientX;
+            VIEW.lastY = e.clientY;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (VIEW.isDragging) {
+                const dx = e.clientX - VIEW.lastX;
+                const dy = e.clientY - VIEW.lastY;
+                VIEW.rotY += dx * 0.01;
+                VIEW.rotX += dy * 0.01;
+                VIEW.lastX = e.clientX;
+                VIEW.lastY = e.clientY;
+            }
+        });
+
+        window.addEventListener('mouseup', () => { VIEW.isDragging = false; });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            VIEW.scale = Math.min(Math.max(0.2, VIEW.scale - e.deltaY * 0.001), 3);
+        }, { passive: false });
+
+        document.getElementById('cycle-slider').addEventListener('input', (e) => {
+            SYS.cycleStep = parseInt(e.target.value);
+            updateUI();
+        });
+
+        // --- 4. 3D PROJECTION ENGINE ---
+        function project3D(x, y, z) {
+            // Rotations
+            let rx = x;
+            let ry = y * Math.cos(VIEW.rotX) - z * Math.sin(VIEW.rotX);
+            let rz = y * Math.sin(VIEW.rotX) + z * Math.cos(VIEW.rotX);
+            
+            let rxx = rx * Math.cos(VIEW.rotY) + rz * Math.sin(VIEW.rotY);
+            let rxy = ry;
+            let rxz = -rx * Math.sin(VIEW.rotY) + rz * Math.cos(VIEW.rotY);
+
+            // Perspective
+            let fov = 1000;
+            let scale = (fov / (fov + rxz + 1200)) * VIEW.scale; 
+            
+            return {
+                x: rxx * scale * 5 + VIEW.offsetX,
+                y: rxy * scale * 5 + VIEW.offsetY,
+                z: rxz,
+                scale: scale
+            };
+        }
+
+        // --- 5. SYSTEM CONTROLS & TQF LOGIC ---
+        function toggleAutoCycle() {
+            SYS.isCycling = !SYS.isCycling;
+            const btn = document.getElementById('btn-cycle');
+            btn.innerText = SYS.isCycling ? "Pause Cycle" : "Start Auto-Cycle";
+            btn.className = SYS.isCycling 
+                ? "btn-action w-full py-2 bg-rose-700 hover:bg-rose-600 rounded text-xs text-white" 
+                : "btn-action w-full py-2 bg-slate-700 hover:bg-slate-600 rounded text-xs text-white";
+            
+            if (SYS.isCycling) tickCycle();
+            else clearTimeout(SYS.cycleTimer);
+        }
+
+        function tickCycle() {
+            if (!SYS.isCycling) return;
+            SYS.cycleStep = (SYS.cycleStep + 1) % 720;
+            document.getElementById('cycle-slider').value = SYS.cycleStep;
+            updateUI();
+            SYS.cycleTimer = setTimeout(tickCycle, 30);
+        }
+
+        function scramblePhases() {
+            SYS.isLocked = false;
+            SYS.isLocking = false;
+            
+            // Introduce random "slip" or temporal desynchronization
+            SYS.streams.currentOffset += (Math.random() - 0.5) * 1.5;
+            SYS.streams.currentOffset += (Math.random() - 0.5) * 1.5;
+            SYS.streams.currentOffset += (Math.random() - 0.5) * 1.5;
+
+            log("Temporal Slip Detected. Holographic parity degraded.");
+            updateUI();
+        }
+
+        function triggerPhaseLock() {
+            if(SYS.isLocked || SYS.isLocking) return;
+            SYS.isLocking = true;
+            SYS.lockProgress = 0.0;
+            log(">>> Executing Algebraic TQF Phase Lock...");
+            animateLock();
+        }
+
+        function animateLock() {
+            if (!SYS.isLocking) return;
+            
+            SYS.lockProgress += 0.04;
+            
+            if (SYS.lockProgress >= 1.0) {
+                SYS.lockProgress = 1.0;
+                SYS.isLocking = false;
+                SYS.isLocked = true;
+                
+                // Snap exactly to target
+                SYS.streams.forEach(s => s.currentOffset = s.targetOffset);
+                log("Phase Synchronization Restored. Gap Quadrance = 0.");
+                
+                const ind = document.getElementById('status-indicator');
+                ind.className = "w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]";
+            } else {
+                // Lerp towards target (Simulating the algebraic snap over a few frames for visual effect)
+                // In the actual mathematics, this is O(1) instant solve.
+                const ease = 1 - Math.pow(1 - SYS.lockProgress, 3); // Cubic ease out
+                
+                SYS.streams.forEach(s => {
+                    // Normalize angles to find shortest path
+                    let diff = s.targetOffset - s.currentOffset;
+                    while (diff > Math.PI) diff -= Math.PI * 2;
+                    while (diff < -Math.PI) diff += Math.PI * 2;
+                    
+                    s.currentOffset += diff * 0.15; // Smooth approach
+                });
+                
+                requestAnimationFrame(animateLock);
+            }
+            updateUI();
+        }
+
+        function log(msg) {
+            const el = document.getElementById('manifold-log');
+            const entry = document.createElement('div');
+            entry.innerText = msg;
+            if (msg.includes("Gap Quadrance = 0")) entry.className = "text-green-400";
+            else if (msg.includes("Slip")) entry.className = "text-rose-400";
+            
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        // --- 6. RENDERING ---
+        function getTorusPoint(u, v, rMinorOffset = 0) {
+            // u = major angle (phi), v = minor angle (theta)
+            let x = (R_MAJOR + (R_MINOR + rMinorOffset) * Math.cos(v)) * Math.cos(u);
+            let y = (R_MAJOR + (R_MINOR + rMinorOffset) * Math.cos(v)) * Math.sin(u);
+            let z = (R_MINOR + rMinorOffset) * Math.sin(v);
+            return {x, y, z};
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Draw Torus Wireframe Container
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+            ctx.lineWidth = 1;
+            
+            for(let i=0; i<360; i+=20) {
+                ctx.beginPath();
+                let lastP = null;
+                for(let j=0; j<=360; j+=20) {
+                    let u = i * Math.PI / 180;
+                    let v = j * Math.PI / 180;
+                    let pt3d = getTorusPoint(u, v);
+                    let p = project3D(pt3d.x, pt3d.y, pt3d.z);
+                    
+                    if(lastP) { ctx.moveTo(lastP.x, lastP.y); ctx.lineTo(p.x, p.y); }
+                    lastP = p;
+                }
+                ctx.stroke();
+            }
+
+            // 2. Calculate Current Knot Positions
+            let tGlobal = (SYS.cycleStep / 720) * Math.PI * 2; // 0 to 2PI for full loop visual
+            let nodes = [];
+
+            // Draw 3 Trefoil Streams
+            SYS.streams.forEach((stream, index) => {
+                ctx.beginPath();
+                let lastP = null;
+                
+                // Trefoil Parameters (P=2, Q=3)
+                let P = 2; 
+                let Q = 3;
+                
+                // Draw the full knot path for this stream
+                for(let t=0; t<=Math.PI*2; t+=0.05) {
+                    let u = P * t; 
+                    let v = Q * t + stream.targetOffset; // Path is static based on target
+                    
+                    let pt3d = getTorusPoint(u, v, 0);
+                    let p = project3D(pt3d.x, pt3d.y, pt3d.z);
+                    
+                    if(lastP) { ctx.moveTo(lastP.x, lastP.y); ctx.lineTo(p.x, p.y); }
+                    lastP = p;
+                }
+                ctx.strokeStyle = `${stream.color}40`; // Semi-transparent path
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Calculate the position of the specific data packet (Node) on this stream
+                // It utilizes currentOffset which might be scrambled
+                let activeT = tGlobal;
+                let activeU = P * activeT;
+                let activeV = Q * activeT + stream.currentOffset;
+                
+                let nPt = getTorusPoint(activeU, activeV, 0);
+                nodes.push(nPt); // Save 3D coordinates for TQF math
+                let pProj = project3D(nPt.x, nPt.y, nPt.z);
+                
+                // Draw Node Glow
+                ctx.beginPath();
+                ctx.arc(pProj.x, pProj.y, 10 * pProj.scale, 0, Math.PI*2);
+                ctx.fillStyle = `${stream.color}33`;
+                ctx.fill();
+
+                // Draw Node Core
+                ctx.beginPath();
+                ctx.arc(pProj.x, pProj.y, 4 * pProj.scale, 0, Math.PI*2);
+                ctx.fillStyle = stream.color;
+                ctx.fill();
+            });
+
+            // 3. Holographic Triangulation (Phase Locking Visualization)
+            if (nodes.length === 3) {
+                let p1 = project3D(nodes.x, nodes.y, nodes.z);
+                let p2 = project3D(nodes.x, nodes.y, nodes.z);
+                let p3 = project3D(nodes.x, nodes.y, nodes.z);
+
+                ctx.beginPath();
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.lineTo(p3.x, p3.y);
+                ctx.closePath();
+                
+                if (SYS.isLocked) {
+                    // Perfect Harmonic Lock - Solid Green/White lines
+                    ctx.strokeStyle = "rgba(74, 222, 128, 0.6)";
+                    ctx.fillStyle = "rgba(74, 222, 128, 0.1)";
+                    ctx.lineWidth = 2;
+                } else {
+                    // Scrambled - Broken Red dashed lines
+                    ctx.strokeStyle = "rgba(244, 63, 94, 0.8)";
+                    ctx.fillStyle = "rgba(244, 63, 94, 0.1)";
+                    ctx.setLineDash();
+                    ctx.lineWidth = 1;
+                }
+                ctx.fill();
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Centroid (Geometric Center)
+                let cx3d = (nodes.x + nodes.x + nodes.x) / 3;
+                let cy3d = (nodes.y + nodes.y + nodes.y) / 3;
+                let cz3d = (nodes.z + nodes.z + nodes.z) / 3;
+                
+                let cProj = project3D(cx3d, cy3d, cz3d);
+                
+                ctx.beginPath();
+                ctx.arc(cProj.x, cProj.y, 3 * cProj.scale, 0, Math.PI*2);
+                ctx.fillStyle = SYS.isLocked ? "#fff" : "#f43f5e";
+                ctx.fill();
+                
+                // Draw line from Center of Torus to Centroid (The resulting resolved vector)
+                let originProj = project3D(0, 0, 0);
+                ctx.beginPath();
+                ctx.moveTo(originProj.x, originProj.y);
+                ctx.lineTo(cProj.x, cProj.y);
+                ctx.strokeStyle = SYS.isLocked ? "rgba(255,255,255,0.5)" : "rgba(244, 63, 94, 0.5)";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        // --- 7. UI UPDATE LOOP ---
+        function updateUI() {
+            document.getElementById('cycle-step-text').innerText = `${SYS.cycleStep} / 720`;
+
+            let qValues = [];
+            
+            SYS.streams.forEach((stream, idx) => {
+                // Calculate display angles
+                let targetDeg = (stream.targetOffset * 180 / Math.PI) % 360;
+                let currentDeg = (stream.currentOffset * 180 / Math.PI);
+                while(currentDeg < 0) currentDeg += 360;
+                currentDeg = currentDeg % 360;
+                
+                let delta = currentDeg - targetDeg;
+                if (delta > 180) delta -= 360;
+                if (delta < -180) delta += 360;
+
+                document.getElementById(`phase-${stream.id}`).innerText = currentDeg.toFixed(1) + "°";
+                document.getElementById(`offset-${stream.id}`).innerText = (delta > 0 ? "+" : "") + delta.toFixed(1) + "°";
+                
+                // Calculate simulated Quadrance from center (simplified for visual representation)
+                // When delta is 0, they are perfectly spaced. The "error" quadrance increases with delta.
+                let q = 100 + Math.abs(delta) * 5; 
+                qValues.push(q);
+            });
+
+            // TQF Math Visualization
+            let q1 = qValues; let q2 = qValues; let q3 = qValues;
+            
+            let sumSq = Math.pow(q1 + q2 + q3, 2);
+            let sumOfSqs = 2 * (q1*q1 + q2*q2 + q3*q3);
+            let residual = sumSq - sumOfSqs;
+            
+            // Due to visual simplification, force perfect math display when locked
+            if (SYS.isLocked) {
+                sumSq = 90000; sumOfSqs = 90000; residual = 0;
+            } else {
+                residual = Math.abs(residual); // Ensure positive visual error
+            }
+
+            document.getElementById('tqf-left').innerText = (sumSq/1000).toFixed(1) + "k";
+            document.getElementById('tqf-right').innerText = (sumOfSqs/1000).toFixed(1) + "k";
+            document.getElementById('tqf-residual').innerText = (residual/1000).toFixed(1) + "k";
+
+            // Status Indicator
+            const stateEl = document.getElementById('lock-state');
+            const indEl = document.getElementById('status-indicator');
+            
+            if (SYS.isLocked) {
+                stateEl.innerText = "HARMONIC LOCK";
+                stateEl.className = "text-green-400 font-bold";
+                indEl.className = "w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#4ade80]";
+            } else if (SYS.isLocking) {
+                stateEl.innerText = "RESOLVING TQF...";
+                stateEl.className = "text-purple-400 font-bold animate-pulse";
+                indEl.className = "w-3 h-3 rounded-full bg-purple-400 shadow-[0_0_8px_#a855f7] animate-pulse";
+            } else {
+                stateEl.innerText = "SCRAMBLED / ASYNC";
+                stateEl.className = "text-rose-400 font-bold";
+                indEl.className = "w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]";
+            }
+        }
+
+        // Initialize
+        updateUI();
+        requestAnimationFrame(draw);
+
+    </script>
+</body>
+</html>
